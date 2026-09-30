@@ -1,0 +1,7 @@
+[workspace]
+members = ["crates/launcher", "crates/autolingua2-native"]
+default-members = ["crates/launcher"]
+resolver = "2"
+
+# Build each package separately so the Python extension feature is not
+# unified into the standalone launcher.

@@ -1,15 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
-from autolingua2_native import bootstrap as native_bootstrap
 
-if not hasattr(native_bootstrap, "CoreSession"):
-    raise RuntimeError("Rebuild/install autolingua2-native before packaging")
 
 
 a = Analysis(
     ['main.py'],
     pathex=['src', '.', 'build/native'],
     binaries=[],
-    datas=[('ui/*.ui', 'ui')],
+    datas=[('ui/*.ui', 'ui'), ('assets/images/app.ico', 'assets/images')],
     hiddenimports=['autolingua2_native'],
     hookspath=[],
     hooksconfig={},
@@ -36,6 +33,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='assets/images/app.ico',
 )
 coll = COLLECT(
     exe,
@@ -44,5 +42,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='AUTOlingua2',
+    name='core',
 )

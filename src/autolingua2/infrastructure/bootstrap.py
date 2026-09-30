@@ -31,9 +31,11 @@ class LaunchConfiguration:
 def configuration() -> LaunchConfiguration:
     suffix = ".exe" if sys.platform == "win32" else ""
     if getattr(sys, "frozen", False):
-        return LaunchConfiguration(Path(sys.executable).resolve().with_name("AUTOlingua2" + suffix), None)
+        exe = Path(sys.executable).resolve()
+        launcher = exe.parent.parent / ("AUTOlingua2" + suffix) if exe.parent.name.lower() == "core" else exe.with_name("AUTOlingua2" + suffix)
+        return LaunchConfiguration(launcher, None)
     root = Path(__file__).resolve().parents[3]
-    return LaunchConfiguration(root / "crates" / "launcher" / "target" / "release" / ("autolingua-launcher" + suffix), root)
+    return LaunchConfiguration(root / "target" / "release" / ("autolingua-launcher" + suffix), root)
 
 
 def launcher_environment() -> dict[str, str]:

@@ -22,6 +22,7 @@ fn autolingua2_native(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // 2. プラットフォーム関連の登録 (トップレベル & サブモジュール)
     let platform_module = PyModule::new(py, "platform")?;
+    platform_module.add_function(wrap_pyfunction!(platform::configure_desktop_integration, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::allocate_debug_console, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::is_executable_plugin, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::plugin_creation_flags, &platform_module)?)?;

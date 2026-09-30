@@ -20,6 +20,11 @@ pub fn abort_startup_plugins() {
 }
 
 #[pyfunction]
+pub fn configure_desktop_integration(app_id: &str) -> PyResult<()> {
+    os_impl::configure_desktop_integration(app_id).map_err(PyOSError::new_err)
+}
+
+#[pyfunction]
 pub fn allocate_debug_console() -> (String, String) {
     os_impl::allocate_debug_console()
 }

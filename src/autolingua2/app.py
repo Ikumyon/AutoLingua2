@@ -44,9 +44,16 @@ def main() -> int:
             discovery.result()
         startup.check()
         startup.phase("settings", "設定・翻訳・テーマを適用しています…")
+        current_platform.configure_desktop_integration("autolingua.autolingua2.app")
         app = QApplication(sys.argv)
         app.setApplicationName("AUTOlingua")
         app.setOrganizationName("AUTOlingua")
+        app.setDesktopFileName("autolingua2")
+        from PySide6.QtGui import QIcon
+        from .infrastructure.filesystem import ASSETS_DIR
+        app_icon_path = ASSETS_DIR / "images" / "app.ico"
+        if app_icon_path.exists():
+            app.setWindowIcon(QIcon(str(app_icon_path)))
         install_ui_translator(app, load_ui_language())
         theme, _ = load_theme_settings()
         ThemeManager().apply_theme(theme, app)

@@ -81,6 +81,13 @@ class SystemPlatformDriver:
             return "linux"
         raise OSError("このOSの実行ファイル型プラグインには未対応です")
 
+    def configure_desktop_integration(self, app_id: str) -> None:
+        try:
+            _native().configure_desktop_integration(app_id)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("デスクトップ統合の設定に失敗しました: %s", exc)
+
     def start_plugin(self, executable: Path, args: list[str], cwd: Path) -> tuple[subprocess.Popen[bytes], ProcessGuard]:
         native = _native()
         if not native.is_executable_plugin(str(executable)):

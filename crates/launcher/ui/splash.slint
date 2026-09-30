@@ -1,8 +1,13 @@
 import { Button } from "std-widgets.slint";
 export component SplashWindow inherits Window {
     title: "AUTOlingua2";
-    width: 520px;
-    height: 300px;
+    icon: @image-url("../../../assets/images/app.ico");
+    in property <image> custom-image;
+    in property <bool> has-custom-image: false;
+    in-out property <length> window-width: 520px;
+    in-out property <length> window-height: 300px;
+    width: root.window-width;
+    height: root.window-height;
     background: #181825;
     in property <string> status-text: "起動を準備しています…";
     in property <string> detail: "";
@@ -13,6 +18,19 @@ export component SplashWindow inherits Window {
     callback cancel();
     callback dismiss();
     callback open-logs();
+
+    if root.has-custom-image: Image {
+        source: root.custom-image;
+        width: 100%;
+        height: 100%;
+        image-fit: cover;
+    }
+
+    if root.has-custom-image: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: @linear-gradient(180deg, rgba(24, 24, 37, 0.45) 0%, rgba(24, 24, 37, 0.82) 55%, rgba(24, 24, 37, 0.95) 100%);
+    }
     VerticalLayout {
         padding: 28px;
         spacing: 16px;
@@ -24,6 +42,7 @@ export component SplashWindow inherits Window {
             border-radius: 4px;
             clip: true;
             Rectangle {
+                x: 0;
                 width: parent.width * root.progress;
                 height: parent.height;
                 background: #89b4fa;
