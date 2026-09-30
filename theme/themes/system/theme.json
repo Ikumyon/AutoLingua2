@@ -1,0 +1,6 @@
+{
+  "id": "system",
+  "name_key": "theme.system.name",
+  "description_key": "theme.system.description",
+  "type": "system"
+}

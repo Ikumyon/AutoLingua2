@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ProblemsDialog</class>
+ <widget class="QDialog" name="ProblemsDialog">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>900</width><height>520</height></rect>
+  </property>
+  <property name="windowTitle"><string>問題一覧</string></property>
+  <layout class="QVBoxLayout" name="layoutRoot">
+   <item>
+    <layout class="QHBoxLayout" name="layoutToolbar">
+     <item>
+      <widget class="QComboBox" name="comboProblemType">
+       <item><property name="text"><string>すべて</string></property></item>
+       <item><property name="text"><string>翻訳</string></property></item>
+       <item><property name="text"><string>構文</string></property></item>
+       <item><property name="text"><string>保存</string></property></item>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="editProblemSearch">
+       <property name="placeholderText"><string>問題を検索</string></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QTableWidget" name="tableProblems">
+     <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+     <property name="alternatingRowColors"><bool>true</bool></property>
+     <column><property name="text"><string>種類</string></property></column>
+     <column><property name="text"><string>対象</string></property></column>
+     <column><property name="text"><string>内容</string></property></column>
+     <column><property name="text"><string>ファイル</string></property></column>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="layoutBottom">
+     <item>
+      <widget class="QPushButton" name="buttonGoTo">
+       <property name="text"><string>該当箇所へ移動</string></property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="spacerBottom">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="buttonClose">
+       <property name="text"><string>閉じる</string></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,18 @@
+[project]
+name = "autolingua2"
+version = "0.1.0"
+description = "Paradox localization translation editor"
+requires-python = ">=3.14"
+dependencies = [
+    "PySide6",
+    "PyYAML",
+]
+
+[project.scripts]
+autolingua2 = "autolingua2.app:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.pyright]
+extraPaths = ["src"]

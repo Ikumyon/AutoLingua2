@@ -1,0 +1,13 @@
+/* Model list row status colors */
+
+ModelRowWidget[status="valid"] {
+    background-color: rgba(40, 167, 69, 0.15);
+}
+
+ModelRowWidget[status="invalid"] {
+    background-color: rgba(220, 53, 69, 0.15);
+}
+
+ModelRowWidget[status="disabled"] {
+    background-color: rgba(108, 117, 125, 0.08);
+}

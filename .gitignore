@@ -1,0 +1,41 @@
+# === Python / 仮想環境 / キャッシュ ===
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# === ビルド成果物 / パッケージング ===
+build/
+dist/
+*.egg-info/
+*.pyd
+*.so
+*.dylib
+*.dll
+
+# === Rust / Cargo ===
+target/
+**/target/
+
+# === アプリ実行ログ・ローカルデータ ===
+logs/
+*.log
+settings.json
+test file/
+
+# === IDE / OS固有ファイル ===
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+
+
+#その他
+docs/
+examples/

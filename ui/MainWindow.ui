@@ -1,0 +1,1303 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1440</width>
+    <height>900</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>AUTOlingua</string>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="layoutRoot">
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <item>
+     <widget class="QStackedWidget" name="stackMain">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="pageNewProject">
+       <layout class="QVBoxLayout" name="layoutNewProjectPage">
+        <property name="leftMargin">
+         <number>24</number>
+        </property>
+        <property name="topMargin">
+         <number>20</number>
+        </property>
+        <property name="rightMargin">
+         <number>24</number>
+        </property>
+        <property name="bottomMargin">
+         <number>20</number>
+        </property>
+        <item>
+         <spacer name="spacerTop">
+          <property name="orientation">
+           <enum>Qt::Orientation::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>10</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="layoutColumns">
+          <property name="spacing">
+           <number>20</number>
+          </property>
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QFrame" name="cardNewProject">
+            <property name="frameShape">
+             <enum>QFrame::Shape::StyledPanel</enum>
+            </property>
+            <layout class="QVBoxLayout" name="layoutCard">
+             <property name="spacing">
+              <number>12</number>
+             </property>
+             <property name="leftMargin">
+              <number>20</number>
+             </property>
+             <property name="topMargin">
+              <number>18</number>
+             </property>
+             <property name="rightMargin">
+              <number>20</number>
+             </property>
+             <property name="bottomMargin">
+              <number>18</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="labelTitleProject">
+               <property name="styleSheet">
+                <string notr="true">font-size: 18px; font-weight: bold;</string>
+               </property>
+               <property name="text">
+                <string>プロジェクト作成</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <layout class="QHBoxLayout" name="layoutProjectBody">
+               <property name="spacing">
+                <number>16</number>
+               </property>
+               <item>
+                <layout class="QVBoxLayout" name="layoutIconSection">
+                 <property name="spacing">
+                  <number>6</number>
+                 </property>
+                 <item alignment="Qt::AlignmentFlag::AlignHCenter">
+                  <widget class="QFrame" name="frameIconDrop">
+                   <property name="minimumSize">
+                    <size>
+                     <width>84</width>
+                     <height>84</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>84</width>
+                     <height>84</height>
+                    </size>
+                   </property>
+                   <property name="acceptDrops">
+                    <bool>true</bool>
+                   </property>
+                   <property name="styleSheet">
+                    <string notr="true">QFrame#frameIconDrop { border-width: 1px; border-style: solid; border-radius: 6px; }</string>
+                   </property>
+                   <property name="frameShape">
+                    <enum>QFrame::Shape::StyledPanel</enum>
+                   </property>
+                   <layout class="QVBoxLayout" name="layoutIconDrop">
+                    <property name="leftMargin">
+                     <number>4</number>
+                    </property>
+                    <property name="topMargin">
+                     <number>4</number>
+                    </property>
+                    <property name="rightMargin">
+                     <number>4</number>
+                    </property>
+                    <property name="bottomMargin">
+                     <number>4</number>
+                    </property>
+                    <item>
+                     <widget class="QLabel" name="labelIconPreview">
+                      <property name="styleSheet">
+                       <string notr="true">font-size: 11px; color: palette(placeholder-text);</string>
+                      </property>
+                      <property name="text">
+                       <string>アイコン画像
+未設定</string>
+                      </property>
+                      <property name="alignment">
+                       <set>Qt::AlignmentFlag::AlignCenter</set>
+                      </property>
+                      <property name="wordWrap">
+                       <bool>true</bool>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item>
+                  <layout class="QHBoxLayout" name="layoutIconButtons">
+                   <property name="spacing">
+                    <number>4</number>
+                   </property>
+                   <item>
+                    <widget class="QPushButton" name="buttonBrowseIcon">
+                     <property name="toolTip">
+                      <string>アイコン画像ファイルを選択</string>
+                     </property>
+                     <property name="text">
+                      <string>選択...</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="buttonClearIcon">
+                     <property name="maximumSize">
+                      <size>
+                       <width>24</width>
+                       <height>24</height>
+                      </size>
+                     </property>
+                     <property name="toolTip">
+                      <string>アイコンを解除</string>
+                     </property>
+                     <property name="text">
+                      <string>✕</string>
+                      </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="editIconPath">
+                   <property name="styleSheet">
+                    <string notr="true">font-size: 11px;</string>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
+                   </property>
+                   <property name="readOnly">
+                    <bool>true</bool>
+                   </property>
+                   <property name="placeholderText">
+                    <string>未選択</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <spacer name="spacerIconBottom">
+                   <property name="orientation">
+                    <enum>Qt::Orientation::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>40</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </item>
+               <item>
+                <layout class="QVBoxLayout" name="layoutFormCol">
+                 <property name="spacing">
+                  <number>12</number>
+                 </property>
+                 <item>
+                  <widget class="QFrame" name="frameTargetDrop">
+                   <property name="acceptDrops">
+                    <bool>true</bool>
+                   </property>
+                   <property name="styleSheet">
+                    <string notr="true">QFrame#frameTargetDrop { border-width: 2px; border-style: dashed; border-radius: 6px; padding: 10px; }</string>
+                   </property>
+                   <property name="frameShape">
+                    <enum>QFrame::Shape::StyledPanel</enum>
+                   </property>
+                   <layout class="QVBoxLayout" name="layoutTargetDropInner">
+                    <property name="leftMargin">
+                     <number>0</number>
+                    </property>
+                    <property name="topMargin">
+                     <number>0</number>
+                    </property>
+                    <property name="rightMargin">
+                     <number>0</number>
+                    </property>
+                    <property name="bottomMargin">
+                     <number>0</number>
+                    </property>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item>
+                  <layout class="QVBoxLayout" name="layoutNameAndGame">
+                   <property name="spacing">
+                    <number>6</number>
+                   </property>
+                   <item>
+                    <widget class="QLabel" name="labelProjectName">
+                     <property name="styleSheet">
+                      <string notr="true">font-weight: 600;</string>
+                     </property>
+                     <property name="text">
+                      <string>プロジェクト名:</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QLineEdit" name="editProjectName">
+                     <property name="placeholderText">
+                      <string>プロジェクト名を入力（省略時は自動設定）</string>
+                     </property>
+                     <property name="clearButtonEnabled">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QLabel" name="labelGame">
+                     <property name="styleSheet">
+                      <string notr="true">font-weight: 600;</string>
+                     </property>
+                     <property name="text">
+                      <string>ゲーム:</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QComboBox" name="comboGame"/>
+                   </item>
+                  </layout>
+                 </item>
+                 <item>
+                  <layout class="QVBoxLayout" name="layoutSourceLanguage">
+                   <property name="spacing">
+                    <number>4</number>
+                   </property>
+                   <item>
+                    <widget class="QLabel" name="labelSourceLanguage">
+                     <property name="styleSheet">
+                      <string notr="true">font-weight: 600;</string>
+                     </property>
+                     <property name="text">
+                      <string>翻訳元言語 (原文):</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QComboBox" name="comboSourceLanguage">
+                     <item>
+                      <property name="text">
+                       <string>自動検出</string>
+                      </property>
+                     </item>
+                     <item>
+                      <property name="text">
+                       <string>English (英語)</string>
+                      </property>
+                     </item>
+                     <item>
+                      <property name="text">
+                       <string>日本語 (Japanese)</string>
+                      </property>
+                     </item>
+                     <item>
+                      <property name="text">
+                       <string>Simplified Chinese (簡体字中国語)</string>
+                      </property>
+                     </item>
+                     <item>
+                      <property name="text">
+                       <string>German (ドイツ語)</string>
+                      </property>
+                     </item>
+                     <item>
+                      <property name="text">
+                       <string>French (フランス語)</string>
+                      </property>
+                     </item>
+                     <item>
+                      <property name="text">
+                       <string>Spanish (スペイン語)</string>
+                      </property>
+                     </item>
+                     <item>
+                      <property name="text">
+                       <string>Russian (ロシア語)</string>
+                      </property>
+                     </item>
+                     <item>
+                      <property name="text">
+                       <string>Korean (韓国語)</string>
+                      </property>
+                     </item>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                 <item>
+                  <layout class="QHBoxLayout" name="layoutTargetAndSlot">
+                   <property name="spacing">
+                    <number>12</number>
+                   </property>
+                   <item>
+                    <layout class="QVBoxLayout" name="layoutTargetLanguage">
+                     <property name="spacing">
+                      <number>4</number>
+                     </property>
+                     <item>
+                      <widget class="QLabel" name="labelTargetLanguage">
+                       <property name="styleSheet">
+                        <string notr="true">font-weight: 600;</string>
+                       </property>
+                       <property name="text">
+                        <string>翻訳先言語:</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QComboBox" name="comboTargetLanguage">
+                       <property name="editable">
+                        <bool>true</bool>
+                       </property>
+                       <item>
+                        <property name="text">
+                         <string>日本語 (Japanese)</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>English (英語)</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>Simplified Chinese (簡体字中国語)</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>German (ドイツ語)</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>French (フランス語)</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>Spanish (スペイン語)</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>Russian (ロシア語)</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>Korean (韓国語)</string>
+                        </property>
+                       </item>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item>
+                    <layout class="QVBoxLayout" name="layoutTargetSlot">
+                     <property name="spacing">
+                      <number>4</number>
+                     </property>
+                     <item>
+                      <widget class="QLabel" name="labelTargetSlot">
+                       <property name="styleSheet">
+                        <string notr="true">font-weight: 600;</string>
+                       </property>
+                       <property name="text">
+                        <string>出力言語スロット:</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QComboBox" name="comboTargetSlot">
+                       <item>
+                        <property name="text">
+                         <string>l_english</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>l_japanese</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>l_spanish</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>l_french</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>l_german</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>l_simp_chinese</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>ja</string>
+                        </property>
+                       </item>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </item>
+                 <item>
+                  <layout class="QVBoxLayout" name="layoutTargetSection">
+                   <property name="spacing">
+                    <number>6</number>
+                   </property>
+                   <item>
+                    <widget class="QLabel" name="labelTargetPrompt">
+                     <property name="styleSheet">
+                      <string notr="true">font-weight: 600;</string>
+                     </property>
+                     <property name="text">
+                      <string>追加された翻訳対象:</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QListWidget" name="listTargetItems">
+                     <property name="minimumSize">
+                      <size>
+                       <width>0</width>
+                       <height>130</height>
+                      </size>
+                     </property>
+                     <property name="styleSheet">
+                      <string notr="true">border: 1px solid palette(mid); border-radius: 4px; background-color: palette(base);</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <widget class="QPushButton" name="buttonCreateProject">
+               <property name="minimumSize">
+                <size>
+                 <width>0</width>
+                 <height>38</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">font-size: 14px; font-weight: bold;</string>
+               </property>
+               <property name="text">
+                <string>プロジェクト作成</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QFrame" name="cardRecentProjects">
+            <property name="minimumSize">
+             <size>
+              <width>320</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="frameShape">
+             <enum>QFrame::Shape::StyledPanel</enum>
+            </property>
+            <layout class="QVBoxLayout" name="layoutRecent">
+             <property name="spacing">
+              <number>10</number>
+             </property>
+             <property name="leftMargin">
+              <number>18</number>
+             </property>
+             <property name="topMargin">
+              <number>18</number>
+             </property>
+             <property name="rightMargin">
+              <number>18</number>
+             </property>
+             <property name="bottomMargin">
+              <number>18</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="labelTitleRecent">
+               <property name="styleSheet">
+                <string notr="true">font-size: 18px; font-weight: bold;</string>
+               </property>
+               <property name="text">
+                <string>過去のプロジェクト</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="labelSubtitleRecent">
+               <property name="styleSheet">
+                <string notr="true">color: palette(placeholder-text); font-size: 11px;</string>
+               </property>
+               <property name="text">
+                <string>最近開いたプロジェクト履歴</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QListWidget" name="listRecentProjects">
+               <property name="styleSheet">
+                <string notr="true">border: 1px solid palette(mid); border-radius: 4px; background-color: palette(base);</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <spacer name="spacerBottom">
+          <property name="orientation">
+           <enum>Qt::Orientation::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>10</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="pageWorkspace">
+       <layout class="QVBoxLayout" name="layoutWorkspace">
+        <property name="leftMargin">
+         <number>8</number>
+        </property>
+        <property name="topMargin">
+         <number>8</number>
+        </property>
+        <property name="rightMargin">
+         <number>8</number>
+        </property>
+        <property name="bottomMargin">
+         <number>8</number>
+        </property>
+        <item>
+         <layout class="QHBoxLayout" name="layoutTopBar">
+          <item>
+           <widget class="QLineEdit" name="editSearch">
+            <property name="placeholderText">
+             <string>キー・原文・訳文を検索</string>
+            </property>
+            <property name="clearButtonEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="comboStatusFilter">
+            <item>
+             <property name="text">
+              <string>すべて</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>未翻訳</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>翻訳済み</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>疑問あり</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>ロック</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>非表示</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>問題あり</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="buttonListMode">
+            <property name="text">
+             <string>一覧</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="buttonFocusMode">
+            <property name="text">
+             <string>集中</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QSplitter" name="splitterMain">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <widget class="QFrame" name="frameFiles">
+           <property name="minimumSize">
+            <size>
+             <width>220</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>420</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::Shape::StyledPanel</enum>
+           </property>
+           <layout class="QVBoxLayout" name="layoutFiles">
+            <item>
+             <widget class="QLabel" name="labelFiles">
+              <property name="text">
+               <string>ファイル</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QTreeWidget" name="treeFiles">
+              <property name="headerHidden">
+               <bool>true</bool>
+              </property>
+              <column>
+               <property name="text">
+                <string>ファイル</string>
+               </property>
+              </column>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QStackedWidget" name="stackTranslationView">
+           <property name="currentIndex">
+            <number>0</number>
+           </property>
+           <widget class="QWidget" name="pageList">
+            <layout class="QVBoxLayout" name="layoutListPage">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QTableWidget" name="tableTranslations">
+               <property name="styleSheet">
+                <string notr="true">QTableWidget {
+    background-color: palette(window);
+    alternate-background-color: palette(alternate-base);
+    color: palette(text);
+    gridline-color: palette(mid);
+}
+QTableWidget::item {
+    background-color: palette(base);
+    border-right: 1px solid palette(mid);
+}
+QTableWidget::item:selected {
+    background-color: palette(highlight);
+    color: palette(highlighted-text);
+}
+QHeaderView {
+    background-color: palette(window);
+    color: palette(text);
+}
+QHeaderView::section {
+    background-color: palette(button);
+    color: palette(button-text);
+    border: 0;
+    border-right: 1px solid palette(mid);
+    border-bottom: 1px solid palette(mid);
+    padding: 4px 8px;
+}
+QTableCornerButton::section {
+    background-color: palette(window);
+    border: 0;
+    border-right: 1px solid palette(mid);
+    border-bottom: 1px solid palette(mid);
+}</string>
+               </property>
+               <property name="alternatingRowColors">
+                <bool>true</bool>
+               </property>
+               <property name="selectionMode">
+                <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+               </property>
+               <property name="selectionBehavior">
+                <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
+               </property>
+               <property name="sortingEnabled">
+                <bool>true</bool>
+               </property>
+               <property name="wordWrap">
+                <bool>true</bool>
+               </property>
+               <column>
+                <property name="text">
+                 <string>状態</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>キー</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>原文</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>訳文</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>コンテキスト</string>
+                </property>
+               </column>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="pageFocus">
+            <layout class="QVBoxLayout" name="layoutFocusPage">
+             <item>
+              <layout class="QHBoxLayout" name="layoutFocusHeader">
+               <item>
+                <widget class="QPushButton" name="buttonPrevious">
+                 <property name="text">
+                  <string>← 前へ</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <spacer name="spacerFocusHeaderLeft">
+                 <property name="orientation">
+                  <enum>Qt::Orientation::Horizontal</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>40</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+               <item>
+                <widget class="QLabel" name="labelPosition">
+                 <property name="text">
+                  <string>0 / 0</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <spacer name="spacerFocusHeaderRight">
+                 <property name="orientation">
+                  <enum>Qt::Orientation::Horizontal</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>40</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+               <item>
+                <widget class="QPushButton" name="buttonNext">
+                 <property name="text">
+                  <string>次へ →</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <layout class="QFormLayout" name="layoutKeyInfo">
+               <item row="0" column="0">
+                <widget class="QLabel" name="labelKeyTitle">
+                 <property name="text">
+                  <string>キー</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QLineEdit" name="editKey">
+                 <property name="readOnly">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <widget class="QSplitter" name="splitterFocusTexts">
+               <property name="orientation">
+                <enum>Qt::Orientation::Vertical</enum>
+               </property>
+               <widget class="QGroupBox" name="groupSource">
+                <property name="title">
+                 <string>原文</string>
+                </property>
+                <layout class="QVBoxLayout" name="layoutSource">
+                 <item>
+                  <widget class="QPlainTextEdit" name="editSource">
+                   <property name="readOnly">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+               <widget class="QGroupBox" name="groupTranslation">
+                <property name="title">
+                 <string>訳文</string>
+                </property>
+                <layout class="QVBoxLayout" name="layoutTranslation">
+                 <item>
+                  <widget class="QPlainTextEdit" name="editTranslation"/>
+                 </item>
+                </layout>
+               </widget>
+              </widget>
+             </item>
+             <item>
+              <widget class="QGroupBox" name="groupKeyFlags">
+               <property name="title">
+                <string>キー状態</string>
+               </property>
+               <layout class="QGridLayout" name="layoutKeyFlags">
+                <item row="0" column="0">
+                 <widget class="QCheckBox" name="checkTranslated">
+                  <property name="text">
+                   <string>翻訳済み</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QCheckBox" name="checkDoubtful">
+                  <property name="text">
+                   <string>疑問あり</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="2">
+                 <widget class="QCheckBox" name="checkHidden">
+                  <property name="text">
+                   <string>非表示</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="3">
+                 <widget class="QCheckBox" name="checkLocked">
+                  <property name="text">
+                   <string>ロック</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QGroupBox" name="groupContext">
+               <property name="title">
+                <string>コンテキスト</string>
+               </property>
+               <layout class="QVBoxLayout" name="layoutContext">
+                <item>
+                 <widget class="QPlainTextEdit" name="editContext"/>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <layout class="QHBoxLayout" name="layoutFocusActions">
+               <item>
+                <widget class="QPushButton" name="buttonRevert">
+                 <property name="text">
+                  <string>変更を戻す</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <spacer name="spacerFocusActions">
+                 <property name="orientation">
+                  <enum>Qt::Orientation::Horizontal</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>40</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+               <item>
+                <widget class="QPushButton" name="buttonSaveAndNext">
+                 <property name="text">
+                  <string>保存して次へ</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1440</width>
+     <height>33</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>ファイル</string>
+    </property>
+    <addaction name="actionNewProject"/>
+    <addaction name="separator"/>
+    <addaction name="actionOpenFile"/>
+    <addaction name="actionOpenFolder"/>
+    <addaction name="actionOpenTranslationFile"/>
+    <addaction name="separator"/>
+    <addaction name="actionSave"/>
+    <addaction name="actionSaveAs"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>編集</string>
+    </property>
+    <addaction name="actionUndo"/>
+    <addaction name="actionRedo"/>
+    <addaction name="separator"/>
+    <addaction name="actionFind"/>
+   </widget>
+   <widget class="QMenu" name="menuTranslate">
+    <property name="title">
+     <string>翻訳</string>
+    </property>
+    <addaction name="actionStartTranslation"/>
+    <addaction name="actionPauseTranslation"/>
+    <addaction name="actionStopTranslation"/>
+    <addaction name="separator"/>
+    <addaction name="actionTranslateSelected"/>
+    <addaction name="actionTranslateUntranslated"/>
+   </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>表示</string>
+    </property>
+    <addaction name="actionListMode"/>
+    <addaction name="actionFocusMode"/>
+    <addaction name="separator"/>
+    <addaction name="actionToggleFileSidebar"/>
+   </widget>
+   <widget class="QMenu" name="menuSettings">
+    <property name="title">
+     <string>設定</string>
+    </property>
+    <addaction name="actionSettings"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>ヘルプ</string>
+    </property>
+    <addaction name="actionProblems"/>
+    <addaction name="separator"/>
+    <addaction name="actionAbout"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
+   <addaction name="menuTranslate"/>
+   <addaction name="menuView"/>
+   <addaction name="menuSettings"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <widget class="QToolBar" name="mainToolBar">
+   <property name="windowTitle">
+    <string>メインツールバー</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionNewProject"/>
+   <addaction name="actionOpenFile"/>
+   <addaction name="actionSave"/>
+   <addaction name="separator"/>
+   <addaction name="actionStartTranslation"/>
+   <addaction name="actionStopTranslation"/>
+  </widget>
+  <widget class="QStatusBar" name="statusBar">
+   <widget class="QProgressBar" name="progressTranslation">
+    <property name="geometry">
+     <rect>
+      <x>0</x>
+      <y>0</y>
+      <width>180</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="minimumSize">
+     <size>
+      <width>180</width>
+      <height>0</height>
+     </size>
+    </property>
+    <property name="value">
+     <number>0</number>
+    </property>
+    <property name="textVisible">
+     <bool>true</bool>
+    </property>
+   </widget>
+  </widget>
+  <action name="actionNewProject">
+   <property name="text">
+    <string>新規プロジェクト...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
+  </action>
+  <action name="actionOpenFile">
+   <property name="text">
+    <string>ファイルを開く</string>
+   </property>
+  </action>
+  <action name="actionOpenFolder">
+   <property name="text">
+    <string>フォルダを開く</string>
+   </property>
+  </action>
+  <action name="actionOpenTranslationFile">
+   <property name="text">
+    <string>既存訳ファイルを追加</string>
+   </property>
+  </action>
+  <action name="actionSave">
+   <property name="text">
+    <string>保存</string>
+   </property>
+  </action>
+  <action name="actionSaveAs">
+   <property name="text">
+    <string>名前を付けて保存</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="text">
+    <string>終了</string>
+   </property>
+  </action>
+  <action name="actionUndo">
+   <property name="text">
+    <string>元に戻す</string>
+   </property>
+  </action>
+  <action name="actionRedo">
+   <property name="text">
+    <string>やり直す</string>
+   </property>
+  </action>
+  <action name="actionFind">
+   <property name="text">
+    <string>検索</string>
+   </property>
+  </action>
+  <action name="actionStartTranslation">
+   <property name="text">
+    <string>翻訳開始</string>
+   </property>
+  </action>
+  <action name="actionPauseTranslation">
+   <property name="text">
+    <string>一時停止</string>
+   </property>
+  </action>
+  <action name="actionStopTranslation">
+   <property name="text">
+    <string>停止</string>
+   </property>
+  </action>
+  <action name="actionTranslateSelected">
+   <property name="text">
+    <string>選択行を翻訳</string>
+   </property>
+  </action>
+  <action name="actionTranslateUntranslated">
+   <property name="text">
+    <string>未翻訳のみ翻訳</string>
+   </property>
+  </action>
+  <action name="actionListMode">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>一覧モード</string>
+   </property>
+  </action>
+  <action name="actionFocusMode">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>集中モード</string>
+   </property>
+  </action>
+  <action name="actionToggleFileSidebar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>ファイル一覧</string>
+   </property>
+  </action>
+  <action name="actionSettings">
+   <property name="text">
+    <string>設定</string>
+   </property>
+  </action>
+  <action name="actionProblems">
+   <property name="text">
+    <string>問題一覧</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>バージョン情報</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

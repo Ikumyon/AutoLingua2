@@ -1,0 +1,25 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Literal, Protocol
+import subprocess
+
+
+@dataclass(frozen=True)
+class ConsoleResult:
+    state: Literal["owned", "attached", "existing", "unavailable"]
+    error: str = ""
+
+
+class ProcessGuard(Protocol):
+    def close(self) -> None: ...
+
+
+class PlatformDriver(Protocol):
+    def allocate_debug_console(self) -> ConsoleResult: ...
+    def pause_console_on_exit(self) -> None: ...
+    def restart_process(self, debug: bool) -> None: ...
+    def open_folder(self, path: Path) -> None: ...
+    def plugin_platform_key(self) -> str: ...
+    def start_plugin(self, executable: Path, args: list[str], cwd: Path) -> tuple[subprocess.Popen[bytes], ProcessGuard]: ...

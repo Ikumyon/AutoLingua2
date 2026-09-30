@@ -1,0 +1,20 @@
+/* Drag and Drop colors for System Theme */
+QFrame#frameTargetDrop {
+    border-color: palette(mid);
+    background-color: palette(base);
+}
+
+QFrame#frameTargetDrop[dragOver="true"] {
+    border-color: #2d8cff;
+    background-color: rgba(45, 140, 255, 0.08);
+}
+
+QFrame#frameIconDrop {
+    border-color: palette(mid);
+    background-color: palette(base);
+}
+
+QFrame#frameIconDrop[dragOver="true"] {
+    border-color: #2d8cff;
+    background-color: rgba(45, 140, 255, 0.08);
+}

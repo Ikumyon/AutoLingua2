@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AboutDialog</class>
+ <widget class="QDialog" name="AboutDialog">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>460</width><height>300</height></rect>
+  </property>
+  <property name="windowTitle"><string>AUTOlinguaについて</string></property>
+  <layout class="QVBoxLayout" name="layoutRoot">
+   <item>
+    <widget class="QLabel" name="labelAppName">
+     <property name="text"><string>AUTOlingua</string></property>
+     <property name="alignment"><set>Qt::AlignCenter</set></property>
+     <property name="styleSheet"><string notr="true">font-size: 24px; font-weight: 700;</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="labelDescription">
+     <property name="text"><string>Paradoxゲーム向けローカライズ翻訳ツール</string></property>
+     <property name="alignment"><set>Qt::AlignCenter</set></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="labelVersion">
+     <property name="text"><string>Version 0.1.0</string></property>
+     <property name="alignment"><set>Qt::AlignCenter</set></property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="spacerMiddle">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <property name="sizeHint"><size><width>20</width><height>40</height></size></property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QPushButton" name="buttonClose">
+     <property name="text"><string>閉じる</string></property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

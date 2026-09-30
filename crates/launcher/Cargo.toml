@@ -1,0 +1,11 @@
+[package]
+name = "autolingua-launcher"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+slint = "1"
+autolingua2-native = { path = "../autolingua2-native", default-features = false }
+
+[build-dependencies]
+slint-build = "1"

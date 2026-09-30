@@ -1,0 +1,10 @@
+{
+  "include": ["src", "main.py"],
+  "stubPath": "typings",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": ["src", "build/native"]
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>TranslationDialog</class>
+ <widget class="QDialog" name="TranslationDialog">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>520</width><height>360</height></rect>
+  </property>
+  <property name="windowTitle"><string>翻訳を開始</string></property>
+  <layout class="QVBoxLayout" name="layoutRoot">
+   <item>
+    <widget class="QLabel" name="labelTitle">
+     <property name="text"><string>翻訳設定</string></property>
+     <property name="styleSheet"><string notr="true">font-size: 18px; font-weight: 600;</string></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QFormLayout" name="formLanguages">
+     <item row="0" column="0"><widget class="QLabel" name="labelSourceLanguage"><property name="text"><string>翻訳元</string></property></widget></item>
+     <item row="0" column="1">
+      <widget class="QComboBox" name="comboSourceLanguage">
+       <item><property name="text"><string>English</string></property></item>
+      </widget>
+     </item>
+     <item row="1" column="0"><widget class="QLabel" name="labelTargetLanguage"><property name="text"><string>翻訳先</string></property></widget></item>
+     <item row="1" column="1">
+      <widget class="QComboBox" name="comboTargetLanguage">
+       <item><property name="text"><string>Japanese</string></property></item>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupTarget">
+     <property name="title"><string>対象</string></property>
+     <layout class="QFormLayout" name="formTarget">
+      <item row="0" column="0"><widget class="QLabel" name="labelTotalText"><property name="text"><string>全キー</string></property></widget></item>
+      <item row="0" column="1"><widget class="QLabel" name="labelTotalValue"><property name="text"><string>0</string></property></widget></item>
+      <item row="1" column="0"><widget class="QLabel" name="labelUntranslatedText"><property name="text"><string>未翻訳</string></property></widget></item>
+      <item row="1" column="1"><widget class="QLabel" name="labelUntranslatedValue"><property name="text"><string>0</string></property></widget></item>
+      <item row="2" column="0"><widget class="QLabel" name="labelSelectedText"><property name="text"><string>選択中</string></property></widget></item>
+      <item row="2" column="1"><widget class="QLabel" name="labelSelectedValue"><property name="text"><string>0</string></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="checkSkipTranslated">
+     <property name="text"><string>翻訳済みのキーをスキップ</string></property>
+     <property name="checked"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="checkSkipLocked">
+     <property name="text"><string>ロックされたキーをスキップ</string></property>
+     <property name="checked"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="spacerBottom">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <property name="sizeHint"><size><width>20</width><height>40</height></size></property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>TranslationDialog</receiver>
+   <slot>accept()</slot>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>TranslationDialog</receiver>
+   <slot>reject()</slot>
+  </connection>
+ </connections>
+</ui>
