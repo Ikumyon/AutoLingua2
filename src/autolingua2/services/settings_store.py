@@ -31,6 +31,7 @@ KEY_WINDOW_STATE = "window_state"
 KEY_SPLITTER_MAIN = "splitter_main"
 KEY_SPLITTER_FOCUS = "splitter_focus"
 KEY_SIDEBAR_VISIBLE = "sidebar_visible"
+KEY_AI_PANEL_VISIBLE = "ai_panel_visible"
 SETTINGS_ENV_VAR = "AUTOLINGUA_SETTINGS_PATH"
 SETTINGS_FILE_NAME = "settings.json"
 
@@ -213,6 +214,7 @@ class WindowLayout:
     splitter_main: str = ""
     splitter_focus: str = ""
     sidebar_visible: bool = True
+    ai_panel_visible: bool = True
 
 
 def load_window_layout() -> WindowLayout:
@@ -226,6 +228,7 @@ def load_window_layout() -> WindowLayout:
         splitter_main=str(ui_settings.get(KEY_SPLITTER_MAIN) or ""),
         splitter_focus=str(ui_settings.get(KEY_SPLITTER_FOCUS) or ""),
         sidebar_visible=bool(ui_settings.get(KEY_SIDEBAR_VISIBLE, True)),
+        ai_panel_visible=bool(ui_settings.get(KEY_AI_PANEL_VISIBLE, True)),
     )
 
 
@@ -239,6 +242,7 @@ def save_window_layout(layout: WindowLayout) -> None:
     ui_settings[KEY_SPLITTER_MAIN] = layout.splitter_main
     ui_settings[KEY_SPLITTER_FOCUS] = layout.splitter_focus
     ui_settings[KEY_SIDEBAR_VISIBLE] = layout.sidebar_visible
+    ui_settings[KEY_AI_PANEL_VISIBLE] = layout.ai_panel_visible
     settings[GROUP_UI] = ui_settings
     _write_settings_file(settings)
 

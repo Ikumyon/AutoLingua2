@@ -23,7 +23,7 @@ impl Ui {
         self.update(move |window| {
             window.set_failed(true);
             window.set_delayed(false);
-            window.set_status_text("AUTOlingua2 を起動できませんでした".into());
+            window.set_status_text("AutoLingua Desktop を起動できませんでした".into());
             window.set_detail(message.into());
         });
     }

@@ -39,12 +39,11 @@ def main() -> int:
         from .ui.main_window import MainWindowController
 
         startup.check()
-        startup.phase("settings", "設定・翻訳・テーマを適用しています…")
-        current_platform.configure_desktop_integration("autolingua.autolingua2.app")
+        current_platform.configure_desktop_integration("autolingua.desktop.app")
         app = QApplication(sys.argv)
-        app.setApplicationName("AUTOlingua")
-        app.setOrganizationName("AUTOlingua")
-        app.setDesktopFileName("autolingua2")
+        app.setApplicationName("AutoLingua Desktop")
+        app.setOrganizationName("AutoLingua")
+        app.setDesktopFileName("autolingua-desktop")
         from PySide6.QtGui import QIcon
         from .infrastructure.filesystem import ASSETS_DIR, PROJECT_ROOT
         app_icon_path = ASSETS_DIR / "images" / "app.ico"
@@ -54,6 +53,8 @@ def main() -> int:
         startup.phase("plugins", "拡張を読み込んでいます…")
         ui_language = load_ui_language()
         entrance.load_configured(PROJECT_ROOT / "extensions.json", startup.check, ui_language=ui_language)
+        startup.check()
+        startup.phase("settings", "設定・翻訳・テーマを適用しています…")
         entrance.localization.apply_language(app, ui_language)
         theme, icons = load_theme_settings()
         entrance.themes.apply_theme(theme, app)
@@ -110,7 +111,7 @@ def main() -> int:
             error_app = QApplication.instance()
             if error_app is None:
                 error_app = QApplication(sys.argv)
-            QMessageBox.critical(None, "AUTOlingua2 起動エラー", str(exc))
+            QMessageBox.critical(None, "AutoLingua Desktop 起動エラー", str(exc))
         return 1
     finally:
         if entrance is not None:

@@ -6,6 +6,9 @@ import re
 from .unit import TranslationUnit
 from .validation import array, boolean, record, required, string_field, text
 
+# 数値全般（符号・小数・パーセント・カンマ区切りを含む）の正規表現
+_NUMBER_ONLY_PATTERN = re.compile(r"^[+-]?(?:\d[\d,]*(?:\.\d+)?|\.\d+)%?$")
+
 
 @dataclass(slots=True)
 class FilterRule:
@@ -63,13 +66,20 @@ class AdapterFilterConfig:
 
 
 def should_hide_unit(unit: TranslationUnit, config: AdapterFilterConfig) -> bool:
-    """ユニット（文章・キー）が有効な非表示ルールにマッチするか判定する。"""
+    """ユニット（文章・キー）が有効な非表示ルールにマッチするか判定する。
+
+    - 空白のみの行は非表示。
+    - キー名（label）がルールに完全一致する場合は非表示。
+    - 原文テキストから各ルール（タグ・記号等）を除去した結果、実質的なテキストが残らない場合のみ非表示。
+    """
     text = unit.source_text
     label = unit.label
 
     # 空白のみの行は常に非表示対象
     if not text.strip():
         return True
+
+    remaining_text = text
 
     for rule in config.rules:
         if not rule.enabled:
@@ -81,11 +91,22 @@ def should_hide_unit(unit: TranslationUnit, config: AdapterFilterConfig) -> bool
 
         try:
             regex = re.compile(rule.pattern)
-            # 原文テキストにマッチするか、またはキー名にマッチするか判定
-            if regex.search(text) is not None or regex.search(label) is not None:
+            # キー名が除外パターンに完全一致する場合は即座に非表示
+            if regex.fullmatch(label) is not None:
                 return True
+            # 原文テキストから該当パターンを除去
+            remaining_text = regex.sub("", remaining_text)
         except re.error:
             # 不正な正規表現はスキップ
             continue
+
+    # タグや記号を除去した結果、実質的なテキスト（空白以外）が何も残らない場合のみ非表示
+    stripped = remaining_text.strip()
+    if not stripped:
+        return True
+
+    # 数値全般（符号・小数・パーセント・カンマ区切り等を含む）のみで構成される場合も非表示
+    if _NUMBER_ONLY_PATTERN.fullmatch(stripped) is not None:
+        return True
 
     return False

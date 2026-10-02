@@ -1,6 +1,6 @@
 import { Button } from "std-widgets.slint";
 export component SplashWindow inherits Window {
-    title: "AUTOlingua2";
+    title: "AutoLingua Desktop";
     icon: @image-url("../../../assets/images/app.ico");
     in property <image> custom-image;
     in property <bool> has-custom-image: false;
@@ -27,40 +27,48 @@ export component SplashWindow inherits Window {
     }
 
     if root.has-custom-image: Rectangle {
+        y: root.height - 120px;
         width: 100%;
-        height: 100%;
-        background: @linear-gradient(180deg, rgba(24, 24, 37, 0.45) 0%, rgba(24, 24, 37, 0.82) 55%, rgba(24, 24, 37, 0.95) 100%);
+        height: 120px;
+        background: @linear-gradient(180deg, rgba(24, 24, 37, 0.0) 0%, rgba(24, 24, 37, 0.60) 100%);
     }
     VerticalLayout {
-        padding: 28px;
-        spacing: 16px;
-        Text { text: "AUTOlingua2"; font-size: 28px; font-weight: 700; color: #cdd6f4; }
-        Text { text: root.status-text; color: #cdd6f4; wrap: word-wrap; }
+        padding: 24px;
+        spacing: 12px;
+        Text { text: "AutoLingua Desktop"; font-size: 28px; font-weight: 700; color: #cdd6f4; }
+        
+        Rectangle { vertical-stretch: 1; }
+
         Rectangle {
-            height: 8px;
+            height: 6px;
             background: #313244;
-            border-radius: 4px;
+            border-radius: 3px;
             clip: true;
             Rectangle {
                 x: 0;
                 width: parent.width * root.progress;
                 height: parent.height;
-                background: #89b4fa;
-                border-radius: 4px;
+                background: root.failed ? #f38ba8 : #89b4fa;
+                border-radius: 3px;
             }
         }
-        Text {
-            text: root.delayed ? "起動に時間がかかっています。このまま待機できます。" : root.detail;
-            color: #a6adc8;
-            wrap: word-wrap;
-            vertical-stretch: 1;
-        }
+
         HorizontalLayout {
-            alignment: end;
             spacing: 12px;
-            if root.failed: Button { text: "ログを開く"; clicked => { root.open-logs(); } }
-            if root.failed: Button { text: "閉じる"; clicked => { root.dismiss(); } }
-            if root.delayed && root.can-cancel: Button { text: "起動を中止"; clicked => { root.cancel(); } }
+            Text {
+                text: root.failed ? (root.detail != "" ? root.detail : root.status-text)
+                    : (root.delayed ? "起動に時間がかかっています。このまま待機できます。" : root.status-text);
+                color: root.failed ? #f38ba8 : #cdd6f4;
+                wrap: word-wrap;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                if root.failed: Button { text: "ログを開く"; clicked => { root.open-logs(); } }
+                if root.failed: Button { text: "閉じる"; clicked => { root.dismiss(); } }
+                if root.delayed && root.can-cancel: Button { text: "起動を中止"; clicked => { root.cancel(); } }
+            }
         }
     }
 }

@@ -5,11 +5,11 @@
   <property name="geometry">
    <rect><x>0</x><y>0</y><width>460</width><height>300</height></rect>
   </property>
-  <property name="windowTitle"><string>AUTOlinguaについて</string></property>
+  <property name="windowTitle"><string>AutoLingua Desktopについて</string></property>
   <layout class="QVBoxLayout" name="layoutRoot">
    <item>
     <widget class="QLabel" name="labelAppName">
-     <property name="text"><string>AUTOlingua</string></property>
+     <property name="text"><string>AutoLingua Desktop</string></property>
      <property name="alignment"><set>Qt::AlignCenter</set></property>
      <property name="styleSheet"><string notr="true">font-size: 24px; font-weight: 700;</string></property>
     </widget>
