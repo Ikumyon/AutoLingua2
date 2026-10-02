@@ -4,14 +4,13 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtGui import QIcon
 
-from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from autolingua2.ir.validation import record, required, text, string_field
 from autolingua2.ui.i18n import system_language
-from autolingua2.ui.theme import _resolve_locale_text
+from autolingua2.ui.resource_locales import resolve_locale_text
 
 
-ICONS_DIR = PROJECT_ROOT / "theme" / "icons"
 DEFAULT_ICONSET_ID = "default"
 
 
@@ -26,47 +25,39 @@ class IconSetInfo:
 
 
 class IconManager:
-    def __init__(self, icons_dir: Path | None = None) -> None:
-        self.icons_dir = icons_dir or ICONS_DIR
+    def __init__(self) -> None:
+        self._packages: dict[str, tuple[Path, dict[str, object]]] = {}
         self._current_iconset_id: str = DEFAULT_ICONSET_ID
         self._icon_cache: dict[str, QIcon] = {}
 
-    def discover_iconsets(self, ui_language: str = "system") -> dict[str, IconSetInfo]:
-        """icons ディレクトリ内の各アイコンセットを走査して IconSetInfo の辞書を返す。"""
+    def _register(self, path: Path) -> None:
+        meta = record(json.loads((path / "iconset.json").read_text(encoding="utf-8")))
+        package_id = text(required(meta, "id"), nonempty=True)
+        if package_id in self._packages:
+            raise ValueError(f"Duplicate iconset ID: {package_id}")
+        for key in ("name_key", "description_key", "format"):
+            if key in meta:
+                text(meta[key])
+        self._packages[package_id] = (path, meta)
+        self._icon_cache.clear()
+
+    def available_iconsets(self, ui_language: str = "system") -> dict[str, IconSetInfo]:
+        """Return registered packages; never discover additional directories."""
         if not ui_language or ui_language.lower() == "system":
             ui_language = system_language()
         iconsets: dict[str, IconSetInfo] = {}
-        if not self.icons_dir.exists():
-            return iconsets
-
-        for item in sorted(self.icons_dir.iterdir()):
-            if not item.is_dir():
-                continue
-
-            meta_file = item / "iconset.json"
-            if not meta_file.is_file():
-                continue
-
-            try:
-                with open(meta_file, encoding="utf-8") as f:
-                    meta = json.load(f)
-            except Exception:
-                continue
-
-            if not isinstance(meta, dict):
-                continue
-
-            iconset_id = str(meta.get("id") or item.name)
-            name_key = meta.get("name_key", "")
-            desc_key = meta.get("description_key", "")
-            fmt = str(meta.get("format", "svg"))
+        for package_id, (item, meta) in self._packages.items():
+            iconset_id = package_id
+            name_key = string_field(meta, "name_key")
+            desc_key = string_field(meta, "description_key")
+            fmt = string_field(meta, "format", "svg")
 
             locales_dir = item / "locales"
-            name = _resolve_locale_text(locales_dir, name_key, ui_language) if name_key else None
+            name = resolve_locale_text(locales_dir, name_key, ui_language) if name_key else None
             if not name:
                 name = iconset_id.capitalize()
 
-            description = _resolve_locale_text(locales_dir, desc_key, ui_language) if desc_key else ""
+            description = resolve_locale_text(locales_dir, desc_key, ui_language) if desc_key else ""
             if not description:
                 description = ""
 
@@ -99,25 +90,19 @@ class IconManager:
         if cache_key in self._icon_cache:
             return self._icon_cache[cache_key]
 
-        icon_dir = self.icons_dir / self._current_iconset_id
-        # Search for svg, png, etc.
-        extensions = [".svg", ".png"]
         icon_path: Path | None = None
-
-        for ext in extensions:
-            candidate = icon_dir / f"{icon_name}{ext}"
-            if candidate.is_file():
-                icon_path = candidate
-                break
-
-        # Fallback to default iconset if current iconset doesn't have it
-        if icon_path is None and self._current_iconset_id != DEFAULT_ICONSET_ID:
-            default_dir = self.icons_dir / DEFAULT_ICONSET_ID
-            for ext in extensions:
-                candidate = default_dir / f"{icon_name}{ext}"
+        for package_id in dict.fromkeys((self._current_iconset_id, DEFAULT_ICONSET_ID)):
+            package = self._packages.get(package_id)
+            if package is None:
+                continue
+            directory, _ = package
+            for extension in (".svg", ".png"):
+                candidate = directory / f"{icon_name}{extension}"
                 if candidate.is_file():
                     icon_path = candidate
                     break
+            if icon_path is not None:
+                break
 
         if icon_path and icon_path.is_file():
             icon = QIcon(str(icon_path))

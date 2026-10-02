@@ -43,11 +43,18 @@ fn pick_random_splash_image(dir: &Path) -> Option<PathBuf> {
     if images.is_empty() {
         return None;
     }
-    let nanos = SystemTime::now()
+    let ticks = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.subsec_nanos() as usize)
+        .map(|d| (d.as_nanos() / 100) as usize)
         .unwrap_or(0);
-    let index = nanos % images.len();
+    let pid = std::process::id() as usize;
+    let mut x = ticks ^ pid.rotate_left(16);
+    x ^= x >> 30;
+    x = x.wrapping_mul(0xbf58476d1ce4e5b9);
+    x ^= x >> 27;
+    x = x.wrapping_mul(0x94d049bb133111eb);
+    x ^= x >> 31;
+    let index = x % images.len();
     Some(images.swap_remove(index))
 }
 

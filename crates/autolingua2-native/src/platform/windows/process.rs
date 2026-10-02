@@ -27,7 +27,10 @@ pub fn is_executable_plugin(path: &Path) -> bool {
 }
 
 #[cfg(feature = "python")]
-pub fn plugin_creation_flags() -> u32 { CREATE_NO_WINDOW | CREATE_SUSPENDED }
+pub fn configure_plugin_command(command: &mut std::process::Command) {
+    use std::os::windows::process::CommandExt;
+    command.creation_flags(CREATE_NO_WINDOW | CREATE_SUSPENDED);
+}
 
 #[cfg(feature = "python")]
 pub struct Group { handle: usize }
@@ -51,7 +54,7 @@ impl Group {
             let error = std::io::Error::last_os_error();
             CloseHandle(process);
             if assigned == 0 { return Err(error.to_string()); }
-            // Popen created a suspended process. Resume only after job assignment.
+            // Resume the native child only after assigning its kill-on-close job.
             let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
             if snapshot == INVALID_HANDLE_VALUE {
                 return Err(std::io::Error::last_os_error().to_string());

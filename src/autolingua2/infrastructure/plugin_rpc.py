@@ -36,18 +36,9 @@ class PluginRPC:
                              ensure_ascii=False).encode("utf-8") + b"\n"
         if len(request) > MAX_LINE:
             raise PluginRPCError("size", "プラグインへの要求が大きすぎます。")
-        deadline = monotonic() + (timeout if timeout is not None else (30 if method in {"describe", "output_name"} else 600))
-        process, guard = self.platform.start_plugin(self.executable, self.args, self.cwd)
+        deadline = monotonic() + (timeout if timeout is not None else (30 if method in {"register", "output_name"} else 600))
+        process = self.platform.start_plugin(self.executable, self.args, self.cwd)
         stdin, stdout, stderr = process.stdin, process.stdout, process.stderr
-        if stdin is None or stdout is None or stderr is None:
-            guard.close()
-            if process.poll() is None:
-                process.kill()
-            process.wait()
-            for stream in (stdin, stdout, stderr):
-                if stream is not None:
-                    stream.close()
-            raise PluginRPCError("process", "プラグインの通信ストリームを取得できませんでした。")
         queue: Queue = Queue(maxsize=32)
         stopping = Event()
 
@@ -143,12 +134,11 @@ class PluginRPC:
             raise
         finally:
             stopping.set()
-            guard.close()
-            if process.poll() is None:
-                process.kill()
-            process.wait()
-            for thread in threads:
-                thread.join(timeout=2)
-            for stream in (stdin, stdout, stderr):
-                if not stream.closed:
-                    stream.close()
+            try:
+                process.close()
+            finally:
+                for thread in threads:
+                    thread.join(timeout=2)
+                for stream in (stdin, stdout, stderr):
+                    if not stream.closed:
+                        stream.close()

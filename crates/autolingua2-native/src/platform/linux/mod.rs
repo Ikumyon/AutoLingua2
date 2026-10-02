@@ -14,4 +14,4 @@ pub use security::{identity, open_lock, private_directory, random};
 #[cfg(feature = "python")]
 pub use desktop::{allocate_debug_console, configure_desktop_integration};
 #[cfg(feature = "python")]
-pub use process::{is_executable_plugin, plugin_creation_flags, Group};
+pub use process::{is_executable_plugin, configure_plugin_command, Group};

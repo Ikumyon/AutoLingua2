@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import TypeVar
 
 from PySide6.QtCore import QFile, QIODeviceBase, QObject
@@ -21,6 +22,10 @@ def require_child(parent: QObject, child_type: type[ChildType], name: str) -> Ch
 def load_ui(name: str, parent: QWidget | None = None) -> QWidget:
     # Source and frozen distributions both use the packaged .ui resources.
     path = UI_DIR / name
+    if not path.is_file():
+        matches = list(UI_DIR.rglob(Path(name).name))
+        if matches:
+            path = matches[0]
     file = QFile(str(path))
     if not file.open(QIODeviceBase.OpenModeFlag.ReadOnly):
         raise RuntimeError(f"UIファイルを開けません: {path}")

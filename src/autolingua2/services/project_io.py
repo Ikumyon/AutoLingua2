@@ -4,8 +4,9 @@ from dataclasses import dataclass, replace
 import os
 from pathlib import Path
 
-from autolingua2.adapters.base import FileAdapter, ImportedTranslation
-from autolingua2.adapters.registry import load_paths
+from autolingua2.adapters.base import FileAdapter
+from autolingua2.ir.imported import ImportedTranslation
+from autolingua2.adapters.io import load_paths
 from autolingua2.infrastructure.operations import check_cancelled
 
 

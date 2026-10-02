@@ -135,7 +135,7 @@
                     <bool>true</bool>
                    </property>
                    <property name="styleSheet">
-                    <string notr="true">QFrame#frameIconDrop { border-width: 1px; border-style: solid; border-radius: 6px; }</string>
+                    <string notr="true">QFrame#frameIconDrop { border-width: 1.5px; border-style: dashed; border-radius: 6px; }</string>
                    </property>
                    <property name="frameShape">
                     <enum>QFrame::Shape::StyledPanel</enum>
@@ -243,12 +243,12 @@
                   <number>12</number>
                  </property>
                  <item>
-                  <widget class="QFrame" name="frameTargetDrop">
+                  <widget class="QFrame" name="frameDropZone">
                    <property name="acceptDrops">
                     <bool>true</bool>
                    </property>
                    <property name="styleSheet">
-                    <string notr="true">QFrame#frameTargetDrop { border-width: 2px; border-style: dashed; border-radius: 6px; padding: 10px; }</string>
+                    <string notr="true">QFrame#frameDropZone { border-width: 1.5px; border-style: dashed; border-radius: 6px; padding: 10px; }</string>
                    </property>
                    <property name="frameShape">
                     <enum>QFrame::Shape::StyledPanel</enum>
@@ -498,17 +498,61 @@
                        </item>
                       </widget>
                      </item>
-                    </layout>
-                   </item>
-                  </layout>
-                 </item>
-                 <item>
-                  <layout class="QVBoxLayout" name="layoutTargetSection">
-                   <property name="spacing">
-                    <number>6</number>
-                   </property>
-                   <item>
-                    <widget class="QLabel" name="labelTargetPrompt">
+                     </layout>
+                    </item>
+                   </layout>
+                  </item>
+                  <item>
+                   <layout class="QVBoxLayout" name="layoutOutputSection">
+                    <property name="spacing">
+                     <number>4</number>
+                    </property>
+                    <item>
+                     <widget class="QLabel" name="labelOutputPath">
+                      <property name="styleSheet">
+                       <string notr="true">font-weight: 600;</string>
+                      </property>
+                      <property name="text">
+                       <string>出力先フォルダ (任意):</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <layout class="QHBoxLayout" name="layoutOutputFolderInput">
+                      <property name="spacing">
+                       <number>6</number>
+                      </property>
+                      <item>
+                       <widget class="QLineEdit" name="editOutputPath">
+                        <property name="placeholderText">
+                         <string>未指定時は翻訳元と同じ場所に出力</string>
+                        </property>
+                        <property name="clearButtonEnabled">
+                         <bool>true</bool>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <widget class="QPushButton" name="buttonBrowseOutput">
+                        <property name="text">
+                         <string>参照...</string>
+                        </property>
+                        <property name="toolTip">
+                         <string>翻訳ファイルの出力先フォルダを選択</string>
+                        </property>
+                       </widget>
+                      </item>
+                     </layout>
+                    </item>
+                   </layout>
+                  </item>
+                  <item>
+                   <layout class="QVBoxLayout" name="layoutTargetSection">
+                    <property name="spacing">
+                     <number>6</number>
+                    </property>
+                    <item>
+                     <widget class="QLabel" name="labelTargetPrompt">
                      <property name="styleSheet">
                       <string notr="true">font-weight: 600;</string>
                      </property>
@@ -1071,13 +1115,6 @@ QTableCornerButton::section {
     </property>
     <addaction name="actionNewProject"/>
     <addaction name="separator"/>
-    <addaction name="actionOpenFile"/>
-    <addaction name="actionOpenFolder"/>
-    <addaction name="actionOpenTranslationFile"/>
-    <addaction name="separator"/>
-    <addaction name="actionSave"/>
-    <addaction name="actionSaveAs"/>
-    <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
@@ -1141,8 +1178,33 @@ QTableCornerButton::section {
     <bool>false</bool>
    </attribute>
    <addaction name="actionNewProject"/>
-   <addaction name="actionOpenFile"/>
-   <addaction name="actionSave"/>
+   <addaction name="separator"/>
+   <widget class="QLabel" name="labelAiProvider">
+    <property name="text">
+     <string>Provider</string>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="comboAiProvider">
+    <property name="minimumSize">
+     <size>
+      <width>120</width>
+      <height>0</height>
+     </size>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelAiModel">
+    <property name="text">
+     <string>モデル</string>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="comboAiModel">
+    <property name="minimumSize">
+     <size>
+      <width>180</width>
+      <height>0</height>
+     </size>
+    </property>
+   </widget>
    <addaction name="separator"/>
    <addaction name="actionStartTranslation"/>
    <addaction name="actionStopTranslation"/>
@@ -1179,31 +1241,7 @@ QTableCornerButton::section {
     <string>Ctrl+N</string>
    </property>
   </action>
-  <action name="actionOpenFile">
-   <property name="text">
-    <string>ファイルを開く</string>
-   </property>
-  </action>
-  <action name="actionOpenFolder">
-   <property name="text">
-    <string>フォルダを開く</string>
-   </property>
-  </action>
-  <action name="actionOpenTranslationFile">
-   <property name="text">
-    <string>既存訳ファイルを追加</string>
-   </property>
-  </action>
-  <action name="actionSave">
-   <property name="text">
-    <string>保存</string>
-   </property>
-  </action>
-  <action name="actionSaveAs">
-   <property name="text">
-    <string>名前を付けて保存</string>
-   </property>
-  </action>
+
   <action name="actionExit">
    <property name="text">
     <string>終了</string>

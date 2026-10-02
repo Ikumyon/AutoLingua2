@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import os
+from copy import deepcopy
 from pathlib import Path
-import sqlite3
 import sys
-from typing import Any, Callable
+from typing import Callable
 
 from PySide6.QtCore import QByteArray, QEvent, QObject, QPoint, Qt, QSignalBlocker, QTimer, QLocale
-from PySide6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QMouseEvent, QPixmap
+from PySide6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -39,23 +39,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from autolingua2.adapters.base import PluginAdapter, ImportedTranslation
-from autolingua2.adapters.pairing import apply_existing_translation
-from autolingua2.adapters.registry import (
-    PLUGINS_DIR,
-    adapter_for,
-    adapter_by_id,
-    plugin_errors,
-    get_all_adapters,
-    load_file,
-    supported_file_filter,
-)
+from autolingua2.adapters.base import FileAdapter
+from autolingua2.ir.imported import ImportedTranslation
+from autolingua2.ui.creation_contract import CreationActions, CreationAdapter
+from autolingua2.ui.creation_panel import CommonCreationAdapter
+from autolingua2.extensions import ExtensionEntrance
+from autolingua2.infrastructure.filesystem import PROJECT_ROOT
 from autolingua2.infrastructure.platform import current_platform, log_directory
 from autolingua2.infrastructure.platform.base import PlatformDriver
 from autolingua2.infrastructure.operations import OperationCancelled
 from autolingua2.ir import Issue, TranslationProject, TranslationSource, TranslationUnit, UnitState
-from autolingua2.services.filter_rules import AdapterFilterConfig, get_default_filter_config, should_hide_unit
-from autolingua2.services.ai_providers import discover_providers
+from autolingua2.ir.filter_rules import AdapterFilterConfig, should_hide_unit
+from autolingua2.services.filter_rules import get_default_filter_config
+from autolingua2.services.export import export_translation
 from autolingua2.services.settings_store import (
     AiSettings,
     ColumnLayout,
@@ -69,8 +65,6 @@ from autolingua2.services.settings_store import (
     save_translation_table_columns,
     save_window_layout,
 )
-from autolingua2.services.translation_memory_store import TranslationMemoryStore
-from autolingua2.services.project_io import plan_output, write_output
 from autolingua2.ui.dialogs import (
     SettingsDialogController,
     SimpleDialogController,
@@ -78,12 +72,10 @@ from autolingua2.ui.dialogs import (
     require_child,
     show_not_implemented,
 )
-from autolingua2.ui.icons import IconManager
 from autolingua2.ui.i18n import current_ui_language, language_events, tr
 from autolingua2.ui.import_worker import ImportWorker
 from autolingua2.ui.operation_worker import OperationWorker
 from autolingua2.ui.models.translation_table_model import TranslationTableColumn, default_translation_table_columns
-from autolingua2.ui.translation_worker import TranslationWorker
 
 
 STATUS_MATCHERS: dict[str, Callable[[TranslationUnit], bool]] = {
@@ -111,10 +103,6 @@ class MainWindowCreationContext:
             raise RuntimeError("Panel constructors must not modify the creation form")
         if self.controller.import_worker is not None:
             raise RuntimeError("Project import is in progress")
-
-    @property
-    def parent_widget(self) -> QWidget:
-        return self.controller.window
 
     def add_target_path(self, path: Path) -> None:
         self._check()
@@ -148,7 +136,7 @@ class MainWindowCreationContext:
             raise ValueError(f"Unknown output slot: {slot_code}")
         self.controller.combo_target_slot.setCurrentIndex(idx)
 
-    def get_icon(self, name: str) -> Any:
+    def get_icon(self, name: str) -> QIcon:
         return self.controller.icon_manager.get_icon(name)
 
     def cancel_operation(self) -> None:
@@ -159,16 +147,23 @@ class MainWindowCreationContext:
         if self.controller.io_worker:
             self.controller.io_worker.requestInterruption()
 
-    @property
-    def current_ui_language(self) -> str:
-        return current_ui_language()
+    def actions(self) -> CreationActions:
+        return CreationActions(
+            cancel_operation=self.cancel_operation, add_target_path=self.add_target_path,
+            remove_target_path=self.remove_target_path, set_project_name=self.set_project_name,
+            select_game=self.select_game, set_source_language=self.set_source_language,
+            set_target_slot=self.set_target_slot, get_icon=self.get_icon,
+        )
 
 
 
 class MainWindowController(QObject):
-    def __init__(self, platform_driver: PlatformDriver = current_platform) -> None:
+    def __init__(self, entrance: ExtensionEntrance, platform_driver: PlatformDriver = current_platform) -> None:
         super().__init__()
         self.platform = platform_driver
+        self.entrance = entrance
+        self.plugins = entrance.plugins
+        self._known_plugin_errors = len(self.plugins.errors)
         self.io_worker: OperationWorker | None = None
         self._close_after_io = False
         self._restart_target: bool | None = None
@@ -179,23 +174,18 @@ class MainWindowController(QObject):
             raise TypeError("MainWindow.ui は QMainWindow ではありません")
 
         self.window = widget
-        self.icon_manager = IconManager()
+        self.icon_manager = entrance.icons
         _, icon_theme = load_theme_settings()
         self.icon_manager.set_current_iconset(icon_theme)
         self.imported = ImportedTranslation(project=TranslationProject())
-        self.existing_translation: ImportedTranslation | None = None
         self.output_path: Path | None = None
-        self.provider_registry = discover_providers()
+        self.provider_registry = self.plugins.providers
         ai_settings = load_ai_settings()
         self.ai_provider_id = ai_settings.provider_id
         self.ai_models = ai_settings.models
         self.ai_selected_models = ai_settings.selected_models
         self.ai_concurrency = ai_settings.concurrency
         self.ai_api_keys = ai_settings.api_keys
-        self.translation_worker: TranslationWorker | None = None
-        self._pending_human_memory: dict[str, str] = {}
-        self._translation_methods: dict[str, str] = {}
-        self._close_after_translation = False
         self.project = self.imported.project
         self.units: list[TranslationUnit] = []
         self.filtered_units: list[TranslationUnit] = []
@@ -214,7 +204,12 @@ class MainWindowController(QObject):
         self.target_paths: list[Path] = []
         self.target_item_widgets: dict[Path, tuple[QLabel, QListWidgetItem]] = {}
         self.target_files: list[Path] = []
-        self.active_adapter: PluginAdapter | None = None
+        self.active_adapter: FileAdapter | None = None
+        self.creation_adapters: dict[str, CreationAdapter] = {
+            plugin_id: self.plugins.ui_extensions.get(plugin_id, CommonCreationAdapter())
+            for plugin_id in self.plugins.parsers
+        }
+        self.active_creation_adapter: CreationAdapter | None = None
         self.active_creation_panel: QWidget | None = None
         self.creation_context: MainWindowCreationContext | None = None
         self.import_worker: ImportWorker | None = None
@@ -228,9 +223,9 @@ class MainWindowController(QObject):
         self._set_initial_state()
         self.window.installEventFilter(self)
         language_events().changed.connect(self._on_ui_language_changed)
-        if plugin_errors():
+        if entrance.errors:
             QTimer.singleShot(0, lambda: QMessageBox.warning(
-                self.window, "プラグイン読み込みエラー", "\n".join(plugin_errors())))
+                self.window, "拡張読み込みエラー", "\n".join(entrance.errors)))
 
     def show(self) -> None:
         self.window.show()
@@ -246,11 +241,6 @@ class MainWindowController(QObject):
                 event.ignore()
                 self._close_after_import = True
                 self.import_worker.requestInterruption()
-                return True
-            if self.translation_worker is not None:
-                event.ignore()
-                self._close_after_translation = True
-                self.stop_translation()
                 return True
             if self._restart_target is not None:
                 if self._target_snapshot() != self._saved_targets:
@@ -279,9 +269,10 @@ class MainWindowController(QObject):
                 self._save_window_layout()
             if self.creation_context:
                 self.creation_context.active = False
-            if self.active_adapter and self.active_creation_panel:
+                self.plugins.bind_creation(self.creation_context.adapter_id, None)
+            if self.active_creation_adapter is not None and self.active_creation_panel is not None:
                 try:
-                    self.active_adapter.dispose_creation_panel(self.active_creation_panel)
+                    self.active_creation_adapter.dispose_creation_panel(self.active_creation_panel)
                 except Exception:
                     import logging
                     logging.getLogger(__name__).exception("Panel disposal failed")
@@ -321,13 +312,13 @@ class MainWindowController(QObject):
 
                     # 中央スロット枠: アクティブなプラグインにドロップイベントを委譲
                     if watched is frame_target:
-                        adapter = self.active_adapter
+                        adapter = self.active_creation_adapter
                         context = self.creation_context
                         if (self.import_worker is not None or not self._creation_valid
                                 or adapter is None or context is None):
                             return True
                         try:
-                            remaining = adapter.on_paths_dropped(paths, context)
+                            remaining = adapter.on_paths_dropped(paths, self.plugins.context(context.adapter_id))
                             if not isinstance(remaining, list) or any(p not in paths for p in remaining):
                                 raise ValueError("Invalid unhandled drop paths")
                             for p in remaining:
@@ -381,12 +372,6 @@ class MainWindowController(QObject):
         self.check_doubtful = require_child(self.window, QCheckBox, "checkDoubtful")
         self.check_hidden = require_child(self.window, QCheckBox, "checkHidden")
         self.check_locked = require_child(self.window, QCheckBox, "checkLocked")
-
-        self.action_open_file = require_child(self.window, QAction, "actionOpenFile")
-        self.action_open_folder = require_child(self.window, QAction, "actionOpenFolder")
-        self.action_open_translation_file = require_child(self.window, QAction, "actionOpenTranslationFile")
-        self.action_save = require_child(self.window, QAction, "actionSave")
-        self.action_save_as = require_child(self.window, QAction, "actionSaveAs")
         self.action_exit = require_child(self.window, QAction, "actionExit")
         self.action_start_translation = require_child(self.window, QAction, "actionStartTranslation")
         self.action_translate_selected = require_child(self.window, QAction, "actionTranslateSelected")
@@ -400,18 +385,8 @@ class MainWindowController(QObject):
         self.action_focus_mode = require_child(self.window, QAction, "actionFocusMode")
         self.action_toggle_file_sidebar = require_child(self.window, QAction, "actionToggleFileSidebar")
         toolbar = require_child(self.window, QToolBar, "mainToolBar")
-        toolbar.insertSeparator(self.action_start_translation)
-        toolbar.insertWidget(self.action_start_translation, QLabel("Provider", toolbar))
-        self.combo_ai_provider = QComboBox(toolbar)
-        self.combo_ai_provider.setObjectName("comboAiProvider")
-        self.combo_ai_provider.setMinimumWidth(120)
-        toolbar.insertWidget(self.action_start_translation, self.combo_ai_provider)
-        toolbar.insertWidget(self.action_start_translation, QLabel("モデル", toolbar))
-        self.combo_ai_model = QComboBox(toolbar)
-        self.combo_ai_model.setObjectName("comboAiModel")
-        self.combo_ai_model.setMinimumWidth(180)
-        toolbar.insertWidget(self.action_start_translation, self.combo_ai_model)
-        toolbar.insertSeparator(self.action_start_translation)
+        self.combo_ai_provider = require_child(self.window, QComboBox, "comboAiProvider")
+        self.combo_ai_model = require_child(self.window, QComboBox, "comboAiModel")
         self._refresh_ai_choices()
 
         header = self.table.horizontalHeader()
@@ -427,7 +402,6 @@ class MainWindowController(QObject):
         self.header_drop_indicator = QFrame(header)
         self.header_drop_indicator.setObjectName("headerDropIndicator")
         self.header_drop_indicator.setFixedWidth(3)
-        self.header_drop_indicator.setStyleSheet("QFrame#headerDropIndicator { background: #2d8cff; }")
         self.header_drop_indicator.hide()
         self.table.setSortingEnabled(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -447,7 +421,7 @@ class MainWindowController(QObject):
         self.combo_source_language = require_child(self.window, QComboBox, "comboSourceLanguage")
         self.combo_target_language = require_child(self.window, QComboBox, "comboTargetLanguage")
         self.combo_target_slot = require_child(self.window, QComboBox, "comboTargetSlot")
-        self.frame_target_drop = require_child(self.window, QFrame, "frameTargetDrop")
+        self.frame_target_drop = require_child(self.window, QFrame, "frameDropZone")
         self.list_target_items = require_child(self.window, QListWidget, "listTargetItems")
         self.button_create_project = require_child(self.window, QPushButton, "buttonCreateProject")
         self.list_recent_projects = require_child(self.window, QListWidget, "listRecentProjects")
@@ -459,11 +433,6 @@ class MainWindowController(QObject):
 
     def _connect_actions(self) -> None:
         self.action_new_project.triggered.connect(self.show_new_project_page)
-        self.action_open_file.triggered.connect(self.open_file)
-        self.action_open_folder.triggered.connect(self.open_folder)
-        self.action_open_translation_file.triggered.connect(self.open_translation_file)
-        self.action_save.triggered.connect(self.save_translation)
-        self.action_save_as.triggered.connect(self.save_translation_as)
         self.action_exit.triggered.connect(self.window.close)
 
         self.combo_game.currentIndexChanged.connect(self._on_game_selection_changed)
@@ -471,12 +440,6 @@ class MainWindowController(QObject):
         self.button_browse_icon.clicked.connect(self._browse_project_icon)
         self.button_clear_icon.clicked.connect(self.clear_project_icon)
         self.button_create_project.clicked.connect(self.create_project)
-
-        self.action_start_translation.triggered.connect(self.open_translation_dialog)
-        self.action_translate_selected.triggered.connect(self.open_translation_dialog)
-        self.action_translate_untranslated.triggered.connect(self.open_translation_dialog)
-        self.action_pause_translation.triggered.connect(lambda: show_not_implemented(self.window, tr("MainWindow", "一時停止")))
-        self.action_stop_translation.triggered.connect(self.stop_translation)
 
         self.action_settings.triggered.connect(self.open_settings)
         self.combo_ai_provider.currentIndexChanged.connect(self._on_ai_provider_changed)
@@ -537,7 +500,7 @@ class MainWindowController(QObject):
         action_restart.triggered.connect(self._restart_application_mode)
 
         action_open_plugins = help_menu.addAction(tr("MainWindow", "プラグインフォルダを開く"))
-        action_open_plugins.triggered.connect(lambda: self._open_folder(PLUGINS_DIR))
+        action_open_plugins.triggered.connect(lambda: self._open_folder(PROJECT_ROOT / "plugins"))
         action_logs = help_menu.addAction(tr("MainWindow", "ログフォルダを開く"))
         action_logs.triggered.connect(lambda: self._open_folder(log_directory()))
 
@@ -558,6 +521,30 @@ class MainWindowController(QObject):
 
     def _target_snapshot(self) -> list[tuple[str, str]]:
         return [(unit.id, unit.target_text) for unit in self.units]
+
+    def save_translation(self) -> None:
+        adapter = self.plugins.parsers.get(self.project.adapter_id)
+        if adapter is None:
+            self._restart_target = None
+            QMessageBox.warning(self.window, "保存エラー", "このプロジェクトの保存パーサーがありません。")
+            return
+        selected = QFileDialog.getExistingDirectory(
+            self.window, "訳文の出力先フォルダ", str(self.output_path or PROJECT_ROOT),
+        )
+        if not selected:
+            self._restart_target = None
+            return
+        snapshot = deepcopy(self.imported)
+        saved_targets = [(unit.id, unit.target_text) for unit in snapshot.project.units]
+        destination = Path(selected)
+
+        def completed(_result: object) -> None:
+            self.output_path = destination
+            self._saved_targets = saved_targets
+            if self._restart_target is not None:
+                self.window.close()
+
+        self._run_operation(lambda: export_translation(snapshot, adapter, destination), completed)
 
     def _run_operation(self, operation, completed) -> None:
         if self.io_worker is not None:
@@ -584,10 +571,8 @@ class MainWindowController(QObject):
         self.io_worker = None
         self._operation_dialog.close()
         self._operation_dialog.deleteLater()
-        if self._close_after_io:
-            self._close_after_io = False
-            self.window.close()
-            return
+        close_after_io = self._close_after_io
+        self._close_after_io = False
         if worker.error is not None:
             self._restart_target = None
             if not isinstance(worker.error, OperationCancelled):
@@ -595,6 +580,8 @@ class MainWindowController(QObject):
             return
         try:
             self._operation_completed(worker.result)
+            if close_after_io and not self._restart_started:
+                self.window.close()
         except Exception as exc:
             import logging
             logging.getLogger(__name__).exception("Operation completion failed")
@@ -610,7 +597,7 @@ class MainWindowController(QObject):
 
     def open_settings(self) -> None:
         controller = SettingsDialogController(
-            self.window, self.provider_registry, self.ai_provider_id,
+            self.entrance, self.window, self.ai_provider_id,
             self.ai_models, self.ai_selected_models, self.ai_api_keys, self.ai_concurrency,
         )
         if controller.exec() == QDialog.DialogCode.Accepted:
@@ -639,39 +626,6 @@ class MainWindowController(QObject):
         self.combo_ai_provider.setCurrentIndex(self.combo_ai_provider.findData(self.ai_provider_id))
         self.combo_ai_provider.blockSignals(False)
         self._refresh_ai_models()
-
-    def _on_ui_language_changed(self, language_code: str) -> None:
-        if self.active_adapter is not None and self.creation_context is not None:
-            try:
-                self.active_adapter.on_ui_language_changed(language_code, self.creation_context)
-            except Exception as exc:
-                self._creation_valid = False
-                self._panel_valid = False
-                self.button_create_project.setEnabled(False)
-                QMessageBox.warning(self.window, "プラグインエラー", str(exc))
-        with QSignalBlocker(self.combo_game):
-            for index in range(self.combo_game.count()):
-                adapter, game = self.combo_game.itemData(index)
-                self.combo_game.setItemText(index, f"{game.name} ({adapter.name})")
-        if self.active_adapter:
-            with QSignalBlocker(self.combo_source_language):
-                self.combo_source_language.setItemText(0, tr("MainWindow", "自動検出 (Auto Detect)"))
-                for code, label in self.active_adapter.supported_languages:
-                    index = self.combo_source_language.findData(code)
-                    if index >= 0:
-                        self.combo_source_language.setItemText(index, label)
-            selected = self.combo_game.currentData()
-            if selected:
-                for code, label in selected[1].available_slots:
-                    index = self.combo_target_slot.findData(code)
-                    if index >= 0:
-                        self.combo_target_slot.setItemText(index, label)
-                if not selected[1].available_slots:
-                    self.combo_target_slot.setItemText(0, tr("MainWindow", "該当なし"))
-        self._refresh_all_target_labels()
-        self.columns = default_translation_table_columns(self.status_text, lambda unit: unit.context)
-        self.columns_by_id = {column.id: column for column in self.columns}
-        self.refresh_all()
 
     def _refresh_ai_models(self) -> None:
         self.combo_ai_model.blockSignals(True)
@@ -710,6 +664,37 @@ class MainWindowController(QObject):
         self.ai_selected_models[self.ai_provider_id] = str(self.combo_ai_model.itemData(index))
         self._save_ai_choice()
 
+    def _on_ui_language_changed(self, language_code: str) -> None:
+        previous_errors = self._known_plugin_errors
+        self._known_plugin_errors = len(self.plugins.errors)
+        if len(self.plugins.errors) > previous_errors:
+            QMessageBox.warning(self.window, "プラグインエラー", "\n".join(self.plugins.errors[previous_errors:]))
+        with QSignalBlocker(self.combo_game):
+            for index in range(self.combo_game.count()):
+                adapter, game = self.combo_game.itemData(index)
+                self.combo_game.setItemText(index, f"{game.name} ({adapter.name})")
+        if self.active_adapter:
+            selected = self.combo_game.currentData()
+            if selected:
+                _, game = selected
+                with QSignalBlocker(self.combo_source_language):
+                    self.combo_source_language.setItemText(0, tr("MainWindow", "自動検出 (Auto Detect)"))
+                    for slot in game.slots:
+                        index = self.combo_source_language.findData(slot.language_code)
+                        if index >= 0:
+                            self.combo_source_language.setItemText(index, slot.name)
+                with QSignalBlocker(self.combo_target_slot):
+                    for slot in game.slots:
+                        index = self.combo_target_slot.findData(slot.slot_id)
+                        if index >= 0:
+                            self.combo_target_slot.setItemText(index, f"{slot.slot_id} ({slot.name})")
+                    if not game.slots:
+                        self.combo_target_slot.setItemText(0, tr("MainWindow", "該当なし"))
+        self._refresh_all_target_labels()
+        self.columns = default_translation_table_columns(self.status_text, lambda unit: unit.context)
+        self.columns_by_id = {column.id: column for column in self.columns}
+        self.refresh_all()
+
     def apply_filter_rules_to_units(self) -> None:
         configs: dict[str, AdapterFilterConfig] = {}
 
@@ -718,7 +703,7 @@ class MainWindowController(QObject):
 
             if adapter_id not in configs:
                 saved = load_adapter_filter_rules(adapter_id)
-                default_cfg = get_default_filter_config(adapter_id)
+                default_cfg = get_default_filter_config(adapter_id, self.plugins.parsers.values())
                 configs[adapter_id] = AdapterFilterConfig.from_dict(saved, default_cfg.rules)
 
             cfg = configs[adapter_id]
@@ -728,17 +713,12 @@ class MainWindowController(QObject):
     def _init_project_creation_ui(self) -> None:
         self.combo_game.blockSignals(True)
         self.combo_game.clear()
-        for adapter in get_all_adapters():
-            for game in getattr(adapter, "supported_games", []):
+        for adapter in self.plugins.parsers.values():
+            for game in adapter.supported_games:
                 self.combo_game.addItem(f"{game.name} ({adapter.name})", (adapter, game))
         self.combo_game.blockSignals(False)
 
         self.combo_target_language.clear()
-        languages = {locale.bcp47Name(): locale.nativeLanguageName() for locale in QLocale.matchingLocales(
-            QLocale.Language.AnyLanguage, QLocale.Script.AnyScript, QLocale.Country.AnyCountry)}
-        for code, label in sorted(languages.items(), key=lambda pair: pair[1]):
-            self.combo_target_language.addItem(f"{label} ({code})", code)
-        self.combo_target_language.setCurrentIndex(self.combo_target_language.findData("ja"))
 
         self._on_game_selection_changed()
 
@@ -751,23 +731,29 @@ class MainWindowController(QObject):
         adapter, game = selected_data
         self._changing_game = True
         new_context: MainWindowCreationContext | None = None
+        creation_adapter: CreationAdapter | None = None
         panel = None
         try:
+            creation_adapter = self.creation_adapters.get(adapter.id)
+            if creation_adapter is None:
+                raise RuntimeError("UI extension is not connected: " + adapter.id)
             if self.active_adapter is not adapter:
                 new_context = MainWindowCreationContext(self, adapter.id)
-                panel = adapter.create_creation_panel(new_context)
+                self.plugins.bind_creation(adapter.id, new_context.actions())
+                panel = creation_adapter.create_creation_panel(self.plugins.context(adapter.id))
                 if not isinstance(panel, QWidget):
                     raise TypeError("create_creation_panel must return QWidget")
                 layout = self.frame_target_drop.layout()
                 if layout is None:
                     raise RuntimeError("Creation slot layout is missing")
                 if self.active_creation_panel is not None:
-                    previous_adapter = self.active_adapter
+                    previous_adapter = self.active_creation_adapter
                     if previous_adapter is None:
                         raise RuntimeError("Creation panel has no owning adapter")
                     previous_adapter.dispose_creation_panel(self.active_creation_panel)
                 if self.creation_context:
                     self.creation_context.active = False
+                    self.plugins.bind_creation(self.creation_context.adapter_id, None)
                 while layout.count():
                     item = layout.takeAt(0)
                     widget = item.widget() if item is not None else None
@@ -775,35 +761,49 @@ class MainWindowController(QObject):
                         widget.hide()
                         widget.deleteLater()
                 self.active_adapter = adapter
+                self.active_creation_adapter = creation_adapter
                 self.creation_context = new_context
                 self.active_creation_panel = panel
                 layout.addWidget(panel)
                 panel.show()
-                with QSignalBlocker(self.combo_source_language):
-                    self.combo_source_language.clear()
-                    self.combo_source_language.addItem(tr("MainWindow", "自動検出 (Auto Detect)"), "auto")
-                    for code, label in adapter.supported_languages:
-                        self.combo_source_language.addItem(label, code)
+
+            # 翻訳元言語（原文）: 選択されたゲームのスロットに連動
+            with QSignalBlocker(self.combo_source_language):
+                current_src = self.combo_source_language.currentData()
+                self.combo_source_language.clear()
+                self.combo_source_language.addItem(tr("MainWindow", "自動検出 (Auto Detect)"), "auto")
+                for slot in game.slots:
+                    self.combo_source_language.addItem(slot.name, slot.language_code)
+                idx = self.combo_source_language.findData(current_src)
+                self.combo_source_language.setCurrentIndex(max(0, idx))
+
+            # 出力言語スロット: 選択されたゲームのスロットに連動
             with QSignalBlocker(self.combo_target_slot):
                 self.combo_target_slot.clear()
-                for code, label in game.available_slots:
-                    self.combo_target_slot.addItem(label, code)
-                if not game.available_slots:
+                for slot in game.slots:
+                    self.combo_target_slot.addItem(f"{slot.slot_id} ({slot.name})", slot.slot_id)
+                if not game.slots:
                     self.combo_target_slot.addItem(tr("MainWindow", "該当なし"), "")
-                self.combo_target_slot.setEnabled(bool(game.available_slots))
-                self.combo_target_slot.setCurrentIndex(max(0, self.combo_target_slot.findData(game.default_slot)))
+                self.combo_target_slot.setEnabled(bool(game.slots))
+                default_idx = self.combo_target_slot.findData(game.default_slot_id)
+                self.combo_target_slot.setCurrentIndex(max(0, default_idx))
             context = self.creation_context
             if context is None:
                 raise RuntimeError("Creation context is missing")
-            adapter.on_game_selected(game.id, context)
-            adapter.on_ui_language_changed(current_ui_language(), context)
+            creation_adapter.on_game_selected(game.id, self.plugins.context(adapter.id))
             self._creation_valid = True
             self._panel_valid = True
             self._refresh_all_target_labels()
         except Exception as exc:
             if new_context is not None and new_context is not self.creation_context:
                 new_context.active = False
+                self.plugins.bind_creation(new_context.adapter_id, None)
                 if isinstance(panel, QWidget):
+                    if creation_adapter is not None:
+                        try:
+                            creation_adapter.dispose_creation_panel(panel)
+                        except Exception as disposal_error:
+                            self.plugins.report_error(new_context.adapter_id, disposal_error)
                     panel.deleteLater()
             self._creation_valid = False
             self._panel_valid = False
@@ -860,7 +860,10 @@ class MainWindowController(QObject):
                 raise RuntimeError("No creation adapter selected")
             if not path.exists() or (path.is_file() and not adapter.can_load(path)):
                 raise ValueError(tr("MainWindow", "選択形式で読み込めない対象です"))
-            text, style, tooltip = adapter.format_target_path_label(path, current_src)
+            creation_adapter = self.active_creation_adapter
+            if creation_adapter is None:
+                raise RuntimeError("No UI extension connected")
+            text, style, tooltip = creation_adapter.format_target_path_label(path, current_src)
         except Exception as exc:
             text = path.name
             style = "color: #d97706;"
@@ -985,8 +988,7 @@ class MainWindowController(QObject):
                 self.active_creation_panel.setEnabled(not busy)
         self.combo_target_slot.setEnabled(not busy and bool(self.combo_target_slot.currentData()))
         self.button_create_project.setEnabled(not busy and self._creation_valid)
-        for action in (self.action_open_file, self.action_open_folder, self.action_new_project,
-                       self.action_settings):
+        for action in (self.action_new_project, self.action_settings):
             action.setEnabled(not busy)
         self.window.statusBar().showMessage(tr("MainWindow", "対象を解析しています…") if busy else "")
 
@@ -1004,7 +1006,7 @@ class MainWindowController(QObject):
                 if suggestions.get("game_id"):
                     game = next(g for g in adapter.supported_games if g.id == suggestions["game_id"])
                     imported.project.game_id = game.id
-                    imported.project.target_file_language = game.default_slot
+                    imported.project.target_file_language = game.default_slot_id
         self.load_import(imported)
         self.window.setWindowTitle(f"AUTOlingua - {imported.project.name}")
 
@@ -1022,9 +1024,6 @@ class MainWindowController(QObject):
 
     def _set_initial_state(self) -> None:
         self.stack_main.setCurrentIndex(0)
-        self.action_open_translation_file.setEnabled(False)
-        self.action_save.setEnabled(False)
-        self.action_save_as.setEnabled(False)
         self.action_stop_translation.setEnabled(False)
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
@@ -1058,128 +1057,12 @@ class MainWindowController(QObject):
             sidebar_visible=sidebar,
         ))
 
-    def open_file(self) -> None:
-        file_name, _ = QFileDialog.getOpenFileName(
-            self.window,
-            tr("MainWindow", "翻訳対象ファイルを開く"),
-            str(Path.cwd()),
-            supported_file_filter(),
-        )
-        if not file_name:
-            return
-
-        path = Path(file_name)
-        try:
-            adapter = self.active_adapter if self.active_adapter and self.active_adapter.can_load(path) else adapter_for(path)
-        except Exception as exc:
-            QMessageBox.warning(self.window, "読み込みエラー", str(exc))
-            return
-        if adapter is None:
-            QMessageBox.warning(self.window, tr("MainWindow", "エラー"), tr("MainWindow", "対応するアダプターが見つかりません。"))
-            return
-
-        self.show_new_project_page()
-        if adapter is not self.active_adapter:
-            self.select_game_by_id(adapter.supported_games[0].id, adapter.id)
-        try:
-            self.add_target_path(path)
-        except Exception as exc:
-            QMessageBox.warning(self.window, "読み込みエラー", str(exc))
-
-    def open_folder(self) -> None:
-        folder_name = QFileDialog.getExistingDirectory(
-            self.window,
-            tr("MainWindow", "翻訳対象フォルダを開く"),
-            str(Path.cwd()),
-        )
-        if not folder_name:
-            return
-
-        self.show_new_project_page()
-        try:
-            self.add_target_path(Path(folder_name))
-        except Exception as exc:
-            QMessageBox.warning(self.window, "読み込みエラー", str(exc))
-
-    def open_translation_file(self) -> None:
-        if len(self.project.sources) != 1:
-            return
-
-        file_name, _ = QFileDialog.getOpenFileName(
-            self.window,
-            tr("MainWindow", "既存訳ファイルを開く"),
-            str(Path(self.project.sources[0].id).parent),
-            supported_file_filter(),
-        )
-        if not file_name:
-            return
-
-        path = Path(file_name)
-        if path.resolve() == Path(self.project.sources[0].id).resolve():
-            QMessageBox.warning(self.window, tr("MainWindow", "エラー"), tr("MainWindow", "原文と同じファイルは指定できません。"))
-            return
-
-        adapter = adapter_by_id(self.project.adapter_id)
-        if not adapter.can_load(path):
-            QMessageBox.warning(self.window, tr("MainWindow", "エラー"), tr("MainWindow", "原文と同じ形式のファイルを選択してください。"))
-            return
-
-        if any(unit.target_text for unit in self.units):
-            answer = QMessageBox.question(
-                self.window,
-                tr("MainWindow", "既存訳の読み込み"),
-                tr("MainWindow", "現在の訳文を既存訳ファイルの内容で置き換えますか？"),
-            )
-            if answer != QMessageBox.StandardButton.Yes:
-                return
-
-        self._run_operation(lambda: load_file(path, adapter), self._existing_translation_loaded)
-
-    def _existing_translation_loaded(self, translation: ImportedTranslation) -> None:
-        try:
-            summary = apply_existing_translation(self.imported, translation)
-        except Exception as exc:
-            QMessageBox.warning(self.window, tr("MainWindow", "エラー"), str(exc))
-            return
-
-        self.existing_translation = translation
-        self._pending_human_memory.clear()
-        self._translation_methods.clear()
-        try:
-            with TranslationMemoryStore() as memory:
-                for unit in self.units:
-                    memory.record_imported(
-                        unit.source_text, unit.target_text, self.project.source_language,
-                        self.project.target_language, self.memory_context_for_unit(unit),
-                    )
-        except (OSError, ValueError, sqlite3.Error) as exc:
-            QMessageBox.warning(self.window, tr("MainWindow", "翻訳メモリ"), str(exc))
-        self.output_path = None
-        self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
-        self.refresh_all()
-        self.window.statusBar().showMessage(
-            tr("MainWindow", "既存訳を{matched}件対応付けました（未翻訳{untranslated}件、翻訳済み{translated}件）。").format(
-                matched=summary.matched,
-                untranslated=summary.untranslated,
-                translated=summary.translated,
-            ),
-            8000,
-        )
-
     def load_import(self, imported: ImportedTranslation) -> None:
-        self._pending_human_memory.clear()
-        self._translation_methods.clear()
-        self.existing_translation = None
         self.output_path = None
         self.imported = imported
         self.project = imported.project
         self.units = self.project.units
         self._saved_targets = self._target_snapshot()
-        self.action_open_translation_file.setEnabled(
-            len(self.project.sources) == 1
-        )
-        self.action_save.setEnabled(bool(self.project.sources))
-        self.action_save_as.setEnabled(self.action_save.isEnabled())
         self.apply_filter_rules_to_units()
         self.current_unit = self.units[0] if self.units else None
         self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
@@ -1236,8 +1119,6 @@ class MainWindowController(QObject):
                 self.table.setItem(row, column_index, item)
         self.apply_header_visual_order()
         self.table.resizeColumnsToContents()
-        self.progress.setMaximum(max(len(self.units), 1))
-        self.progress.setValue(sum(1 for unit in self.units if unit.state == UnitState.TRANSLATED))
 
     def sync_focus_from_table(self) -> None:
         selected = self.table.selectedItems()
@@ -1281,18 +1162,14 @@ class MainWindowController(QObject):
         if self._updating_focus or self.current_unit is None:
             return
         new_target = self.edit_translation.toPlainText()
-        if new_target != self.current_unit.target_text:
-            self._pending_human_memory[self.current_unit.id] = new_target
-            self._translation_methods[self.current_unit.id] = "human"
         self.current_unit.target_text = new_target
         self.current_unit.context = self.edit_context.toPlainText()
-        self.current_unit.state = self.current_state_from_controls(self.current_unit.target_text)
-        self._updating_focus = True
-        try:
-            self.check_translated.setChecked(self.current_unit.state == UnitState.TRANSLATED)
-            self.check_doubtful.setChecked(self.current_unit.state == UnitState.DOUBTFUL)
-        finally:
-            self._updating_focus = False
+        if self.check_doubtful.isChecked():
+            self.current_unit.state = UnitState.DOUBTFUL
+        elif self.check_translated.isChecked():
+            self.current_unit.state = UnitState.TRANSLATED
+        else:
+            self.current_unit.state = UnitState.UNTRANSLATED
         self.current_unit.hidden = self.check_hidden.isChecked()
         self.current_unit.locked = self.check_locked.isChecked()
         self.refresh_table()
@@ -1338,228 +1215,6 @@ class MainWindowController(QObject):
         visible = self.action_toggle_file_sidebar.isChecked()
         self.frame_files.setVisible(visible)
 
-    def open_translation_dialog(self) -> None:
-        selected_only = self.sender() is self.action_translate_selected
-        if self.translation_worker is not None or not self.units:
-            return
-        dialog = SimpleDialogController("TranslationDialog.ui", self.window).dialog
-        label_total = require_child(dialog, QLabel, "labelTotalValue")
-        label_untranslated = require_child(dialog, QLabel, "labelUntranslatedValue")
-        label_selected = require_child(dialog, QLabel, "labelSelectedValue")
-        combo_source = require_child(dialog, QComboBox, "comboSourceLanguage")
-        combo_target = require_child(dialog, QComboBox, "comboTargetLanguage")
-        skip_translated = require_child(dialog, QCheckBox, "checkSkipTranslated")
-        skip_translated.setText(tr("MainWindow", "未翻訳のみ翻訳（既存テキストを保持）"))
-        skip_translated.setChecked(True)
-        skip_translated.setEnabled(False)
-        skip_locked = require_child(dialog, QCheckBox, "checkSkipLocked")
-        skip_locked.setChecked(True)
-        skip_locked.setEnabled(False)
-
-        label_total.setText(str(len(self.units)))
-        label_untranslated.setText(str(sum(1 for unit in self.units if unit.state == UnitState.UNTRANSLATED)))
-        label_selected.setText(str(len({item.row() for item in self.table.selectedItems()})))
-
-        combo_source.clear()
-        combo_target.clear()
-        for combo, code in ((combo_source, self.project.source_language),
-                            (combo_target, self.project.target_language)):
-            combo.addItem(f"{QLocale(code).nativeLanguageName()} ({code})", code)
-
-        if self.project.source_language:
-            idx = combo_source.findData(self.project.source_language)
-            if idx >= 0:
-                combo_source.setCurrentIndex(idx)
-        if self.project.target_language:
-            idx = combo_target.findData(self.project.target_language)
-            if idx >= 0:
-                combo_target.setCurrentIndex(idx)
-        combo_source.setEnabled(False)
-        combo_target.setEnabled(False)
-
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-        if combo_source.currentData() == combo_target.currentData():
-            QMessageBox.warning(self.window, tr("MainWindow", "翻訳"), tr("MainWindow", "翻訳元と翻訳先の言語が同じです。"))
-            return
-
-        if selected_only:
-            rows = {item.row() for item in self.table.selectedItems()}
-            candidates = [self.filtered_units[row] for row in sorted(rows)]
-        else:
-            candidates = self.units
-        items = [
-            (unit.id, unit.source_text, self.memory_context_for_unit(unit))
-            for unit in candidates
-            if unit.state == UnitState.UNTRANSLATED and not unit.locked
-            and (not unit.target_text.strip() or unit.target_text == unit.source_text)
-            and unit.source_text.strip()
-        ]
-        if not items:
-            QMessageBox.information(self.window, tr("MainWindow", "翻訳"), tr("MainWindow", "翻訳できる未翻訳項目がありません。"))
-            return
-        self.project.source_language = str(combo_source.currentData())
-        self.project.target_language = str(combo_target.currentData())
-        self.start_translation(items)
-
-    def memory_context_for_unit(self, unit: TranslationUnit) -> str:
-        ref = self.imported.source_refs.get(unit.id)
-        return f"{ref.source_id if ref else ''}::{unit.label}"
-
-    def start_translation(self, items: list[tuple[str, str, str]]) -> None:
-        worker = TranslationWorker(
-            items,
-            self.project.source_language,
-            self.project.target_language,
-            self.ai_provider_id,
-            self.provider_registry.get(self.ai_provider_id),
-            self.ai_api_keys.get(self.ai_provider_id, ""),
-            str(self.combo_ai_model.currentData() or ""),
-            self.ai_concurrency,
-        )
-        self.translation_worker = worker
-        worker.translated.connect(self.on_translation_result)
-        worker.failed.connect(self.on_translation_error)
-        worker.advanced.connect(self.on_translation_progress)
-        worker.finished.connect(self.on_translation_finished)
-        worker.finished.connect(worker.deleteLater)
-        self.action_start_translation.setEnabled(False)
-        self.action_translate_selected.setEnabled(False)
-        self.action_translate_untranslated.setEnabled(False)
-        self.action_open_file.setEnabled(False)
-        self.action_open_folder.setEnabled(False)
-        self.action_open_translation_file.setEnabled(False)
-        self.action_stop_translation.setEnabled(True)
-        self.progress.setRange(0, len(items))
-        self.progress.setValue(0)
-        worker.start()
-
-    def stop_translation(self) -> None:
-        if self.translation_worker is not None:
-            self.translation_worker.stop()
-            self.window.statusBar().showMessage(tr("MainWindow", "停止しています。現在のリクエストの終了を待ちます。"))
-
-    def on_translation_result(self, unit_id: str, target_text: str, method: str) -> None:
-        unit = next((item for item in self.units if item.id == unit_id), None)
-        if unit is None or unit.state != UnitState.UNTRANSLATED or unit.locked or (
-            unit.target_text.strip() and unit.target_text != unit.source_text
-        ):
-            return
-        unit.target_text = target_text
-        unit.state = UnitState.TRANSLATED
-        self._translation_methods[unit_id] = method
-        self.refresh_all()
-
-    def on_translation_error(self, unit_id: str, message: str) -> None:
-        unit = next((item for item in self.units if item.id == unit_id), None)
-        if unit is not None:
-            unit.issues.append(Issue(message=f"翻訳: {message}"))
-            self.refresh_all()
-
-    def on_translation_progress(self, completed: int, total: int) -> None:
-        self.progress.setRange(0, total)
-        self.progress.setValue(completed)
-        self.window.statusBar().showMessage(f"{completed} / {total}")
-
-    def on_translation_finished(self) -> None:
-        self.translation_worker = None
-        self.action_start_translation.setEnabled(True)
-        self.action_translate_selected.setEnabled(True)
-        self.action_translate_untranslated.setEnabled(True)
-        self.action_open_file.setEnabled(True)
-        self.action_open_folder.setEnabled(True)
-        self.action_open_translation_file.setEnabled(len(self.project.sources) == 1)
-        self.action_stop_translation.setEnabled(False)
-        self.refresh_all()
-        self.window.statusBar().showMessage(tr("MainWindow", "翻訳処理が終了しました。"), 5000)
-        if self._close_after_translation:
-            self._close_after_translation = False
-            self.window.close()
-
-    def save_translation(self) -> None:
-        if self.output_path is None:
-            self.save_translation_as()
-        else:
-            self._write_translation(self.output_path)
-
-    def save_translation_as(self) -> None:
-        if not self.project.sources:
-            self._restart_target = None
-            return
-        if len(self.project.sources) > 1:
-            folder = QFileDialog.getExistingDirectory(self.window, tr("MainWindow", "翻訳結果の出力フォルダ"))
-            if folder:
-                self._write_translation(Path(folder))
-            else:
-                self._restart_target = None
-            return
-        adapter = adapter_by_id(self.project.adapter_id)
-        source_path = Path(self.project.sources[0].id)
-        self._run_operation(lambda: adapter.output_name(source_path, self.project),
-                            lambda name: self._choose_output_file(source_path, name))
-
-    def _choose_output_file(self, source_path: Path, default_name: str) -> None:
-        if not default_name or Path(default_name).name != default_name:
-            self._restart_target = None
-            QMessageBox.warning(self.window, "保存エラー", "出力ファイル名が不正です。")
-            return
-        if self.existing_translation is not None:
-            existing_path = Path(self.existing_translation.project.sources[0].id)
-            if source_path.with_name(default_name).resolve() == existing_path.resolve():
-                default_name = f"{source_path.with_name(default_name).stem}_autolingua{source_path.suffix}"
-        file_name, _ = QFileDialog.getSaveFileName(
-            self.window, tr("MainWindow", "翻訳結果を別ファイルへ保存"),
-            str(source_path.with_name(default_name)),
-            supported_file_filter(adapter_by_id(self.project.adapter_id)))
-        if file_name:
-            self._write_translation(Path(file_name))
-        else:
-            self._restart_target = None
-
-    def _write_translation(self, path: Path) -> None:
-        adapter = adapter_by_id(self.project.adapter_id)
-        self._run_operation(lambda: plan_output(adapter, self.imported, path, self.existing_translation),
-                            lambda outputs: self._confirm_output(path, outputs))
-
-    def _confirm_output(self, path: Path, outputs) -> None:
-        existing_paths = [str(output.path) for output in outputs if output.path.exists()]
-        if existing_paths and path != self.output_path:
-            answer = QMessageBox.question(self.window, tr("MainWindow", "保存"),
-                tr("MainWindow", "既存の出力ファイルを上書きしますか？") + "\n" + "\n".join(existing_paths))
-            if answer != QMessageBox.StandardButton.Yes:
-                self._restart_target = None
-                return
-        adapter = adapter_by_id(self.project.adapter_id)
-        self._run_operation(lambda: write_output(adapter, outputs, self.existing_translation),
-                            lambda _: self._output_saved(path))
-
-    def _output_saved(self, path: Path) -> None:
-        self.output_path = path
-        self._saved_targets = self._target_snapshot()
-        self._record_human_edits()
-        self.window.statusBar().showMessage(tr("MainWindow", "翻訳結果を保存しました: {path}").format(path=str(path)), 8000)
-        if self._restart_target is not None:
-            QTimer.singleShot(0, self.window.close)
-
-    def _record_human_edits(self) -> None:
-        if not self._pending_human_memory:
-            return
-        try:
-            with TranslationMemoryStore() as memory:
-                for unit in self.units:
-                    target = self._pending_human_memory.get(unit.id)
-                    if target is None or target != unit.target_text:
-                        continue
-                    if not target.strip() or target == unit.source_text or unit.state != UnitState.TRANSLATED:
-                        continue
-                    memory.record(
-                        unit.source_text, target, self.project.source_language,
-                        self.project.target_language, "human", self.memory_context_for_unit(unit),
-                    )
-                    del self._pending_human_memory[unit.id]
-        except (OSError, ValueError, sqlite3.Error) as exc:
-            QMessageBox.warning(self.window, tr("MainWindow", "翻訳メモリ"), str(exc))
-
     def open_problems_dialog(self) -> None:
         controller = SimpleDialogController("ProblemsDialog.ui", self.window)
         dialog = controller.dialog
@@ -1593,15 +1248,6 @@ class MainWindowController(QObject):
         if unit.state == UnitState.DOUBTFUL:
             return tr("MainWindow", "疑問あり")
         if unit.state == UnitState.TRANSLATED:
-            method = self._translation_methods.get(unit.id)
-            if method == "human":
-                return tr("MainWindow", "人間が修正")
-            if method == "exact":
-                return tr("MainWindow", "翻訳メモリ")
-            if method == "structural":
-                return tr("MainWindow", "構造一致")
-            if method == "ai":
-                return tr("MainWindow", "AI翻訳")
             return tr("MainWindow", "翻訳済み")
         return tr("MainWindow", "未翻訳")
 
@@ -1618,15 +1264,6 @@ class MainWindowController(QObject):
             tr("MainWindow", "翻訳済み"): STATUS_MATCHERS["translated"],
             tr("MainWindow", "未翻訳"): STATUS_MATCHERS["untranslated"],
         }
-
-    def current_state_from_controls(self, target_text: str) -> UnitState:
-        if not target_text.strip() or (
-            self.current_unit is not None and target_text == self.current_unit.source_text
-        ):
-            return UnitState.UNTRANSLATED
-        if self.check_doubtful.isChecked():
-            return UnitState.DOUBTFUL
-        return UnitState.TRANSLATED
 
     def count_units_for_source(self, source: TranslationSource) -> int:
         return sum(1 for ref in self.imported.source_refs.values() if ref.source_id == source.id)

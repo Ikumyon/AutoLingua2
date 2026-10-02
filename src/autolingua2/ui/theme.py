@@ -4,14 +4,13 @@ from dataclasses import dataclass, field
 import json
 from pathlib import Path
 
-from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QApplication
 
-from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from autolingua2.ir.validation import record, required, text, string_field
 from autolingua2.ui.i18n import system_language
+from autolingua2.ui.resource_locales import resolve_locale_text
 
 
-THEMES_DIR = PROJECT_ROOT / "theme" / "themes"
 DEFAULT_THEME_ID = "system"
 
 
@@ -27,82 +26,38 @@ class ThemeInfo:
     qss_paths: list[Path] = field(default_factory=list)
 
 
-def _resolve_locale_text(locales_dir: Path, key: str, language: str) -> str | None:
-    if not locales_dir.exists() or not locales_dir.is_dir():
-        return None
-
-    # Candidate file names in order of preference
-    candidates: list[str] = [f"{language}.json"]
-    if "_" in language:
-        candidates.append(f"{language.split('_')[0]}.json")
-    if language != "en_US":
-        candidates.extend(["en_US.json", "en.json"])
-
-    for candidate in candidates:
-        locale_file = locales_dir / candidate
-        if locale_file.is_file():
-            try:
-                with open(locale_file, encoding="utf-8") as f:
-                    data = json.load(f)
-                if isinstance(data, dict) and key in data:
-                    return str(data[key])
-            except Exception:
-                continue
-
-    # Fallback to any json file found
-    for locale_file in locales_dir.glob("*.json"):
-        try:
-            with open(locale_file, encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict) and key in data:
-                return str(data[key])
-        except Exception:
-            continue
-
-    return None
-
-
 class ThemeManager:
-    def __init__(self, themes_dir: Path | None = None) -> None:
-        self.themes_dir = themes_dir or THEMES_DIR
+    def __init__(self) -> None:
+        self._packages: dict[str, tuple[Path, dict[str, object]]] = {}
         self._current_theme_id: str = DEFAULT_THEME_ID
 
-    def discover_themes(self, ui_language: str = "system") -> dict[str, ThemeInfo]:
-        """themes ディレクトリ内の各テーマを走査して ThemeInfo の辞書を返す。"""
+    def _register(self, path: Path) -> None:
+        meta = record(json.loads((path / "theme.json").read_text(encoding="utf-8")))
+        package_id = text(required(meta, "id"), nonempty=True)
+        if package_id in self._packages:
+            raise ValueError(f"Duplicate theme ID: {package_id}")
+        for key in ("name_key", "description_key", "type"):
+            if key in meta:
+                text(meta[key])
+        self._packages[package_id] = (path, meta)
+
+    def available_themes(self, ui_language: str = "system") -> dict[str, ThemeInfo]:
+        """Return registered packages; never discover additional directories."""
         if not ui_language or ui_language.lower() == "system":
             ui_language = system_language()
         themes: dict[str, ThemeInfo] = {}
-        if not self.themes_dir.exists():
-            return themes
-
-        for item in sorted(self.themes_dir.iterdir()):
-            if not item.is_dir():
-                continue
-
-            meta_file = item / "theme.json"
-            if not meta_file.is_file():
-                continue
-
-            try:
-                with open(meta_file, encoding="utf-8") as f:
-                    meta = json.load(f)
-            except Exception:
-                continue
-
-            if not isinstance(meta, dict):
-                continue
-
-            theme_id = str(meta.get("id") or item.name)
-            name_key = meta.get("name_key", "")
-            desc_key = meta.get("description_key", "")
-            theme_type = str(meta.get("type", "system"))
+        for package_id, (item, meta) in self._packages.items():
+            theme_id = package_id
+            name_key = string_field(meta, "name_key")
+            desc_key = string_field(meta, "description_key")
+            theme_type = string_field(meta, "type", "system")
 
             locales_dir = item / "locales"
-            name = _resolve_locale_text(locales_dir, name_key, ui_language) if name_key else None
+            name = resolve_locale_text(locales_dir, name_key, ui_language) if name_key else None
             if not name:
                 name = theme_id.capitalize()
 
-            description = _resolve_locale_text(locales_dir, desc_key, ui_language) if desc_key else ""
+            description = resolve_locale_text(locales_dir, desc_key, ui_language) if desc_key else ""
             if not description:
                 description = ""
 
@@ -134,7 +89,7 @@ class ThemeManager:
                 return False
             app = instance
 
-        themes = self.discover_themes()
+        themes = self.available_themes()
         theme = themes.get(theme_id)
         if not theme:
             # Fallback to system

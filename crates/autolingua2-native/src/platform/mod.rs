@@ -13,6 +13,8 @@ compile_error!("AUTOlingua2 supports Windows and Linux only");
 pub use os_impl::{executable_name, development_python, configure_core_command, log_directory, open_folder};
 
 #[cfg(feature = "python")]
-mod bindings;
+pub mod bindings;
+#[cfg(feature = "python")]
+mod child;
 #[cfg(feature = "python")]
 pub use bindings::*;

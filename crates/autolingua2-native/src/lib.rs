@@ -24,9 +24,14 @@ fn autolingua2_native(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     let platform_module = PyModule::new(py, "platform")?;
     platform_module.add_function(wrap_pyfunction!(platform::configure_desktop_integration, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::allocate_debug_console, &platform_module)?)?;
-    platform_module.add_function(wrap_pyfunction!(platform::is_executable_plugin, &platform_module)?)?;
-    platform_module.add_function(wrap_pyfunction!(platform::plugin_creation_flags, &platform_module)?)?;
-    platform_module.add_class::<platform::ProcessGroup>()?;
+    platform_module.add_function(wrap_pyfunction!(platform::start_plugin, &platform_module)?)?;
+    platform_module.add_function(wrap_pyfunction!(platform::plugin_platform_key, &platform_module)?)?;
+    platform_module.add_function(wrap_pyfunction!(platform::bindings::executable_filename, &platform_module)?)?;
+    platform_module.add_function(wrap_pyfunction!(platform::bindings::show_folder, &platform_module)?)?;
+    platform_module.add_function(wrap_pyfunction!(platform::spawn_launcher, &platform_module)?)?;
+    platform_module.add_class::<platform::PluginProcess>()?;
+    platform_module.add_class::<platform::BinaryReader>()?;
+    platform_module.add_class::<platform::BinaryWriter>()?;
     m.add_submodule(&platform_module)?;
     let bootstrap_module = PyModule::new(py, "bootstrap")?;
     bootstrap_module.add_class::<bootstrap::bindings::CoreSession>()?;

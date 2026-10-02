@@ -9,16 +9,6 @@ from autolingua2.ui.i18n import tr
 from .base import SimpleDialogController, require_child
 
 
-FALLBACK_LANGUAGES: list[tuple[str, str]] = [
-    ("en", "English"),
-    ("ja", "Japanese"),
-    ("zh", "Simplified Chinese"),
-    ("de", "German"),
-    ("fr", "French"),
-    ("es", "Spanish"),
-    ("ru", "Russian"),
-    ("ko", "Korean"),
-]
 
 
 class ProjectLanguageDialogController(SimpleDialogController):
@@ -39,7 +29,7 @@ class ProjectLanguageDialogController(SimpleDialogController):
             f"{tr('ProjectLanguageDialog', '対象')}: {self.path.name} ({self.adapter.name})"
         )
 
-        languages = getattr(self.adapter, "supported_languages", None) or FALLBACK_LANGUAGES
+        languages = self.adapter.supported_languages
 
         self.combo_source.clear()
         self.combo_target.clear()

@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
-import logging
 from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication, QLocale, QTranslator, QObject, Signal
 
-from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from collections.abc import Mapping
+from types import MappingProxyType
+
+from autolingua2.ir.validation import record, required, text
 
 
-TRANSLATIONS_DIR = PROJECT_ROOT / "translations"
 DEFAULT_LANGUAGE = "ja_JP"
 
 _current_language = DEFAULT_LANGUAGE
@@ -65,117 +66,63 @@ def system_language() -> str:
     return normalize_language(QLocale.system().name())
 
 
-def get_available_languages() -> dict[str, LanguageInfo]:
-    """translations/ 内で metadata.json を持つ言語フォルダのみを読み込んで返す。"""
-    languages: dict[str, LanguageInfo] = {}
+class LocalizationManager:
+    """Owns only application dictionaries; plugin dictionaries remain independent."""
 
-    if not TRANSLATIONS_DIR.exists():
-        return languages
+    def __init__(self) -> None:
+        self._languages: dict[str, LanguageInfo] = {}
+        self._installed: list[QTranslator] = []
+        self._app: QCoreApplication | None = None
 
-    for lang_dir in sorted(TRANSLATIONS_DIR.iterdir()):
-        if not lang_dir.is_dir():
-            continue
+    def _register(self, path: Path) -> None:
+        meta = record(json.loads((path / "metadata.json").read_text(encoding="utf-8")))
+        code = normalize_language(text(required(meta, "code"), nonempty=True))
+        name = text(required(meta, "name"), nonempty=True)
+        if code in self._languages:
+            raise ValueError(f"Duplicate UI language: {code}")
+        flag = text(meta.get("flag", ""))
+        flag_path = path / flag if flag else None
+        if flag_path is not None and not flag_path.is_file():
+            flag_path = None
+        self._languages[code] = LanguageInfo(code, name, flag_path, sorted(path.glob("*.qm")))
 
-        meta_file = lang_dir / "metadata.json"
-        if not meta_file.is_file():
-            continue
+    @property
+    def available_languages(self) -> Mapping[str, LanguageInfo]:
+        return MappingProxyType(self._languages)
 
-        try:
-            with open(meta_file, "r", encoding="utf-8") as f:
-                meta = json.load(f)
-            if not isinstance(meta, dict):
-                continue
-        except Exception:
-            continue
-
-        code_raw = meta.get("code")
-        name_raw = meta.get("name")
-        if not code_raw or not name_raw:
-            continue
-
-        code = normalize_language(str(code_raw))
-        name = str(name_raw)
-
-        # 国旗画像は metadata.json に "flag" が指定されている場合のみ
-        flag_path: Path | None = None
-        flag_file = meta.get("flag")
-        if flag_file and isinstance(flag_file, str):
-            custom_path = lang_dir / flag_file
-            if custom_path.is_file():
-                flag_path = custom_path
-
-        qm_paths = sorted(lang_dir.glob("*.qm"))
-
-        languages[code] = LanguageInfo(
-            code=code,
-            name=name,
-            flag_path=flag_path,
-            qm_paths=qm_paths,
-        )
-
-    return languages
-
-
-def resolve_ui_language(configured_language: str | None = None) -> str:
-    """設定値から実際に適用する言語コードを解決する。
-    
-    'system' の場合はOSの言語を検出し、対応パッケージがあればそれを採用。
-    未対応の場合は日本語(ja_JP)にフォールバックする。
-    """
-    if not configured_language or configured_language.lower() == "system":
-        sys_code = system_language()
-        available = get_available_languages()
-        if sys_code in available:
-            return sys_code
-        sys_prefix = sys_code.split("_")[0]
-        for code in available:
-            if code.split("_")[0] == sys_prefix:
+    def resolve_language(self, configured_language: str) -> str:
+        if not configured_language or configured_language.lower() == "system":
+            code = system_language()
+            if code in self._languages:
                 return code
-        return DEFAULT_LANGUAGE
+            prefix = code.split("_")[0]
+            for available in self._languages:
+                if available.split("_")[0] == prefix:
+                    return available
+            return DEFAULT_LANGUAGE
+        return normalize_language(configured_language)
 
-    return normalize_language(configured_language)
-
-
-_installed_translators: list[QTranslator] = []
-
-
-def install_ui_translator(app: QCoreApplication, language: str) -> None:
-    global _current_language
-
-    for trans in _installed_translators:
-        app.removeTranslator(trans)
-        trans.deleteLater()
-    _installed_translators.clear()
-
-    code = resolve_ui_language(language)
-    _current_language = code
-
-    # Only explicitly opted-in, successfully registered plugins provide Qt dictionaries.
-    from autolingua2.adapters.registry import get_all_adapters
-    for adapter in get_all_adapters():
-        provider = getattr(adapter, "qt_translation_files", None)
-        if provider is None:
-            continue
-        try:
-            for candidate in dict.fromkeys(provider(code)):
+    def apply_language(self, app: QCoreApplication, language: str) -> None:
+        global _current_language
+        self.close()
+        self._app = app
+        code = self.resolve_language(language)
+        _current_language = code
+        info = self._languages.get(code)
+        if info is not None:
+            for qm in info.qm_paths:
                 translator = QTranslator(app)
-                if translator.load(str(candidate)):
+                if translator.load(str(qm)):
                     app.installTranslator(translator)
-                    _installed_translators.append(translator)
+                    self._installed.append(translator)
                 else:
                     translator.deleteLater()
-                    logging.getLogger(__name__).warning("Cannot load translation: %s", candidate)
-        except Exception:
-            logging.getLogger(__name__).exception("Translation provider failed: %s", adapter.id)
-    # Qt searches in reverse installation order: host strings retain priority.
-    available = get_available_languages()
-    lang_info = available.get(code)
-    if lang_info:
-        for qm in lang_info.qm_paths:
-            translator = QTranslator(app)
-            if translator.load(str(qm)):
-                app.installTranslator(translator)
-                _installed_translators.append(translator)
-            else:
+        language_events().changed.emit(code)
+
+    def close(self) -> None:
+        if self._app is not None:
+            for translator in self._installed:
+                self._app.removeTranslator(translator)
                 translator.deleteLater()
-    language_events().changed.emit(code)
+        self._installed.clear()
+        self._app = None

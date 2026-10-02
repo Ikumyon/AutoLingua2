@@ -12,7 +12,11 @@ pub fn is_executable_plugin(path: &Path) -> bool {
         .is_ok_and(|path| unsafe { libc::access(path.as_ptr(), libc::X_OK) == 0 })
 }
 #[cfg(feature = "python")]
-pub fn plugin_creation_flags() -> u32 { 0 }
+pub fn configure_plugin_command(command: &mut std::process::Command) {
+    use std::os::unix::process::CommandExt;
+    // A dedicated process group lets cancellation terminate descendants too.
+    command.process_group(0);
+}
 #[cfg(feature = "python")]
 pub struct Group { pid: Option<u32> }
 #[cfg(feature = "python")]

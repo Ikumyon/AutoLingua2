@@ -51,13 +51,14 @@ class InlineEditableField(QWidget):
         self,
         text: str = "",
         placeholder: str = "",
-        icon_manager: IconManager | None = None,
+        *,
+        icon_manager: IconAPI,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._text = text
         self._placeholder = placeholder
-        self.icon_manager = icon_manager or IconManager()
+        self.icon_manager = icon_manager
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(6, 3, 6, 3)
@@ -166,12 +167,12 @@ class ModelRowWidget(QFrame):
     def __init__(
         self,
         entry: AiModel,
-        icon_manager: IconManager | None = None,
+        icon_manager: IconAPI,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.entry = entry
-        self.icon_manager = icon_manager or IconManager()
+        self.icon_manager = icon_manager
         self.setStyleSheet("ModelRowWidget { border-radius: 6px; }")
 
         layout = QHBoxLayout(self)
@@ -240,13 +241,10 @@ class ModelRowWidget(QFrame):
             enabled=self.check_enabled.isChecked(),
         )
 
-from autolingua2.adapters.registry import get_all_adapters
-from autolingua2.services.filter_rules import (
-    AdapterFilterConfig,
-    FilterRule,
-    get_default_filter_config,
-)
-from autolingua2.services.ai_providers import ProviderRegistry, discover_providers
+from autolingua2.extensions import ExtensionEntrance
+from autolingua2.ir.filter_rules import AdapterFilterConfig, FilterRule
+from autolingua2.services.filter_rules import get_default_filter_config
+from autolingua2.services.ai_providers import ProviderRegistry
 from autolingua2.services.settings_store import (
     AiModel,
     AiSettings,
@@ -260,33 +258,52 @@ from autolingua2.services.settings_store import (
     save_ui_language,
 )
 from autolingua2.ui.i18n import (
-    get_available_languages,
     normalize_language,
     system_language,
     tr,
 )
-from autolingua2.ui.icons import IconManager
-from autolingua2.ui.theme import ThemeManager
-from .base import SimpleDialogController, require_child
+from autolingua2.ui.resource_api import IconAPI
+from .base import SimpleDialogController, load_ui, require_child
 
 
 class SettingsDialogController(SimpleDialogController):
     def __init__(
-        self, parent: QWidget | None = None, registry: ProviderRegistry | None = None,
+        self, entrance: ExtensionEntrance, parent: QWidget | None = None,
         provider_id: str = "openai", models: dict[str, list[AiModel]] | None = None,
         selected_models: dict[str, str] | None = None,
         api_keys: dict[str, str] | None = None,
         concurrency: int = 4,
     ) -> None:
-        super().__init__("SettingsDialog.ui", parent)
+        super().__init__("dialogs/settings/SettingsDialog.ui", parent)
+        self.plugins = entrance.plugins
+        self.localization = entrance.localization
+        self.theme_manager = entrance.themes
+        self.icon_manager = entrance.icons
         self._filter_configs: dict[str, AdapterFilterConfig] = {}
-        self._current_adapter_id: str = "paradox_yaml"
+        self._current_adapter_id: str = ""
+        self._mount_pages()
         self._connect_category_stack()
         self._setup_ui_language()
         self._setup_themes_and_icons()
-        self._setup_ai(registry, provider_id, models or {}, selected_models or {}, api_keys or {}, concurrency)
+        self._setup_ai(self.plugins.providers, provider_id, models or {}, selected_models or {}, api_keys or {}, concurrency)
         self._setup_filter_rules()
         self._setup_dialog_buttons()
+
+    def _mount_pages(self) -> None:
+        pages = [
+            ("pageGeneral", "dialogs/settings/GeneralPage.ui"),
+            ("pageAI", "dialogs/settings/AiPage.ui"),
+            ("pageFile", "dialogs/settings/FilePage.ui"),
+            ("pageDisplay", "dialogs/settings/DisplayPage.ui"),
+            ("pageFilterRules", "dialogs/settings/FilterRulesPage.ui"),
+            ("pageGlossary", "dialogs/settings/GlossaryPage.ui"),
+        ]
+        for page_name, ui_name in pages:
+            container = require_child(self.dialog, QWidget, page_name)
+            layout = container.layout()
+            sub_widget = load_ui(ui_name, container)
+            if layout is not None:
+                layout.addWidget(sub_widget)
 
     def _setup_dialog_buttons(self) -> None:
         button_box = self.dialog.findChild(QDialogButtonBox, "buttonBox")
@@ -303,11 +320,11 @@ class SettingsDialogController(SimpleDialogController):
                 cancel_btn.setText(tr("SettingsDialog", "キャンセル"))
 
     def _setup_ai(
-        self, registry: ProviderRegistry | None, provider_id: str,
+        self, registry: ProviderRegistry, provider_id: str,
         models: dict[str, list[AiModel]], selected_models: dict[str, str],
         api_keys: dict[str, str], concurrency: int,
     ) -> None:
-        self.registry = registry if registry is not None else discover_providers()
+        self.registry = registry
         self.ai_models = {key: [AiModel(item.name, item.model, item.enabled) for item in values]
                           for key, values in models.items()}
         self.ai_selected_models = dict(selected_models)
@@ -419,7 +436,7 @@ class SettingsDialogController(SimpleDialogController):
             self.layout_model_list.addStretch()
 
     def _add_row_widget(self, entry: AiModel) -> ModelRowWidget:
-        row = ModelRowWidget(entry, icon_manager=getattr(self, "icon_manager", None), parent=self.scroll_area_models)
+        row = ModelRowWidget(entry, icon_manager=self.icon_manager, parent=self.scroll_area_models)
         row.deleted.connect(self._on_row_deleted)
         row.modelCommitted.connect(self._validate_model_if_needed)
         if self.layout_model_list is not None:
@@ -521,7 +538,7 @@ class SettingsDialogController(SimpleDialogController):
         # 先頭に「システム規定」を追加
         self.combo_ui_language.addItem(tr("SettingsDialog", "システム規定"), DEFAULT_UI_LANGUAGE)
 
-        available_languages = get_available_languages()
+        available_languages = self.localization.available_languages
         if not is_system and current_language not in available_languages:
             self.combo_ui_language.addItem(current_language, current_language)
 
@@ -543,9 +560,6 @@ class SettingsDialogController(SimpleDialogController):
         self.list_themes = require_child(self.dialog, QListWidget, "listThemes")
         self.list_icon_themes = require_child(self.dialog, QListWidget, "listIconThemes")
 
-        self.theme_manager = ThemeManager()
-        self.icon_manager = IconManager()
-
         current_theme, current_icon_theme = load_theme_settings()
         raw_language = load_ui_language()
         if not raw_language or raw_language.lower() == DEFAULT_UI_LANGUAGE:
@@ -555,7 +569,7 @@ class SettingsDialogController(SimpleDialogController):
 
         # テーマタイルの生成
         self.list_themes.clear()
-        themes = self.theme_manager.discover_themes(ui_language)
+        themes = self.theme_manager.available_themes(ui_language)
         selected_theme_row = 0
         for row, (theme_id, info) in enumerate(themes.items()):
             item = QListWidgetItem(info.name)
@@ -572,7 +586,7 @@ class SettingsDialogController(SimpleDialogController):
 
         # アイコンセットタイルの生成
         self.list_icon_themes.clear()
-        iconsets = self.icon_manager.discover_iconsets(ui_language)
+        iconsets = self.icon_manager.available_iconsets(ui_language)
         selected_icon_row = 0
         for row, (icon_id, info) in enumerate(iconsets.items()):
             item = QListWidgetItem(info.name)
@@ -613,13 +627,18 @@ class SettingsDialogController(SimpleDialogController):
 
         # アダプター選択肢の登録（全登録済みプラグイン）
         self.combo_rule_adapter.clear()
-        for adapter in get_all_adapters():
-            adapter_id = getattr(adapter, "id", None) or adapter.name.lower().replace(" ", "_")
+        for adapter in self.plugins.parsers.values():
+            adapter_id = adapter.id
             display_name = f"{adapter.name} ({', '.join(sorted(adapter.suffixes))})"
             self.combo_rule_adapter.addItem(display_name, adapter_id)
 
-        self._current_adapter_id = str(self.combo_rule_adapter.currentData())
-        self._load_config_for_adapter(self._current_adapter_id)
+        self._current_adapter_id = str(self.combo_rule_adapter.currentData() or "")
+        if self._current_adapter_id:
+            self._load_config_for_adapter(self._current_adapter_id)
+        else:
+            for widget in (self.check_disable_all_builtin, self.table_filter_rules,
+                           self.button_add_rule, self.button_remove_rule):
+                widget.setEnabled(False)
         self._populate_rules_table()
 
         self.combo_rule_adapter.currentIndexChanged.connect(self._on_adapter_changed)
@@ -630,7 +649,7 @@ class SettingsDialogController(SimpleDialogController):
     def _load_config_for_adapter(self, adapter_id: str) -> None:
         if adapter_id not in self._filter_configs:
             saved_data = load_adapter_filter_rules(adapter_id)
-            default_config = get_default_filter_config(adapter_id)
+            default_config = get_default_filter_config(adapter_id, self.plugins.parsers.values())
             config = AdapterFilterConfig.from_dict(saved_data, default_config.rules)
             self._filter_configs[adapter_id] = config
 
@@ -799,11 +818,10 @@ class SettingsDialogController(SimpleDialogController):
         ))
         if new_language != old_language:
             from PySide6.QtCore import QCoreApplication
-            from autolingua2.ui.i18n import install_ui_translator
             app = QCoreApplication.instance()
             if app is None:
                 raise RuntimeError("QCoreApplication インスタンスが存在しません")
-            install_ui_translator(app, new_language)
+            self.localization.apply_language(app, new_language)
 
         # 非表示ルールの保存
         self._save_current_table_to_config()

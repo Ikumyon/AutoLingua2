@@ -3,6 +3,10 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .extensions import ExtensionEntrance
 
 
 def main() -> int:
@@ -10,6 +14,7 @@ def main() -> int:
     from .infrastructure.logging import configure_logging, connect_console_logging, install_exception_hooks
     from .infrastructure.platform import current_platform
 
+    entrance: ExtensionEntrance | None = None
     internal_launch = "AUTOLINGUA_BOOT_TOKEN" in os.environ
     try:
         if not bootstrap.enter():
@@ -29,19 +34,10 @@ def main() -> int:
         startup.phase("modules", "モジュールを読み込んでいます…")
         from PySide6.QtWidgets import QApplication, QMessageBox
         from PySide6.QtCore import QTimer
-        from .adapters.registry import get_all_adapters
+        from .extensions import ExtensionEntrance
         from .services.settings_store import load_ui_language, load_theme_settings
-        from .ui.i18n import install_ui_translator
         from .ui.main_window import MainWindowController
-        from .ui.theme import ThemeManager
 
-        startup.phase("plugins", "プラグインを読み込んでいます…")
-        from concurrent.futures import ThreadPoolExecutor, wait
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            discovery = pool.submit(get_all_adapters)
-            while not wait([discovery], timeout=0.1).done:
-                startup.check()
-            discovery.result()
         startup.check()
         startup.phase("settings", "設定・翻訳・テーマを適用しています…")
         current_platform.configure_desktop_integration("autolingua.autolingua2.app")
@@ -50,15 +46,21 @@ def main() -> int:
         app.setOrganizationName("AUTOlingua")
         app.setDesktopFileName("autolingua2")
         from PySide6.QtGui import QIcon
-        from .infrastructure.filesystem import ASSETS_DIR
+        from .infrastructure.filesystem import ASSETS_DIR, PROJECT_ROOT
         app_icon_path = ASSETS_DIR / "images" / "app.ico"
         if app_icon_path.exists():
             app.setWindowIcon(QIcon(str(app_icon_path)))
-        install_ui_translator(app, load_ui_language())
-        theme, _ = load_theme_settings()
-        ThemeManager().apply_theme(theme, app)
+        entrance = ExtensionEntrance()
+        startup.phase("plugins", "拡張を読み込んでいます…")
+        ui_language = load_ui_language()
+        entrance.load_configured(PROJECT_ROOT / "extensions.json", startup.check, ui_language=ui_language)
+        entrance.localization.apply_language(app, ui_language)
+        theme, icons = load_theme_settings()
+        entrance.themes.apply_theme(theme, app)
+        entrance.icons.set_current_iconset(icons)
+        startup.check()
         startup.phase("window", "メイン画面を構築しています…")
-        window = MainWindowController(platform_driver=current_platform)
+        window = MainWindowController(entrance, platform_driver=current_platform)
         window.show()
         is_ready = False
 
@@ -111,4 +113,6 @@ def main() -> int:
             QMessageBox.critical(None, "AUTOlingua2 起動エラー", str(exc))
         return 1
     finally:
+        if entrance is not None:
+            entrance.close()
         bootstrap.close()

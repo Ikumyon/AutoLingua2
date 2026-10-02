@@ -4,7 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
-import subprocess
 import sys
 from typing import TYPE_CHECKING
 
@@ -29,13 +28,13 @@ class LaunchConfiguration:
 
 
 def configuration() -> LaunchConfiguration:
-    suffix = ".exe" if sys.platform == "win32" else ""
+    from autolingua2_native import platform as native
     if getattr(sys, "frozen", False):
         exe = Path(sys.executable).resolve()
-        launcher = exe.parent.parent / ("AUTOlingua2" + suffix) if exe.parent.name.lower() == "core" else exe.with_name("AUTOlingua2" + suffix)
+        launcher = exe.parent.parent / native.executable_name("AUTOlingua2") if exe.parent.name.lower() == "core" else exe.with_name(native.executable_name("AUTOlingua2"))
         return LaunchConfiguration(launcher, None)
     root = Path(__file__).resolve().parents[3]
-    return LaunchConfiguration(root / "target" / "release" / ("autolingua-launcher" + suffix), root)
+    return LaunchConfiguration(root / "target" / "release" / native.executable_name("autolingua-launcher"), root)
 
 
 def launcher_environment() -> dict[str, str]:
@@ -48,9 +47,9 @@ def launcher_environment() -> dict[str, str]:
     return environment
 
 
-def spawn_launcher(arguments: list[str], environment: dict[str, str]) -> subprocess.Popen[bytes]:
-    return subprocess.Popen(configuration().command(arguments), env=environment,
-                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def spawn_launcher(arguments: list[str], environment: dict[str, str]) -> None:
+    from autolingua2_native import platform as native
+    native.spawn_launcher(configuration().command(arguments), environment)
 
 
 def enter() -> bool:

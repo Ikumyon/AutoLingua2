@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import atexit
-import os
 from pathlib import Path
-import subprocess
-import sys
 
 from autolingua2.infrastructure.filesystem import PROJECT_ROOT
-from .base import ConsoleResult, PlatformDriver, ProcessGuard
+from .base import ConsoleResult, PlatformDriver, PluginProcess
 
 
 def _native():
@@ -34,18 +31,6 @@ class SystemPlatformDriver:
             if state not in {"owned", "attached", "existing", "unavailable"}:
                 raise RuntimeError("Invalid native console state")
             result = ConsoleResult(state, error)
-            if state != "unavailable" and sys.platform == "win32":
-                # AllocConsole does not recreate CPython's windowed streams.
-                streams = []
-                try:
-                    streams.append(open("CONIN$", "r", encoding="utf-8"))
-                    streams.append(open("CONOUT$", "w", encoding="utf-8", buffering=1))
-                    streams.append(open("CONOUT$", "w", encoding="utf-8", buffering=1))
-                except Exception:
-                    for stream in streams:
-                        stream.close()
-                    raise
-                sys.stdin, sys.stdout, sys.stderr = streams
             self._console = result
         except Exception as exc:
             self._console = ConsoleResult("unavailable", f"{type(exc).__name__}: {exc}")
@@ -67,19 +52,10 @@ class SystemPlatformDriver:
         self._restarting = True
 
     def open_folder(self, path: Path) -> None:
-        from PySide6.QtCore import QUrl
-        from PySide6.QtGui import QDesktopServices
-        path = path.resolve()
-        path.mkdir(parents=True, exist_ok=True)
-        if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path))):
-            raise OSError(f"フォルダを開けません: {path}")
+        _native().open_folder(str(path.resolve()))
 
     def plugin_platform_key(self) -> str:
-        if sys.platform == "win32":
-            return "windows"
-        if sys.platform.startswith("linux"):
-            return "linux"
-        raise OSError("このOSの実行ファイル型プラグインには未対応です")
+        return _native().plugin_platform_key()
 
     def configure_desktop_integration(self, app_id: str) -> None:
         try:
@@ -88,26 +64,8 @@ class SystemPlatformDriver:
             import logging
             logging.getLogger(__name__).warning("デスクトップ統合の設定に失敗しました: %s", exc)
 
-    def start_plugin(self, executable: Path, args: list[str], cwd: Path) -> tuple[subprocess.Popen[bytes], ProcessGuard]:
-        native = _native()
-        if not native.is_executable_plugin(str(executable)):
-            raise OSError("プラグインの実行ファイルを実行できません")
-        is_windows = self.plugin_platform_key() == "windows"
-        process = subprocess.Popen([str(executable), *args], cwd=cwd,
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            creationflags=native.plugin_creation_flags() if is_windows else 0,
-            start_new_session=not is_windows, text=False)
-        try:
-            # Windows process is suspended until assigned to its kill-on-close job.
-            guard = native.ProcessGroup(process.pid)
-        except Exception:
-            process.kill()
-            process.wait()
-            for stream in (process.stdin, process.stdout, process.stderr):
-                if stream:
-                    stream.close()
-            raise
-        return process, guard
+    def start_plugin(self, executable: Path, args: list[str], cwd: Path) -> PluginProcess:
+        return _native().start_plugin(str(executable), args, str(cwd))
 
 
 current_platform: PlatformDriver = SystemPlatformDriver()
