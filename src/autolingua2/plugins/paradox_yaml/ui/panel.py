@@ -17,9 +17,10 @@ from PySide6.QtWidgets import (
 )
 
 from autolingua2.plugins.api import PluginContext
-from autolingua2.plugins.paradox_yaml.parser import reader
-from autolingua2.plugins.paradox_yaml.parser.mod_parser import parse_mod_file
+from ..parser import reader
+from ..parser.mod_parser import parse_mod_file
 from .translations import tr
+
 
 class ParadoxCreationAdapter:
     """UI hooks supplied through the common plugin entrance."""
@@ -187,7 +188,8 @@ def handle_paths_dropped(paths: list[Path], context: PluginContext) -> list[Path
 
 def format_target_label(path: Path, current_source_lang: str) -> tuple[str, str, str]:
     """対象フォルダ/ファイルの表示ラベル、スタイル、ツールチップを生成する。"""
-    from autolingua2.plugins.paradox_yaml.parser.reader import detect_file_language_from_name
+    from ..parser.reader import detect_file_language_from_name
+
 
     if path.is_file():
         return path.name, "", str(path)

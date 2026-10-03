@@ -1,15 +1,26 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_data_files
+import json
+import sys
+from pathlib import Path
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-
+sys.path.insert(0, str(Path('src').resolve()))
+plugin_datas = []
+plugin_imports = []
+for manifest in sorted(Path('src/autolingua2/plugins').glob('*/manifest.json')):
+    package = 'autolingua2.plugins.' + manifest.parent.name
+    data = json.loads(manifest.read_text(encoding='utf-8'))
+    plugin_datas += collect_data_files(package)
+    if data.get('kind', 'python') == 'python':
+        plugin_imports += collect_submodules(package)
 
 a = Analysis(
     ['main.py'],
     pathex=['src', '.', 'build/native'],
     binaries=[],
     datas=[('ui', 'ui'), ('assets/images/app.ico', 'assets/images')]
-          + collect_data_files('autolingua2.plugins.paradox_yaml', includes=['translations/*']),
-    hiddenimports=['autolingua2_native', 'autolingua2.plugins.paradox_yaml.entry'],
+          + plugin_datas,
+    hiddenimports=['autolingua2_native'] + plugin_imports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

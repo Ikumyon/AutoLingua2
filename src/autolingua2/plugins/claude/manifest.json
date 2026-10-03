@@ -1,0 +1,7 @@
+{
+  "id": "claude",
+  "name": "Anthropic Claude",
+  "kind": "python",
+  "entry": "entry.py",
+  "description": "Anthropic Claude translation provider"
+}

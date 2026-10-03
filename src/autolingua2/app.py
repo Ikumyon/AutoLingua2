@@ -52,7 +52,7 @@ def main() -> int:
         entrance = ExtensionEntrance()
         startup.phase("plugins", "拡張を読み込んでいます…")
         ui_language = load_ui_language()
-        entrance.load_configured(PROJECT_ROOT / "extensions.json", startup.check, ui_language=ui_language)
+        entrance.load_all(PROJECT_ROOT, startup.check, ui_language=ui_language)
         startup.check()
         startup.phase("settings", "設定・翻訳・テーマを適用しています…")
         entrance.localization.apply_language(app, ui_language)

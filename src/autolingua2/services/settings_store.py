@@ -247,6 +247,37 @@ def save_window_layout(layout: WindowLayout) -> None:
     _write_settings_file(settings)
 
 
+KEY_RENDER_LITERAL_NEWLINES = "render_literal_newlines"
+KEY_HIGHLIGHT_TRANSLATION_TAGS = "highlight_translation_tags"
+KEY_APPLY_COLOR_TAGS = "apply_color_tags"
+
+
+def load_ui_display_flags() -> tuple[bool, bool, bool]:
+    """画面表示フラグ (改行展開, タグハイライト, 色タグ適用) をロード。デフォルトはすべてTrue。"""
+    settings = _read_settings_file()
+    ui_settings = settings.get(GROUP_UI, {})
+    if not isinstance(ui_settings, dict):
+        ui_settings = {}
+    return (
+        bool(ui_settings.get(KEY_RENDER_LITERAL_NEWLINES, True)),
+        bool(ui_settings.get(KEY_HIGHLIGHT_TRANSLATION_TAGS, True)),
+        bool(ui_settings.get(KEY_APPLY_COLOR_TAGS, True)),
+    )
+
+
+def save_ui_display_flags(render_newlines: bool, highlight_tags: bool, apply_color_tags: bool) -> None:
+    """画面表示フラグを settings.json の ui グループに保存。"""
+    settings = _read_settings_file()
+    ui_settings = settings.get(GROUP_UI, {})
+    if not isinstance(ui_settings, dict):
+        ui_settings = {}
+    ui_settings[KEY_RENDER_LITERAL_NEWLINES] = render_newlines
+    ui_settings[KEY_HIGHLIGHT_TRANSLATION_TAGS] = highlight_tags
+    ui_settings[KEY_APPLY_COLOR_TAGS] = apply_color_tags
+    settings[GROUP_UI] = ui_settings
+    _write_settings_file(settings)
+
+
 def load_adapter_filter_rules(adapter_id: str) -> dict[str, object]:
     settings = _read_settings_file()
     rules_group = settings.get(GROUP_FILTER_RULES, {})
@@ -263,6 +294,28 @@ def save_adapter_filter_rules(adapter_id: str, rules_data: dict[str, object]) ->
         rules_group = {}
     rules_group[adapter_id] = rules_data
     settings[GROUP_FILTER_RULES] = rules_group
+    _write_settings_file(settings)
+
+
+GROUP_PLUGINS = "plugins"
+
+
+def load_plugin_settings(plugin_id: str) -> dict[str, object]:
+    settings = _read_settings_file()
+    plugins_group = settings.get(GROUP_PLUGINS, {})
+    if not isinstance(plugins_group, dict):
+        return {}
+    plugin_settings = plugins_group.get(plugin_id, {})
+    return dict(plugin_settings) if isinstance(plugin_settings, dict) else {}
+
+
+def save_plugin_settings(plugin_id: str, data: dict[str, object]) -> None:
+    settings = _read_settings_file()
+    plugins_group = settings.get(GROUP_PLUGINS, {})
+    if not isinstance(plugins_group, dict):
+        plugins_group = {}
+    plugins_group[plugin_id] = data
+    settings[GROUP_PLUGINS] = plugins_group
     _write_settings_file(settings)
 
 

@@ -717,6 +717,9 @@
           </item>
           <item>
            <widget class="QComboBox" name="comboStatusFilter">
+            <property name="currentIndex">
+             <number>1</number>
+            </property>
             <item>
              <property name="text">
               <string>すべて</string>
@@ -770,25 +773,76 @@
            </widget>
           </item>
           <item>
-           <widget class="QToolButton" name="buttonListMode">
-            <property name="text">
-             <string>一覧</string>
+           <widget class="QFrame" name="frameSegmentMode">
+            <property name="styleSheet">
+             <string notr="true">QFrame#frameSegmentMode {
+    background-color: palette(alternate-base);
+    border: 1px solid palette(mid);
+    border-radius: 6px;
+}
+QFrame#frameSegmentMode QToolButton {
+    background-color: transparent;
+    color: palette(text);
+    border: none;
+    border-radius: 4px;
+    padding: 3px 12px;
+    font-weight: 500;
+}
+QFrame#frameSegmentMode QToolButton:hover:!checked {
+    color: palette(highlight);
+}
+QFrame#frameSegmentMode QToolButton:checked {
+    background-color: transparent;
+    color: palette(highlighted-text);
+    font-weight: bold;
+}</string>
             </property>
-            <property name="checkable">
-             <bool>true</bool>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
+            <layout class="QHBoxLayout" name="layoutSegmentMode">
+             <property name="spacing">
+              <number>2</number>
+             </property>
+             <property name="leftMargin">
+              <number>2</number>
+             </property>
+             <property name="topMargin">
+              <number>2</number>
+             </property>
+             <property name="rightMargin">
+              <number>2</number>
+             </property>
+             <property name="bottomMargin">
+              <number>2</number>
+             </property>
+             <item>
+              <widget class="QToolButton" name="buttonListMode">
+               <property name="text">
+                <string>一覧</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="buttonFocusMode">
+               <property name="text">
+                <string>集中</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </widget>
           </item>
           <item>
-           <widget class="QToolButton" name="buttonFocusMode">
-            <property name="text">
-             <string>集中</string>
-            </property>
-            <property name="checkable">
-             <bool>true</bool>
+           <widget class="QToolButton" name="buttonDisplaySettings">
+            <property name="toolTip">
+             <string>文章の表示設定</string>
             </property>
            </widget>
           </item>
@@ -1032,11 +1086,6 @@ QTableCornerButton::section {
                </property>
                <column>
                 <property name="text">
-                 <string>状態</string>
-                </property>
-               </column>
-               <column>
-                <property name="text">
                  <string>キー</string>
                 </property>
                </column>
@@ -1052,9 +1101,17 @@ QTableCornerButton::section {
                </column>
                <column>
                 <property name="text">
+                 <string>状態</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
                  <string>ファイル</string>
                 </property>
                </column>
+               <attribute name="verticalHeaderVisible">
+                <bool>false</bool>
+               </attribute>
               </widget>
              </item>
             </layout>

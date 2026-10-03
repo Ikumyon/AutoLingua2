@@ -1,0 +1,7 @@
+{
+  "id": "paradox_yaml",
+  "name": "Paradox YAML",
+  "kind": "python",
+  "entry": "entry.py",
+  "description": "Paradox Interactive YAML translation file parser and UI extension"
+}

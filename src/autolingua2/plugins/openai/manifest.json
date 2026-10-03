@@ -1,0 +1,7 @@
+{
+  "id": "openai",
+  "name": "OpenAI",
+  "kind": "python",
+  "entry": "entry.py",
+  "description": "OpenAI translation provider"
+}

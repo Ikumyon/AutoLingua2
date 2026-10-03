@@ -6,10 +6,12 @@ from pathlib import Path
 import sys
 from typing import Callable
 
-from PySide6.QtCore import QByteArray, QEvent, QObject, QPoint, QSize, Qt, QSignalBlocker, QTimer, QLocale
-from PySide6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QPixmap
+from PySide6.QtCore import QByteArray, QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QSize, Qt, QSignalBlocker, QTimer, QLocale
+from PySide6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QPixmap, QSyntaxHighlighter
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -63,9 +65,11 @@ from autolingua2.services.settings_store import (
     load_ai_settings,
     load_theme_settings,
     load_translation_table_columns,
+    load_ui_display_flags,
     load_window_layout,
     save_ai_settings,
     save_translation_table_columns,
+    save_ui_display_flags,
     save_window_layout,
 )
 from autolingua2.ui.dialogs import (
@@ -78,6 +82,7 @@ from autolingua2.ui.dialogs import (
 from autolingua2.ui.i18n import current_ui_language, language_events, tr
 from autolingua2.ui.import_worker import ImportWorker
 from autolingua2.ui.operation_worker import OperationWorker
+from autolingua2.plugins.api import GameTextPresentation
 from autolingua2.ui.models.translation_table_model import TranslationTableColumn, default_translation_table_columns
 
 
@@ -228,8 +233,17 @@ class MainWindowController(QObject):
         self._syncing_focus_list: bool = False
         self.focus_page_size: int = 50
         self.focus_current_page: int = 1
+        render_newlines, highlight_tags, apply_colors = load_ui_display_flags()
+        self.render_literal_newlines: bool = render_newlines
+        self.highlight_translation_tags: bool = highlight_tags
+        self.apply_color_tags: bool = apply_colors
+        self._text_presentation: GameTextPresentation | None = None
+        self.source_highlighter: QSyntaxHighlighter | None = None
+        self.translation_highlighter: QSyntaxHighlighter | None = None
 
         self._setup_widgets()
+        self.plugins.on_display_changed(self._on_plugin_display_changed)
+        self._configure_text_presentation()
         self._connect_actions()
         self._set_initial_state()
         self.window.installEventFilter(self)
@@ -278,6 +292,8 @@ class MainWindowController(QObject):
                 self._restart_target = None
             else:
                 self._save_window_layout()
+            self.plugins.remove_display_listener(self._on_plugin_display_changed)
+            self._dispose_highlighters()
             if self.creation_context:
                 self.creation_context.active = False
                 self.plugins.bind_creation(self.creation_context.adapter_id, None)
@@ -343,12 +359,25 @@ class MainWindowController(QObject):
         if header is not None and (watched is header or watched is header_viewport):
             if isinstance(event, QMouseEvent):
                 if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
-                    self._dragged_header_logical_index = header.logicalIndexAt(event.position().toPoint())
-                elif event.type() == QEvent.Type.MouseMove and event.buttons() & Qt.MouseButton.LeftButton:
-                    if self._dragged_header_logical_index is not None and self._dragged_header_logical_index >= 0:
-                        self.show_header_drop_indicator(event.position().toPoint())
-            if event.type() in {QEvent.Type.MouseButtonRelease, QEvent.Type.Leave}:
-                self.hide_header_drop_indicator()
+                    self._is_header_dragging = True
+                    self._drag_start_global_pos = event.globalPosition().toPoint()
+                elif event.type() == QEvent.Type.MouseMove and bool(event.buttons() & Qt.MouseButton.LeftButton):
+                    if getattr(self, "_is_header_dragging", False):
+                        curr_global = event.globalPosition().toPoint()
+                        start_global = getattr(self, "_drag_start_global_pos", curr_global)
+                        if (curr_global - start_global).manhattanLength() >= 4:
+                            vp = header.viewport()
+                            ref = vp if vp is not None else header
+                            pos_in_vp = ref.mapFromGlobal(curr_global)
+                            self.show_header_drop_indicator(pos_in_vp)
+                elif event.type() == QEvent.Type.MouseButtonRelease:
+                    self.hide_header_drop_indicator()
+            elif event.type() == QEvent.Type.Leave:
+                if not getattr(self, "_is_header_dragging", False):
+                    self.hide_header_drop_indicator()
+        elif watched is getattr(self, "frame_segment_mode", None):
+            if event.type() in {QEvent.Type.Resize, QEvent.Type.Show}:
+                self._sync_segment_indicator_pos(animate=False)
         return False
 
     def _set_drop_hover(self, target: QObject, is_hover: bool) -> None:
@@ -364,8 +393,58 @@ class MainWindowController(QObject):
         self.search = require_child(self.window, QLineEdit, "editSearch")
         self.status_filter = require_child(self.window, QComboBox, "comboStatusFilter")
         self.stack = require_child(self.window, QStackedWidget, "stackTranslationView")
+        self.frame_segment_mode = require_child(self.window, QFrame, "frameSegmentMode")
         self.button_list_mode = require_child(self.window, QToolButton, "buttonListMode")
         self.button_focus_mode = require_child(self.window, QToolButton, "buttonFocusMode")
+        self.mode_group = QButtonGroup(self.window)
+        self.mode_group.setExclusive(True)
+        self.mode_group.addButton(self.button_list_mode)
+        self.mode_group.addButton(self.button_focus_mode)
+
+        self.segment_indicator = QFrame(self.frame_segment_mode)
+        self.segment_indicator.setObjectName("segmentIndicator")
+        self.segment_indicator.setStyleSheet(
+            "background-color: palette(highlight); border-radius: 4px;"
+        )
+        self.segment_indicator.stackUnder(self.button_list_mode)
+        self.segment_indicator.hide()
+
+        self.segment_anim = QPropertyAnimation(self.segment_indicator, b"geometry")
+        self.segment_anim.setDuration(220)
+        self.segment_anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
+
+        self.frame_segment_mode.installEventFilter(self)
+
+        self.button_display_settings = require_child(self.window, QToolButton, "buttonDisplaySettings")
+        self.button_display_settings.setIcon(self.icon_manager.get_icon("settings-2"))
+
+        self.display_settings_menu = QMenu(self.window)
+        self.action_render_newlines = QAction(tr("MainWindow", "改行記号を改行して表示"), self.display_settings_menu)
+        self.action_render_newlines.setCheckable(True)
+        self.action_render_newlines.setChecked(self.render_literal_newlines)
+        self.action_render_newlines.toggled.connect(self._on_toggle_render_newlines)
+        self.display_settings_menu.addAction(self.action_render_newlines)
+
+        self.action_highlight_tags = QAction(tr("MainWindow", "翻訳タグを色分けする"), self.display_settings_menu)
+        self.action_highlight_tags.setCheckable(True)
+        self.action_highlight_tags.setChecked(self.highlight_translation_tags)
+        self.action_highlight_tags.toggled.connect(self._on_toggle_highlight_tags)
+        self.display_settings_menu.addAction(self.action_highlight_tags)
+
+        self.action_apply_color_tags = QAction(tr("MainWindow", "色タグで実際に色を付ける"), self.display_settings_menu)
+        self.action_apply_color_tags.setCheckable(True)
+        self.action_apply_color_tags.setChecked(self.apply_color_tags)
+        self.action_apply_color_tags.toggled.connect(self._on_toggle_apply_color_tags)
+        self.display_settings_menu.addAction(self.action_apply_color_tags)
+
+        self.display_settings_separator = self.display_settings_menu.addSeparator()
+        self.action_open_color_settings = QAction(self.display_settings_menu)
+        self.action_open_color_settings.triggered.connect(self._open_game_color_settings)
+        self.display_settings_menu.addAction(self.action_open_color_settings)
+
+        self.button_display_settings.setStyleSheet("QToolButton::menu-indicator { image: none; width: 0px; }")
+        self.button_display_settings.clicked.connect(self._open_display_settings_menu)
+
         self.progress = require_child(self.window, QProgressBar, "progressTranslation")
         self.frame_files = require_child(self.window, QFrame, "frameFiles")
         self.splitter_main = require_child(self.window, QSplitter, "splitterMain")
@@ -431,11 +510,25 @@ class MainWindowController(QObject):
         header.customContextMenuRequested.connect(self.open_table_header_menu)
         header.sectionMoved.connect(self.handle_table_section_moved)
         header.installEventFilter(self)
-        header.viewport().installEventFilter(self)
-        self.header_drop_indicator = QFrame(header)
+        if header.viewport() is not None:
+            header.viewport().installEventFilter(self)
+        h_parent = header.viewport() if header.viewport() is not None else header
+        self.header_drop_indicator = QFrame(h_parent)
         self.header_drop_indicator.setObjectName("headerDropIndicator")
+        self.header_drop_indicator.setStyleSheet(
+            "background-color: #2563eb; border: none; border-radius: 1px;"
+        )
         self.header_drop_indicator.setFixedWidth(3)
         self.header_drop_indicator.hide()
+
+        t_parent = self.table.viewport()
+        self.table_drop_indicator = QFrame(t_parent)
+        self.table_drop_indicator.setObjectName("tableDropIndicator")
+        self.table_drop_indicator.setStyleSheet(
+            "background-color: #2563eb; border: none; border-radius: 1px;"
+        )
+        self.table_drop_indicator.setFixedWidth(3)
+        self.table_drop_indicator.hide()
         self.table.setSortingEnabled(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setShowGrid(True)
@@ -642,11 +735,13 @@ class MainWindowController(QObject):
         if callable(set_status):
             set_status(message)
 
-    def open_settings(self) -> None:
+    def open_settings(self, initial_category: str | None = None) -> None:
         controller = SettingsDialogController(
             self.entrance, self.window, self.ai_provider_id,
             self.ai_models, self.ai_selected_models, self.ai_api_keys, self.ai_concurrency,
         )
+        if initial_category is not None:
+            controller.select_category(initial_category)
         if controller.exec() == QDialog.DialogCode.Accepted:
             self.ai_models = controller.ai_models
             self.ai_selected_models = controller.ai_selected_models
@@ -675,9 +770,15 @@ class MainWindowController(QObject):
         self._refresh_ai_models()
 
     def _refresh_ai_models(self) -> None:
+        if self.ai_provider_id not in self.ai_models or not self.ai_models[self.ai_provider_id]:
+            defaults = self.provider_registry.get_default_models(self.ai_provider_id)
+            if defaults:
+                self.ai_models[self.ai_provider_id] = defaults
         self.combo_ai_model.blockSignals(True)
         self.combo_ai_model.clear()
         for entry in self.ai_models.get(self.ai_provider_id, []):
+
+
             if entry.enabled:
                 self.combo_ai_model.addItem(entry.name, entry.model)
         selected = self.ai_selected_models.get(self.ai_provider_id, "")
@@ -712,6 +813,7 @@ class MainWindowController(QObject):
         self._save_ai_choice()
 
     def _on_ui_language_changed(self, language_code: str) -> None:
+        self._configure_text_presentation()
         previous_errors = self._known_plugin_errors
         self._known_plugin_errors = len(self.plugins.errors)
         if len(self.plugins.errors) > previous_errors:
@@ -1077,6 +1179,7 @@ class MainWindowController(QObject):
         self.action_stop_translation.setEnabled(False)
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
+        self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
         self.refresh_all()
         self._restore_window_layout()
 
@@ -1145,6 +1248,7 @@ class MainWindowController(QObject):
         self.focus_current_page = 1
         self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
         self._sync_workspace_language_ui()
+        self._configure_text_presentation()
         self.refresh_all()
         self.show_list_mode()
         self.stack_main.setCurrentIndex(1)
@@ -1395,6 +1499,69 @@ class MainWindowController(QObject):
         self.refresh_focus_unit_list()
         self.refresh_focus()
 
+    def _dispose_highlighters(self) -> None:
+        # Removing formats emits textChanged too; it must never edit the new unit.
+        with QSignalBlocker(self.edit_source), QSignalBlocker(self.edit_translation):
+            for highlighter in (self.source_highlighter, self.translation_highlighter):
+                if highlighter is not None:
+                    highlighter.setDocument(None)
+                    highlighter.deleteLater()
+        self.source_highlighter = None
+        self.translation_highlighter = None
+
+    def _configure_text_presentation(self) -> None:
+        self._dispose_highlighters()
+        self._text_presentation = None
+        try:
+            self._text_presentation = self.plugins.get_text_presentation(
+                self.project.adapter_id, self.project.game_id)
+            factory = self.plugins.get_highlighter_factory(self.project.adapter_id)
+            if factory is not None:
+                for editor, attribute in ((self.edit_source, "source_highlighter"),
+                                          (self.edit_translation, "translation_highlighter")):
+                    document = editor.document()
+                    if document is None:
+                        raise RuntimeError("Text editor has no document")
+                    highlighter = factory(self.project.game_id, document,
+                                          lambda: self.highlight_translation_tags,
+                                          lambda: self.apply_color_tags)
+                    if highlighter is not None and not isinstance(highlighter, QSyntaxHighlighter):
+                        raise TypeError("Invalid plugin highlighter")
+                    if attribute == "source_highlighter":
+                        self.source_highlighter = highlighter
+                    else:
+                        self.translation_highlighter = highlighter
+        except Exception as exc:
+            self._dispose_highlighters()
+            self._text_presentation = None
+            self.plugins.report_error(self.project.adapter_id, exc)
+        presentation = self._text_presentation
+        has_highlighter = self.source_highlighter is not None and self.translation_highlighter is not None
+        self.action_render_newlines.setEnabled(presentation is not None and presentation.newline_codec is not None)
+        self.action_highlight_tags.setEnabled(presentation is not None and presentation.highlight_tags and has_highlighter)
+        self.action_apply_color_tags.setEnabled(presentation is not None and presentation.apply_colors and has_highlighter)
+        has_settings = presentation is not None and presentation.settings_page_id is not None
+        self.action_open_color_settings.setVisible(has_settings)
+        self.display_settings_separator.setVisible(has_settings)
+        self.action_open_color_settings.setText(presentation.settings_label if presentation is not None else "")
+
+    def _on_plugin_display_changed(self, plugin_id: str) -> None:
+        if plugin_id == self.project.adapter_id:
+            self._configure_text_presentation()
+            self.refresh_focus()
+            self.refresh_table()
+
+    def _open_game_color_settings(self) -> None:
+        presentation = self._text_presentation
+        if presentation is not None and presentation.settings_page_id is not None:
+            self.open_settings(presentation.settings_page_id)
+
+    def _expand_display_text(self, text: str) -> str:
+        presentation = self._text_presentation
+        if self.render_literal_newlines and presentation is not None and presentation.newline_codec is not None:
+            return presentation.newline_codec.expand(text)
+        return text
+
     def refresh_table(self) -> None:
         visible_columns = self.visible_columns()
         self.table.clear()
@@ -1404,6 +1571,8 @@ class MainWindowController(QObject):
         for row, unit in enumerate(self.filtered_units):
             for column_index, column in enumerate(visible_columns):
                 value = column.value_for(unit, self.source_name_for_unit)
+                if self.render_literal_newlines and column.id in {"source_text", "target_text"}:
+                    value = self._expand_display_text(value)
                 item = QTableWidgetItem(value)
                 item.setData(Qt.ItemDataRole.UserRole, unit)
                 self.table.setItem(row, column_index, item)
@@ -1437,8 +1606,12 @@ class MainWindowController(QObject):
             self.label_position.setText(f"{position} / {len(self.filtered_units)}")
             self.edit_key.setText(unit.label)
             self.edit_file.setText(self.source_name_for_unit(unit))
-            self.edit_source.setPlainText(unit.source_text)
-            self.edit_translation.setPlainText(unit.target_text)
+            source_display = unit.source_text
+            target_display = unit.target_text
+            source_display = self._expand_display_text(source_display)
+            target_display = self._expand_display_text(target_display)
+            self.edit_source.setPlainText(source_display)
+            self.edit_translation.setPlainText(target_display)
             if sync_list:
                 unit_page = ((position - 1) // self.focus_page_size) + 1 if position > 0 else 1
                 if unit_page != self.focus_current_page:
@@ -1453,6 +1626,11 @@ class MainWindowController(QObject):
         if self._updating_focus or self.current_unit is None:
             return
         new_target = self.edit_translation.toPlainText()
+        if new_target == self._expand_display_text(self.current_unit.target_text):
+            return  # Syntax formatting also emits textChanged without changing text.
+        presentation = self._text_presentation
+        if self.render_literal_newlines and presentation is not None and presentation.newline_codec is not None:
+            new_target = presentation.newline_codec.collapse(new_target)
         self.current_unit.target_text = new_target
         self.refresh_table()
 
@@ -1601,9 +1779,70 @@ class MainWindowController(QObject):
         self.button_focus_mode.setChecked(False)
         self.action_list_mode.setChecked(True)
         self.action_focus_mode.setChecked(False)
+        self._animate_segment_indicator(self.button_list_mode)
         # 一覧表示でのファイル表示廃止
         self.frame_files.setVisible(False)
         self.action_toggle_file_sidebar.setEnabled(False)
+
+    def _animate_segment_indicator(self, target_btn: QToolButton) -> None:
+        geom = target_btn.geometry()
+        if geom.width() <= 0:
+            return
+        if not self.segment_indicator.isVisible():
+            self.segment_indicator.setGeometry(geom)
+            self.segment_indicator.show()
+            self.segment_indicator.stackUnder(self.button_list_mode)
+            return
+        self.segment_anim.stop()
+        self.segment_anim.setStartValue(self.segment_indicator.geometry())
+        self.segment_anim.setEndValue(geom)
+        self.segment_anim.start()
+
+    def _sync_segment_indicator_pos(self, animate: bool = True) -> None:
+        target_btn = self.button_focus_mode if self.button_focus_mode.isChecked() else self.button_list_mode
+        geom = target_btn.geometry()
+        if geom.width() <= 0:
+            return
+        if animate and self.segment_indicator.isVisible():
+            self._animate_segment_indicator(target_btn)
+        else:
+            self.segment_anim.stop()
+            self.segment_indicator.setGeometry(geom)
+            self.segment_indicator.show()
+            self.segment_indicator.stackUnder(self.button_list_mode)
+
+    def _save_display_flags(self) -> None:
+        save_ui_display_flags(
+            self.render_literal_newlines,
+            self.highlight_translation_tags,
+            self.apply_color_tags,
+        )
+
+    def _on_toggle_render_newlines(self, enabled: bool) -> None:
+        self.render_literal_newlines = enabled
+        self._save_display_flags()
+        self.refresh_focus(sync_list=False)
+        self.refresh_table()
+
+    def _on_toggle_highlight_tags(self, enabled: bool) -> None:
+        self.highlight_translation_tags = enabled
+        self._save_display_flags()
+        if self.source_highlighter is not None:
+            self.source_highlighter.rehighlight()
+        if self.translation_highlighter is not None:
+            self.translation_highlighter.rehighlight()
+
+    def _on_toggle_apply_color_tags(self, enabled: bool) -> None:
+        self.apply_color_tags = enabled
+        self._save_display_flags()
+        if self.source_highlighter is not None:
+            self.source_highlighter.rehighlight()
+        if self.translation_highlighter is not None:
+            self.translation_highlighter.rehighlight()
+
+    def _open_display_settings_menu(self) -> None:
+        pos = self.button_display_settings.mapToGlobal(QPoint(0, self.button_display_settings.height()))
+        self.display_settings_menu.exec(pos)
 
     def show_focus_mode(self) -> None:
         if self.current_unit is None and self.filtered_units:
@@ -1613,6 +1852,7 @@ class MainWindowController(QObject):
         self.button_focus_mode.setChecked(True)
         self.action_list_mode.setChecked(False)
         self.action_focus_mode.setChecked(True)
+        self._animate_segment_indicator(self.button_focus_mode)
         # 集中表示時は文一覧サイドバーを設定に従って表示
         self.action_toggle_file_sidebar.setEnabled(True)
         self.action_toggle_file_sidebar.setChecked(self._focus_sidebar_visible)
@@ -1780,6 +2020,7 @@ class MainWindowController(QObject):
         self.save_and_refresh_column_layout()
 
     def handle_table_section_moved(self, logical_index: int, old_visual_index: int, new_visual_index: int) -> None:
+        self.hide_header_drop_indicator()
         if self._syncing_header_order or old_visual_index == new_visual_index:
             return
         visible_ids = [column.id for column in self.visible_columns()]
@@ -1820,26 +2061,38 @@ class MainWindowController(QObject):
 
     def show_header_drop_indicator(self, position: QPoint) -> None:
         header = self.table.horizontalHeader()
-        if self.table.columnCount() == 0:
+        if self.table.columnCount() == 0 or header.count() == 0:
             self.hide_header_drop_indicator()
             return
 
         x = self.header_drop_indicator_x(position)
-        self.header_drop_indicator.setGeometry(x - 1, 0, 3, header.height())
+        h_vp = header.viewport()
+        h_height = h_vp.height() if h_vp is not None else header.height()
+        self.header_drop_indicator.setGeometry(x - 1, 0, 3, h_height)
         self.header_drop_indicator.raise_()
         self.header_drop_indicator.show()
 
+        t_vp = self.table.viewport()
+        if t_vp is not None:
+            self.table_drop_indicator.setGeometry(x - 1, 0, 3, t_vp.height())
+            self.table_drop_indicator.raise_()
+            self.table_drop_indicator.show()
+
     def hide_header_drop_indicator(self) -> None:
-        self._dragged_header_logical_index = None
+        self._is_header_dragging = False
+        self._drag_start_global_pos = None
         if hasattr(self, "header_drop_indicator"):
             self.header_drop_indicator.hide()
+        if hasattr(self, "table_drop_indicator"):
+            self.table_drop_indicator.hide()
 
     def header_drop_indicator_x(self, position: QPoint) -> int:
         header = self.table.horizontalHeader()
-        logical_index = header.logicalIndexAt(position)
+        x = position.x()
+        logical_index = header.logicalIndexAt(x)
 
         if logical_index < 0:
-            if position.x() < 0:
+            if x <= 0:
                 first_logical = header.logicalIndex(0)
                 return header.sectionViewportPosition(first_logical)
             last_logical = header.logicalIndex(header.count() - 1)
@@ -1848,6 +2101,6 @@ class MainWindowController(QObject):
         section_left = header.sectionViewportPosition(logical_index)
         section_width = header.sectionSize(logical_index)
         section_center = section_left + section_width // 2
-        if position.x() < section_center:
+        if x < section_center:
             return section_left
         return section_left + section_width

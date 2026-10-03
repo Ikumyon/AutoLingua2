@@ -38,17 +38,52 @@ class CreationContext(Protocol):
         ...
 
 
-@dataclass(frozen=True)
 class CreationActions:
     """Only supported actions, never the host window or its controller."""
-    cancel_operation: Callable[[], None]
-    add_target_path: Callable[[Path], None]
-    remove_target_path: Callable[[Path], None]
-    set_project_name: Callable[[str], None]
-    select_game: Callable[[str], None]
-    set_source_language: Callable[[str], None]
-    set_target_slot: Callable[[str], None]
-    get_icon: Callable[[str], QIcon]
+
+    def __init__(
+        self,
+        cancel_operation: Callable[[], None],
+        add_target_path: Callable[[Path], None],
+        remove_target_path: Callable[[Path], None],
+        set_project_name: Callable[[str], None],
+        select_game: Callable[[str], None],
+        set_source_language: Callable[[str], None],
+        set_target_slot: Callable[[str], None],
+        get_icon: Callable[[str], QIcon],
+    ) -> None:
+        self._cancel_operation = cancel_operation
+        self._add_target_path = add_target_path
+        self._remove_target_path = remove_target_path
+        self._set_project_name = set_project_name
+        self._select_game = select_game
+        self._set_source_language = set_source_language
+        self._set_target_slot = set_target_slot
+        self._get_icon = get_icon
+
+    def cancel_operation(self) -> None:
+        self._cancel_operation()
+
+    def add_target_path(self, path: Path, /) -> None:
+        self._add_target_path(path)
+
+    def remove_target_path(self, path: Path, /) -> None:
+        self._remove_target_path(path)
+
+    def set_project_name(self, name: str, /) -> None:
+        self._set_project_name(name)
+
+    def select_game(self, game_id: str, /) -> None:
+        self._select_game(game_id)
+
+    def set_source_language(self, lang_code: str, /) -> None:
+        self._set_source_language(lang_code)
+
+    def set_target_slot(self, slot_code: str, /) -> None:
+        self._set_target_slot(slot_code)
+
+    def get_icon(self, name: str, /) -> QIcon:
+        return self._get_icon(name)
 
 
 @runtime_checkable

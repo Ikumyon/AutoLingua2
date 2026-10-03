@@ -26,9 +26,9 @@ def default_translation_table_columns(
     status_getter: Callable[[TranslationUnit], str],
 ) -> list[TranslationTableColumn]:
     return [
-        TranslationTableColumn("status", tr("TranslationTable", "状態"), lambda unit, _: status_getter(unit)),
         TranslationTableColumn("label", tr("TranslationTable", "キー"), lambda unit, _: unit.label),
         TranslationTableColumn("source_text", tr("TranslationTable", "原文"), lambda unit, _: unit.source_text),
         TranslationTableColumn("target_text", tr("TranslationTable", "訳文"), lambda unit, _: unit.target_text),
+        TranslationTableColumn("status", tr("TranslationTable", "状態"), lambda unit, _: status_getter(unit)),
         TranslationTableColumn("file", tr("TranslationTable", "ファイル"), lambda unit, source_name_getter: source_name_getter(unit)),
     ]

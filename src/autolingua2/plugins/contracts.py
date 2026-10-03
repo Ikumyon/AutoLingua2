@@ -7,10 +7,18 @@ from autolingua2.adapters.base import FileAdapter
 from autolingua2.ir import Issue, TranslationProject, TranslationSource, TranslationUnit, UnitState
 from autolingua2.ir.filter_rules import FilterRule
 from autolingua2.ir.imported import GameProfile, GameSlot, ImportedTranslation, SourceRef
-from autolingua2.services.ai_providers.base import AiProviderPlugin, TextTranslator, TranslationProviderError
+from autolingua2.services.ai_providers.base import (
+    AiProviderPlugin,
+    BaseAiProvider,
+    BaseHttpTranslator,
+    TextTranslator,
+    TranslationProviderError,
+)
 
 __all__ = [
     "FileAdapter", "AiProviderPlugin", "TextTranslator", "TranslationProviderError",
+    "BaseHttpTranslator", "BaseAiProvider",
     "Issue", "TranslationProject", "TranslationSource", "TranslationUnit", "UnitState",
     "FilterRule", "GameProfile", "GameSlot", "ImportedTranslation", "SourceRef",
 ]
+

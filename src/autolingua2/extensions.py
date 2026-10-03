@@ -7,8 +7,7 @@ import logging
 from pathlib import Path
 from typing import Literal
 
-from .ir.validation import array, record, required, text
-from .plugins.api import PluginContext
+from .ir.validation import record, required, text
 from .plugins.manager import PluginManager
 from .ui.i18n import LocalizationManager, current_ui_language, language_events
 from .ui.icons import IconManager
@@ -55,10 +54,6 @@ class ExtensionEntrance:
         if self._closed:
             raise RuntimeError("Extension entrance is closed")
 
-    def register_plugin(self, plugin_id: str, entry: Callable[[PluginContext], None]) -> bool:
-        self._ensure_open()
-        return self._plugins._load(plugin_id, entry)
-
     def register_resource(self, kind: ResourceKind, path: Path) -> None:
         self._ensure_open()
         if kind == "ui_translation":
@@ -75,43 +70,102 @@ class ExtensionEntrance:
         self._errors.append(message)
         logger.error("Extension registration failure: %s", message)
 
-    def load_configured(
-        self, config_path: Path, check: Callable[[], None] | None = None,
+    def _load_plugin_folder(
+        self, folder: Path, check: Callable[[], None] | None = None,
+        *, builtin: bool = False,
+    ) -> None:
+        manifest_file = folder / "manifest.json"
+        if not folder.is_dir() or not manifest_file.is_file():
+            return
+        if check is not None:
+            check()
+        try:
+            manifest = record(json.loads(manifest_file.read_text(encoding="utf-8")))
+            plugin_id = text(required(manifest, "id"), nonempty=True)
+            kind = text(manifest.get("kind", "python"), nonempty=True)
+            config_item: dict[str, object] = {
+                "id": plugin_id,
+                "kind": kind,
+            }
+            if kind == "executable":
+                config_item["manifest"] = str(manifest_file.resolve())
+            elif kind == "python":
+                entry_file = Path(text(manifest.get("entry", "entry.py"), nonempty=True))
+                entry_path = (folder / entry_file).resolve()
+                if entry_file.is_absolute() or not entry_path.is_relative_to(folder.resolve()):
+                    raise ValueError("Entry must be inside its plugin folder")
+                if builtin:
+                    parts = (folder.name, *entry_file.with_suffix("").parts)
+                    if entry_file.suffix != ".py" or any(not part.isidentifier() for part in parts):
+                        raise ValueError("Invalid builtin Python entry")
+                    config_item["module"] = "autolingua2.plugins." + ".".join(parts)
+                else:
+                    config_item["path"] = str(entry_path)
+            else:
+                raise ValueError(f"Unknown plugin kind: {kind}")
+            self._plugins._load_configured(config_item, folder.resolve())
+        except Exception as exc:
+            self._report_error(f"plugin:{folder.name}", exc)
+
+    def load_all(
+        self, root_dir: Path, check: Callable[[], None] | None = None,
         *, ui_language: str | None = None,
     ) -> None:
+        """名刺（マニフェスト）を持つ内蔵/外部リソースおよびプラグインを自動探索してロードします。"""
         self._ensure_open()
-        try:
-            config = record(json.loads(config_path.read_text(encoding="utf-8")))
-            entries = array(required(config, "extensions"))
-        except Exception as exc:
-            self._report_error(str(config_path), exc)
-            return
-        plugins: list[dict[str, object]] = []
-        for index, value in enumerate(entries):
-            if check is not None:
-                check()
-            try:
-                item = record(value)
-                kind = text(required(item, "kind"), nonempty=True)
-                if kind in ("python", "executable"):
-                    plugins.append(item)
-                elif kind in ("ui_translation", "theme", "icon_theme"):
-                    path = config_path.parent / text(required(item, "path"), nonempty=True)
-                    self.register_resource(kind, path.resolve())
-                else:
-                    raise ValueError(f"Unknown extension kind: {kind}")
-            except Exception as exc:
-                self._report_error(f"extensions[{index}]", exc)
-        # Resolve system language against registered dictionaries before plugin callbacks.
+
+        # 1. UI翻訳リソースの自動探索 (translations/*/metadata.json)
+        translations_dir = root_dir / "translations"
+        if translations_dir.is_dir():
+            for folder in sorted(translations_dir.iterdir()):
+                if folder.is_dir() and (folder / "metadata.json").is_file():
+                    if check is not None:
+                        check()
+                    try:
+                        self.register_resource("ui_translation", folder.resolve())
+                    except Exception as exc:
+                        self._report_error(f"translations/{folder.name}", exc)
+
+        # 2. テーマリソースの自動探索 (theme/themes/*/theme.json)
+        themes_dir = root_dir / "theme" / "themes"
+        if themes_dir.is_dir():
+            for folder in sorted(themes_dir.iterdir()):
+                if folder.is_dir() and (folder / "theme.json").is_file():
+                    if check is not None:
+                        check()
+                    try:
+                        self.register_resource("theme", folder.resolve())
+                    except Exception as exc:
+                        self._report_error(f"theme/themes/{folder.name}", exc)
+
+        # 3. アイコンリソースの自動探索 (theme/icons/*/iconset.json)
+        icons_dir = root_dir / "theme" / "icons"
+        if icons_dir.is_dir():
+            for folder in sorted(icons_dir.iterdir()):
+                if folder.is_dir() and (folder / "iconset.json").is_file():
+                    if check is not None:
+                        check()
+                    try:
+                        self.register_resource("icon_theme", folder.resolve())
+                    except Exception as exc:
+                        self._report_error(f"theme/icons/{folder.name}", exc)
+
+        # 4. プラグインのコールバック前に言語を解決
         if ui_language is not None:
             self._plugins.change_language(self._localization.resolve_language(ui_language))
-        for item in plugins:
-            if check is not None:
-                check()
-            try:
-                self._plugins._load_configured(item, config_path.parent)
-            except Exception as exc:
-                self._report_error(str(item.get("id", "plugin")), exc)
+
+        # 5. 内蔵プラグインの自動探索 (src/autolingua2/plugins/*/manifest.json)
+        builtin_plugins_dir = Path(__file__).parent / "plugins"
+        if builtin_plugins_dir.is_dir():
+            for folder in sorted(builtin_plugins_dir.iterdir()):
+                self._load_plugin_folder(folder, check, builtin=True)
+
+        # 6. 外部プラグインの自動探索 (plugins/*/manifest.json)
+        external_plugins_dir = root_dir / "plugins"
+        if external_plugins_dir.is_dir() and external_plugins_dir != builtin_plugins_dir:
+            for folder in sorted(external_plugins_dir.iterdir()):
+                # 既に内蔵で読み込み済みのID等があれば PluginManager 側で重複排除
+                self._load_plugin_folder(folder, check)
 
     def close(self) -> None:
         if self._closed:

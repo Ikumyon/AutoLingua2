@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import uuid
 
+
+
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
@@ -242,6 +244,7 @@ class ModelRowWidget(QFrame):
         )
 
 from autolingua2.extensions import ExtensionEntrance
+from autolingua2.plugins.api import SettingsPageProvider
 from autolingua2.ir.filter_rules import AdapterFilterConfig, FilterRule
 from autolingua2.services.filter_rules import get_default_filter_config
 from autolingua2.services.ai_providers import ProviderRegistry
@@ -281,7 +284,9 @@ class SettingsDialogController(SimpleDialogController):
         self.icon_manager = entrance.icons
         self._filter_configs: dict[str, AdapterFilterConfig] = {}
         self._current_adapter_id: str = ""
+        self._plugin_settings_widgets: list[tuple[SettingsPageProvider, QWidget]] = []
         self._mount_pages()
+        self._mount_plugin_settings_pages()
         self._connect_category_stack()
         self._setup_ui_language()
         self._setup_themes_and_icons()
@@ -304,6 +309,30 @@ class SettingsDialogController(SimpleDialogController):
             sub_widget = load_ui(ui_name, container)
             if layout is not None:
                 layout.addWidget(sub_widget)
+
+    def _mount_plugin_settings_pages(self) -> None:
+        categories = require_child(self.dialog, QListWidget, "listCategories")
+        stack = require_child(self.dialog, QStackedWidget, "stackSettings")
+
+        for provider in self.plugins.all_settings_pages:
+            item = QListWidgetItem(provider.title)
+            item.setData(Qt.ItemDataRole.UserRole, provider.id)
+            categories.addItem(item)
+
+            widget = provider.create_widget(stack)
+            stack.addWidget(widget)
+            self._plugin_settings_widgets.append((provider, widget))
+
+    def select_category(self, target: str) -> bool:
+        """公開された設定ページIDに一致するカテゴリを選択。"""
+        categories = require_child(self.dialog, QListWidget, "listCategories")
+        for row in range(categories.count()):
+            item = categories.item(row)
+            if item is not None:
+                if item.data(Qt.ItemDataRole.UserRole) == target:
+                    categories.setCurrentRow(row)
+                    return True
+        return False
 
     def _setup_dialog_buttons(self) -> None:
         button_box = self.dialog.findChild(QDialogButtonBox, "buttonBox")
@@ -346,6 +375,7 @@ class SettingsDialogController(SimpleDialogController):
         self.combo_provider.setCurrentIndex(self.combo_provider.findData(provider_id))
         self._initial_provider_id = provider_id
         self._current_provider_id = provider_id
+        self._ensure_provider_defaults(provider_id)
 
         self.edit_api_key.setText(self.ai_api_keys.get(provider_id, ""))
         self._populate_models()
@@ -508,12 +538,25 @@ class SettingsDialogController(SimpleDialogController):
         self.ai_models[self._current_provider_id] = self._read_model_list()
         self.ai_api_keys[self._current_provider_id] = self.edit_api_key.text().strip()
 
+    def _ensure_provider_defaults(self, p_id: str) -> None:
+        if p_id not in self.ai_models or not self.ai_models[p_id]:
+            defaults = self.registry.get_default_models(p_id)
+            if defaults:
+                self.ai_models[p_id] = defaults
+        if not self.ai_api_keys.get(p_id):
+            env_key = self.registry.get_env_api_key(p_id)
+            if env_key:
+                self.ai_api_keys[p_id] = env_key
+
+
     def _on_provider_changed(self, index: int) -> None:
         self._save_current_ai_fields()
         self._current_provider_id = str(self.combo_provider.itemData(index) or "")
+        self._ensure_provider_defaults(self._current_provider_id)
         self._populate_models()
         self.edit_api_key.setText(self.ai_api_keys.get(self._current_provider_id, ""))
         self._refresh_provider_errors()
+
 
     @property
     def selected_provider_id(self) -> str:
@@ -827,5 +870,9 @@ class SettingsDialogController(SimpleDialogController):
         self._save_current_table_to_config()
         for adapter_id, config in self._filter_configs.items():
             save_adapter_filter_rules(adapter_id, config.to_dict())
+
+        # プラグイン提供の設定ページの保存
+        for provider, widget in self._plugin_settings_widgets:
+            provider.save_settings(widget)
 
         return result

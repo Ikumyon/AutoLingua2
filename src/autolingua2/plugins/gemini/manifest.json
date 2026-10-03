@@ -1,0 +1,7 @@
+{
+  "id": "gemini",
+  "name": "Google Gemini",
+  "kind": "python",
+  "entry": "entry.py",
+  "description": "Google Gemini translation provider"
+}
