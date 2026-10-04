@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import hashlib
 import json
+import locale
 import logging
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 import urllib.error
 import urllib.request
+
+from autolingua2.infrastructure.filesystem import PROJECT_ROOT
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +23,13 @@ class TranslationProviderError(RuntimeError):
 class TextTranslator(Protocol):
     """テキスト翻訳を実行する公開プロトコル契約。"""
 
-    def translate(self, text: str, source_language: str, target_language: str) -> str: ...
+    def translate(
+        self,
+        text: str,
+        source_language: str,
+        target_language: str,
+        tone: str | None = None,
+    ) -> str: ...
 
 
 @runtime_checkable
@@ -33,15 +44,90 @@ class AiProviderPlugin(Protocol):
     def create(self, api_key: str, model: str) -> TextTranslator: ...
 
 
-DEFAULT_SYSTEM_PROMPT_TEMPLATE = (
-    "You are a professional video game localization translator. "
-    "Translate the given text from {source_language} to {target_language}.\n"
-    "Rules:\n"
-    "1. Preserve all placeholders, variables, tags, and formatting codes exactly as they are "
-    "(e.g., §Y, §!, [Tag], $VAR$, %s, \\n, etc.).\n"
-    "2. Use natural and context-appropriate video game dialogue or UI phrasing.\n"
-    "3. Output ONLY the translated text. Do not include commentary, explanations, greetings, or markdown quotes."
+MASTER_SYSTEM_PROMPT = (
+    "あなたはゲーム翻訳者です。与えられたテキストを{source_language}から{target_language}に翻訳してください。\n"
+    "翻訳結果のみを出力してください。\n"
+    "{tone_section}"
 )
+
+PROMPT_CACHE_FILE = PROJECT_ROOT / ".runtime" / "cache" / "prompts_cache.json"
+
+
+def get_prompt_hash(text: str) -> str:
+    """プロンプト原本のSHA-256ハッシュ（先頭16文字）を返します。"""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def get_os_language() -> str:
+    """ユーザーのOS言語コード（例: 'ja', 'en'）を取得します。"""
+    try:
+        lang, _ = locale.getlocale()
+        if lang:
+            return lang.split("_")[0].lower()
+    except Exception:
+        pass
+    return "ja"
+
+
+def _load_prompt_cache() -> dict[str, dict[str, str]]:
+    if PROMPT_CACHE_FILE.is_file():
+        try:
+            with open(PROMPT_CACHE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception as exc:
+            logger.warning("プロンプトキャッシュの読み込みに失敗しました: %s", exc)
+    return {}
+
+
+def _save_prompt_cache(cache_data: dict[str, dict[str, str]]) -> None:
+    try:
+        PROMPT_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(PROMPT_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(cache_data, f, ensure_ascii=False, indent=2)
+    except Exception as exc:
+        logger.warning("プロンプトキャッシュの保存に失敗しました: %s", exc)
+
+
+def build_system_prompt_template(
+    os_language: str,
+    translator: BaseHttpTranslator | None = None,
+) -> str:
+    """OS言語に応じたシステムプロンプトのテンプレートを取得します。
+
+    原本ハッシュを用いてキャッシュの有効性を検証し、未作成または原本変更時は
+    AIによりOS言語向けプロンプトを再生成・キャッシュ保存します。
+    """
+    if os_language == "ja":
+        return MASTER_SYSTEM_PROMPT
+
+    current_hash = get_prompt_hash(MASTER_SYSTEM_PROMPT)
+    cache = _load_prompt_cache()
+    cached_entry = cache.get(os_language)
+
+    if (
+        cached_entry
+        and cached_entry.get("source_hash") == current_hash
+        and "prompt" in cached_entry
+    ):
+        return cached_entry["prompt"]
+
+    # キャッシュ未作成または原本更新時
+    if translator is not None:
+        try:
+            translated = translator.translate(MASTER_SYSTEM_PROMPT, "Japanese", os_language)
+            if "{source_language}" in translated and "{target_language}" in translated:
+                cache[os_language] = {
+                    "source_hash": current_hash,
+                    "prompt": translated,
+                }
+                _save_prompt_cache(cache)
+                return translated
+        except Exception as exc:
+            logger.warning("OS言語(%s)へのプロンプト翻訳に失敗しました: %s", os_language, exc)
+
+    return MASTER_SYSTEM_PROMPT
 
 
 class BaseHttpTranslator(TextTranslator, ABC):
@@ -98,18 +184,33 @@ class BaseHttpTranslator(TextTranslator, ABC):
         """プロバイダ固有のエラー形式からメッセージを抽出します（任意実装）。"""
         return None
 
-    def build_system_prompt(self, source_language: str, target_language: str) -> str:
+    def build_system_prompt(
+        self,
+        source_language: str,
+        target_language: str,
+        tone: str | None = None,
+    ) -> str:
         """ゲーム翻訳用のシステムプロンプトを構築します。"""
-        return DEFAULT_SYSTEM_PROMPT_TEMPLATE.format(
+        os_lang = get_os_language()
+        template = build_system_prompt_template(os_lang, translator=self)
+        tone_section = f"口調: {tone}\n" if tone and tone.strip() else ""
+        return template.format(
             source_language=source_language,
             target_language=target_language,
+            tone_section=tone_section,
         )
 
-    def translate(self, text: str, source_language: str, target_language: str) -> str:
+    def translate(
+        self,
+        text: str,
+        source_language: str,
+        target_language: str,
+        tone: str | None = None,
+    ) -> str:
         if not text.strip():
             return text
 
-        system_prompt = self.build_system_prompt(source_language, target_language)
+        system_prompt = self.build_system_prompt(source_language, target_language, tone=tone)
         payload = self.build_payload(text, source_language, target_language, system_prompt)
         headers = self.build_headers()
 

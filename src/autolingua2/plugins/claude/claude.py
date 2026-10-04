@@ -5,10 +5,10 @@ from typing import Any
 from autolingua2.plugins.contracts import BaseAiProvider, BaseHttpTranslator
 
 DEFAULT_CLAUDE_MODELS: tuple[tuple[str, str], ...] = (
-    ("Claude 3.7 Sonnet", "claude-3-7-sonnet-20250219"),
-    ("Claude 3.5 Sonnet", "claude-3-5-sonnet-20241022"),
-    ("Claude 3.5 Haiku", "claude-3-5-haiku-20241022"),
-    ("Claude 3 Opus", "claude-3-opus-20240229"),
+    ("Claude Sonnet 5.5", "claude-sonnet-5-5"),
+    ("Claude Opus 5.5", "claude-opus-5-5"),
+    ("Claude Fable 5.1", "claude-fable-5-1"),
+    ("Claude Sonnet 5", "claude-sonnet-5"),
 )
 
 

@@ -24,6 +24,6 @@ def register(context: PluginContext) -> None:
 
     context.register(PluginContribution(
         id="paradox_yaml",
-        parser=ParadoxYamlAdapter(context.files.read_text_lossless),
+        parser=ParadoxYamlAdapter(lambda p: context.files.read_text_auto(p)[0]),
         ui=ui,
     ))

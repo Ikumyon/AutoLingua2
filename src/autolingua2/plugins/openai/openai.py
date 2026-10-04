@@ -73,9 +73,11 @@ class OpenAiProvider(BaseAiProvider):
     display_name = "OpenAI"
     api_key_env = "OPENAI_API_KEY"
     default_models = (
-        ("GPT-4o mini", "gpt-4o-mini"),
-        ("GPT-4o", "gpt-4o"),
-        ("GPT-4.1", "gpt-4.1"),
-        ("o3-mini", "o3-mini"),
+        ("GPT-6.1 Sol", "gpt-6.1-sol"),
+        ("GPT-6 Astra", "gpt-6-astra"),
+        ("GPT-6 Luna", "gpt-6-luna"),
+        ("GPT-5.6 Sol", "gpt-5.6-sol"),
+        ("GPT-5.6 Terra", "gpt-5.6-terra"),
+        ("GPT-5.6 Luna", "gpt-5.6-luna"),
     )
     translator_class = OpenAiTranslator

@@ -186,7 +186,7 @@ class ModelRowWidget(QFrame):
         self.check_enabled.setToolTip("有効/無効")
 
         self.field_name = InlineEditableField(entry.name, placeholder="表示名", icon_manager=self.icon_manager, parent=self)
-        self.field_model = InlineEditableField(entry.model, placeholder="モデル名 (例: gpt-4o)", icon_manager=self.icon_manager, parent=self)
+        self.field_model = InlineEditableField(entry.model, placeholder="モデル名 (例: gpt-6.1-sol)", icon_manager=self.icon_manager, parent=self)
 
         self.button_delete = QToolButton(self)
         trash_icon = self.icon_manager.get_icon("trash")
@@ -244,10 +244,11 @@ class ModelRowWidget(QFrame):
         )
 
 from autolingua2.extensions import ExtensionEntrance
-from autolingua2.plugins.api import SettingsPageProvider
 from autolingua2.ir.filter_rules import AdapterFilterConfig, FilterRule
-from autolingua2.services.filter_rules import get_default_filter_config
+from autolingua2.plugins.api import SettingsPageProvider
+from autolingua2.services.ai_network import AiNetworkClient
 from autolingua2.services.ai_providers import ProviderRegistry
+from autolingua2.services.filter_rules import get_default_filter_config
 from autolingua2.services.settings_store import (
     AiModel,
     AiSettings,
@@ -285,9 +286,21 @@ class SettingsDialogController(SimpleDialogController):
         self._filter_configs: dict[str, AdapterFilterConfig] = {}
         self._current_adapter_id: str = ""
         self._plugin_settings_widgets: list[tuple[SettingsPageProvider, QWidget]] = []
+
+        self.ai_client = AiNetworkClient(self.dialog)
+        self.ai_client.model_validated.connect(self._on_model_validated)
+        self.ai_client.all_validated.connect(self._on_all_models_validated)
+        self._testing_for_save = False
+        self._unvalidated_models_for_save: list[ModelRowWidget] = []
+
         self._mount_pages()
         self._mount_plugin_settings_pages()
         self._connect_category_stack()
+
+        self.button_box = require_child(self.dialog, QDialogButtonBox, "buttonBox")
+        self.button_box.accepted.disconnect()
+        self.button_box.accepted.connect(self._on_save_attempt)
+        self.button_box.rejected.connect(self.ai_client.cancel_all)
         self._setup_ui_language()
         self._setup_themes_and_icons()
         self._setup_ai(self.plugins.providers, provider_id, models or {}, selected_models or {}, api_keys or {}, concurrency)
@@ -394,8 +407,8 @@ class SettingsDialogController(SimpleDialogController):
         if not api_key:
             QMessageBox.warning(
                 self.dialog,
-                "接続テスト",
-                "APIキーが入力されていません。APIキーを入力してください。",
+                tr("SettingsDialog", "接続テスト"),
+                tr("SettingsDialog", "APIキーが入力されていません。APIキーを入力してください。"),
             )
             return
 
@@ -403,51 +416,138 @@ class SettingsDialogController(SimpleDialogController):
         if provider is None:
             QMessageBox.warning(
                 self.dialog,
-                "接続テスト",
-                f"選択中の Provider '{self._current_provider_id}' は利用できません。",
+                tr("SettingsDialog", "接続テスト"),
+                tr("SettingsDialog", f"選択中の Provider '{self._current_provider_id}' は利用できません。"),
             )
             return
 
-        if not self._row_widgets:
+        targets = [
+            r for r in self._row_widgets
+            if r.field_model.text().strip() and r.check_enabled.isChecked()
+        ]
+        if not targets:
             QMessageBox.information(
                 self.dialog,
-                "接続テスト",
-                "テスト対象のモデルが登録されていません。",
+                tr("SettingsDialog", "接続テスト"),
+                tr("SettingsDialog", "有効なテスト対象モデルが登録されていません。"),
             )
             return
 
-        success_count = 0
-        error_count = 0
+        if self.button_test_connection is not None:
+            self.button_test_connection.setEnabled(False)
+            self.button_test_connection.setText(tr("SettingsDialog", "テスト中..."))
 
-        for row_widget in self._row_widgets:
-            model = row_widget.field_model.text().strip()
-            if not model:
-                continue
-            if not row_widget.check_enabled.isChecked():
-                row_widget.set_status("disabled", "無効化されています")
-                continue
+        for r in targets:
+            r.set_status(None, tr("SettingsDialog", "検証中..."))
 
-            try:
-                translator = provider.create(api_key, model)
-                translator.translate("test", "en", "ja")
-                row_widget.set_status("valid", "接続確認済み（利用可能）")
-                success_count += 1
-            except Exception as exc:
-                row_widget.set_status("invalid", f"接続エラー: {exc}")
-                error_count += 1
+        self._testing_for_save = False
+        models = [r.field_model.text().strip() for r in targets]
+        self.ai_client.validate_models(provider, api_key, models, timeout_sec=8.0)
+
+    def _on_model_validated(self, model: str, is_valid: bool, message: str) -> None:
+        for r in self._row_widgets:
+            if r.field_model.text().strip() == model:
+                r.set_status("valid" if is_valid else "invalid", message)
+
+    def _on_all_models_validated(self, success_count: int, error_count: int) -> None:
+        if self.button_test_connection is not None:
+            self.button_test_connection.setEnabled(True)
+            self.button_test_connection.setText(tr("SettingsDialog", "接続テスト"))
+
+        if self._testing_for_save:
+            self._testing_for_save = False
+            self._handle_save_validation_result(success_count, error_count)
+            return
 
         if error_count == 0:
             QMessageBox.information(
                 self.dialog,
-                "接続テスト",
-                f"接続テストに成功しました。（利用可能: {success_count} 件）",
+                tr("SettingsDialog", "接続テスト"),
+                tr("SettingsDialog", f"接続テストに成功しました。（利用可能: {success_count} 件）"),
             )
         else:
             QMessageBox.warning(
                 self.dialog,
-                "接続テスト",
-                f"接続テストが完了しました。\n利用可能: {success_count} 件\nエラー/無効: {error_count} 件\n\n各モデルの背景色をご確認ください。",
+                tr("SettingsDialog", "接続テスト"),
+                tr(
+                    "SettingsDialog",
+                    f"接続テストが完了しました。\n利用可能: {success_count} 件\nエラー/無効: {error_count} 件\n\n各モデルの背景色をご確認ください。",
+                ),
             )
+
+    def _switch_to_ai_category(self) -> None:
+        categories = require_child(self.dialog, QListWidget, "listCategories")
+        for idx in range(categories.count()):
+            item = categories.item(idx)
+            if item is not None and "AI" in item.text():
+                categories.setCurrentRow(idx)
+                break
+
+    def _on_save_attempt(self) -> None:
+        self._save_current_ai_fields()
+        api_key = self.edit_api_key.text().strip()
+        provider = self.registry.get(self._current_provider_id)
+
+        # 未検証の有効モデルがあるかチェック（有効かつモデル名あり、かつ status != "valid"）
+        untested_rows = [
+            r for r in self._row_widgets
+            if r.check_enabled.isChecked() and r.field_model.text().strip() and r._status != "valid"
+        ]
+
+        # APIキーがない、またはプロバイダがない、または未検証モデルがない場合はそのまま閉じる
+        if not untested_rows or not api_key or provider is None:
+            self.dialog.accept()
+            return
+
+        # 未検証モデルがある場合：保存前に非同期自動テストを実行
+        self._testing_for_save = True
+        self._unvalidated_models_for_save = untested_rows
+
+        save_btn = self.button_box.button(QDialogButtonBox.StandardButton.Save)
+        if save_btn is not None:
+            save_btn.setEnabled(False)
+            save_btn.setText(tr("SettingsDialog", "検証中..."))
+
+        for r in untested_rows:
+            r.set_status(None, tr("SettingsDialog", "保存前チェック中..."))
+
+        models = [r.field_model.text().strip() for r in untested_rows]
+        self.ai_client.validate_models(provider, api_key, models, timeout_sec=8.0)
+
+    def _handle_save_validation_result(self, success_count: int, error_count: int) -> None:
+        save_btn = self.button_box.button(QDialogButtonBox.StandardButton.Save)
+        if save_btn is not None:
+            save_btn.setEnabled(True)
+            save_btn.setText(tr("SettingsDialog", "保存"))
+
+        # エラーがあった場合
+        if error_count > 0:
+            # 1. 自動でAI設定ページへ画面切り替え
+            self._switch_to_ai_category()
+
+            # 無効なモデルの一覧を取得
+            invalid_rows = [r for r in self._unvalidated_models_for_save if r._status == "invalid"]
+            invalid_names = ", ".join(f"'{r.field_model.text().strip()}'" for r in invalid_rows) or "一部のモデル"
+
+            reply = QMessageBox.warning(
+                self.dialog,
+                tr("SettingsDialog", "モデル確認"),
+                tr(
+                    "SettingsDialog",
+                    f"モデル {invalid_names} は利用できませんでした。\n\n該当モデルを無効化して保存しますか？",
+                ),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                for r in invalid_rows:
+                    r.check_enabled.setChecked(False)
+                self._save_current_ai_fields()
+                self.dialog.accept()
+            return
+
+        # すべて有効だった場合はそのまま保存・終了
+        self.dialog.accept()
 
     def _populate_models(self) -> None:
         if self.layout_model_list is not None:
@@ -468,7 +568,8 @@ class SettingsDialogController(SimpleDialogController):
     def _add_row_widget(self, entry: AiModel) -> ModelRowWidget:
         row = ModelRowWidget(entry, icon_manager=self.icon_manager, parent=self.scroll_area_models)
         row.deleted.connect(self._on_row_deleted)
-        row.modelCommitted.connect(self._validate_model_if_needed)
+        # 入力確定時の同期通信を全廃（ステータスのみクリア）
+        row.modelCommitted.connect(lambda r: r.set_status(None))
         if self.layout_model_list is not None:
             insert_idx = max(0, self.layout_model_list.count() - 1) if self._row_widgets else 0
             self.layout_model_list.insertWidget(insert_idx, row)
@@ -498,36 +599,6 @@ class SettingsDialogController(SimpleDialogController):
         row = self._add_row_widget(entry)
         row.field_model.start_edit()
 
-    def _validate_model_if_needed(self, row_widget: ModelRowWidget) -> None:
-        model = row_widget.field_model.text().strip()
-        if not model:
-            row_widget.set_status(None)
-            return
-        api_key = self.edit_api_key.text().strip()
-        if not api_key:
-            row_widget.set_status(None)
-            return
-
-        provider = self.registry.get(self._current_provider_id)
-        if provider is None:
-            return
-
-        try:
-            translator = provider.create(api_key, model)
-            translator.translate("test", "en", "ja")
-            row_widget.set_status("valid", "接続確認済み（利用可能）")
-        except Exception as exc:
-            row_widget.set_status("invalid", f"接続エラー: {exc}")
-            reply = QMessageBox.warning(
-                self.dialog,
-                "モデル確認",
-                f"モデル '{model}' を利用できませんでした。\nサポートが終了しているか、モデル名が不正な可能性があります。\n\n詳細: {exc}\n\nこのモデルを無効化しますか？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes,
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                row_widget.check_enabled.setChecked(False)
-
     def _refresh_provider_errors(self) -> None:
         messages = list(self.registry.errors)
         if self._current_provider_id not in self.registry.providers:
@@ -548,7 +619,6 @@ class SettingsDialogController(SimpleDialogController):
             if env_key:
                 self.ai_api_keys[p_id] = env_key
 
-
     def _on_provider_changed(self, index: int) -> None:
         self._save_current_ai_fields()
         self._current_provider_id = str(self.combo_provider.itemData(index) or "")
@@ -557,10 +627,9 @@ class SettingsDialogController(SimpleDialogController):
         self.edit_api_key.setText(self.ai_api_keys.get(self._current_provider_id, ""))
         self._refresh_provider_errors()
 
-
     @property
     def selected_provider_id(self) -> str:
-        return self._initial_provider_id
+        return self._current_provider_id
 
     def _connect_category_stack(self) -> None:
         categories = require_child(self.dialog, QListWidget, "listCategories")
@@ -853,7 +922,7 @@ class SettingsDialogController(SimpleDialogController):
 
         self._save_current_ai_fields()
         save_ai_settings(AiSettings(
-            provider_id=self._initial_provider_id,
+            provider_id=self._current_provider_id,
             models=self.ai_models,
             selected_models=self.ai_selected_models,
             api_keys=self.ai_api_keys,

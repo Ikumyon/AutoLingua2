@@ -598,7 +598,7 @@ class MainWindowController(QObject):
         self.button_focus_prev.clicked.connect(self.prev_focus_page)
         self.button_focus_next.clicked.connect(self.next_focus_page)
         self.button_focus_last.clicked.connect(self.last_focus_page)
-        self.page_scrubber.page_changed.connect(self.set_focus_page)
+        self.page_scrubber.value_changed.connect(self.set_focus_page)
         self.spin_focus_page_size.valueChanged.connect(self.on_focus_page_size_changed)
         self._setup_save_button_menu()
         self.button_save_split.clicked.connect(self.save_and_next)

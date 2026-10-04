@@ -13,12 +13,10 @@ fn autolingua2_native(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     let encoding_module = PyModule::new(py, "encoding")?;
     encoding_module.add_function(wrap_pyfunction!(encoding::detect_encoding, &encoding_module)?)?;
     encoding_module.add_function(wrap_pyfunction!(encoding::read_text_auto, &encoding_module)?)?;
-    encoding_module.add_function(wrap_pyfunction!(encoding::read_text_lossless, &encoding_module)?)?;
     m.add_submodule(&encoding_module)?;
 
     m.add_function(wrap_pyfunction!(encoding::detect_encoding, m)?)?;
     m.add_function(wrap_pyfunction!(encoding::read_text_auto, m)?)?;
-    m.add_function(wrap_pyfunction!(encoding::read_text_lossless, m)?)?;
 
     // 2. プラットフォーム関連の登録 (トップレベル & サブモジュール)
     let platform_module = PyModule::new(py, "platform")?;

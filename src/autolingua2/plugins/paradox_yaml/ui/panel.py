@@ -157,7 +157,7 @@ class ParadoxCreationPanel(QWidget):
 def import_mod_file(path: Path, context: PluginContext) -> None:
     """Paradox の .mod ファイルを解析し、コンテキストに情報を設定する。"""
     try:
-        info = parse_mod_file(path, context.files.read_text_lossless)
+        info = parse_mod_file(path, lambda p: context.files.read_text_auto(p)[0])
     except Exception as exc:
         parent = None
         QMessageBox.warning(parent, tr("ParadoxPlugin", "エラー"), tr("ParadoxPlugin", f".modファイルの読み込みに失敗しました: {exc}"))

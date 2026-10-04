@@ -15,7 +15,6 @@ class RangeScrubberWidget(QWidget):
     """
 
     value_changed = Signal(int)
-    page_changed = Signal(int)  # 互換用シグナル
 
     def __init__(
         self,
@@ -339,7 +338,6 @@ class RangeScrubberWidget(QWidget):
                 if self._current_value != val:
                     self._current_value = val
                     self.value_changed.emit(val)
-                    self.page_changed.emit(val)
                     self.update()
         super().mousePressEvent(event)
 
@@ -374,7 +372,6 @@ class RangeScrubberWidget(QWidget):
             if self._current_value != target_val:
                 self._current_value = target_val
                 self.value_changed.emit(target_val)
-                self.page_changed.emit(target_val)
         self.update()
 
     def _cancel_inline_edit(self) -> None:

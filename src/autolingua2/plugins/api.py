@@ -9,7 +9,7 @@ from PySide6.QtGui import QSyntaxHighlighter, QTextDocument
 from PySide6.QtWidgets import QWidget
 
 from .contracts import FileAdapter, AiProviderPlugin
-from autolingua2.infrastructure.encoding import read_text_lossless
+from autolingua2.infrastructure.encoding import read_text_auto
 from autolingua2.services.settings_store import load_plugin_settings, save_plugin_settings
 from autolingua2.ui.creation_contract import CreationAdapter, CreationContext
 
@@ -92,7 +92,7 @@ class UIContribution:
 
 @dataclass(frozen=True)
 class FileAccess:
-    read_text_lossless: Callable[[Path], str]
+    read_text_auto: Callable[[Path], tuple[str, str]]
 
 
 @dataclass(frozen=True)
@@ -109,7 +109,7 @@ class PluginContext:
                  display_changed: Callable[[str], None] | None = None) -> None:
         self.id = plugin_id
         self._language = language
-        self.files = FileAccess(read_text_lossless)
+        self.files = FileAccess(read_text_auto)
         self.settings = PluginSettings(self._load_settings, self._save_settings)
         self._display_changed = display_changed
         self._contribution: PluginContribution | None = None

@@ -39,10 +39,3 @@ pub fn read_text_auto(path: &str) -> PyResult<(String, String)> {
     let (cow, _, _) = encoding.decode(&bytes[bom_len..]);
     Ok((cow.into_owned(), encoding.name().to_string()))
 }
-
-/// 互換用: ファイルパスを受け取り、自動判定してデコードした文字列のみを返します
-#[pyfunction]
-pub fn read_text_lossless(path: &str) -> PyResult<String> {
-    let (text, _) = read_text_auto(path)?;
-    Ok(text)
-}

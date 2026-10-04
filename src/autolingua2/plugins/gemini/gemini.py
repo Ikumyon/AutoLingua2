@@ -5,11 +5,9 @@ from typing import Any
 from autolingua2.plugins.contracts import BaseAiProvider, BaseHttpTranslator
 
 DEFAULT_GEMINI_MODELS: tuple[tuple[str, str], ...] = (
-    ("Gemini 2.5 Flash", "gemini-2.5-flash"),
-    ("Gemini 2.5 Pro", "gemini-2.5-pro"),
-    ("Gemini 2.0 Flash", "gemini-2.0-flash"),
-    ("Gemini 1.5 Flash", "gemini-1.5-flash"),
-    ("Gemini 1.5 Pro", "gemini-1.5-pro"),
+    ("Gemini 3.8 Flash", "gemini-3.8-flash"),
+    ("Gemini 3.5 Flash", "gemini-3.5-flash"),
+    ("Gemini 3 Pro", "gemini-3-pro"),
 )
 
 
