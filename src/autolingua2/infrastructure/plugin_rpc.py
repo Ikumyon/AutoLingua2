@@ -36,7 +36,7 @@ class PluginRPC:
                              ensure_ascii=False).encode("utf-8") + b"\n"
         if len(request) > MAX_LINE:
             raise PluginRPCError("size", "プラグインへの要求が大きすぎます。")
-        deadline = monotonic() + (timeout if timeout is not None else (30 if method in {"register", "output_name"} else 600))
+        deadline = monotonic() + (timeout if timeout is not None else (30 if method == "register" else 600))
         process = self.platform.start_plugin(self.executable, self.args, self.cwd)
         stdin, stdout, stderr = process.stdin, process.stdout, process.stderr
         queue: Queue = Queue(maxsize=32)

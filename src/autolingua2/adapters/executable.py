@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import base64
 from dataclasses import asdict
 import json
 from pathlib import Path
 from threading import local
 
-from autolingua2.ir import TranslationProject
+from autolingua2.services.export_contract import ExportFile
 from autolingua2.ir.filter_rules import FilterRule
 from autolingua2.ir.imported import GameProfile, GameSlot, ImportedTranslation
 from autolingua2.ir.serialization import imported_from_dict
@@ -40,6 +41,8 @@ class ExecutableAdapter:
         args = [text(arg) for arg in array(required(entry, "args"))]
         self.rpc = PluginRPC(self.id, executable, args, root, platform)
         registration = record(self.rpc.call("register", {}))
+        self.exporters = [ExecutableExporter(self.rpc, record(item))
+                          for item in array(registration.get("exporters", []))]
         if text(required(registration, "id"), nonempty=True) != self.id:
             raise ValueError("Executable registration ID does not match its manifest")
         description = record(required(registration, "parser"))
@@ -129,17 +132,21 @@ class ExecutableAdapter:
             raise PluginRPCError("protocol", "ソースIDは読み込んだファイルの絶対パスにしてください。")
         return result
 
-    def output_name(self, path: Path, project: TranslationProject) -> str:
-        result = text(self.rpc.call("output_name", {"path": str(path), "project": asdict(project)}), nonempty=True)
-        if Path(result).name != result or result in {".", ".."}:
-            raise PluginRPCError("protocol", "出力ファイル名が不正です。")
-        return result
 
-    def save(self, path: Path, imported: ImportedTranslation, project: TranslationProject,
-             existing: ImportedTranslation | None = None) -> None:
-        result = self.rpc.call("save", {
-            "path": str(path), "imported": asdict(imported),
-            "project": asdict(project), "existing": asdict(existing) if existing is not None else None,
-        })
-        if result is not True:
-            raise PluginRPCError("protocol", "保存完了応答が不正です。")
+class ExecutableExporter:
+    def __init__(self, rpc: PluginRPC, description: dict[str, object]) -> None:
+        self.rpc = rpc
+        self.id = text(required(description, "id"), nonempty=True)
+        self.name = text(required(description, "name"), nonempty=True)
+
+    def plan(self, workspaces: list[ImportedTranslation], settings: dict[str, object]) -> list[ExportFile]:
+        result = array(self.rpc.call("export_plan", {
+            "exporter_id": self.id, "workspaces": [asdict(item) for item in workspaces], "settings": settings,
+        }))
+        files: list[ExportFile] = []
+        for value in result:
+            item = record(value)
+            path = Path(text(required(item, "relative_path"), nonempty=True))
+            content = base64.b64decode(text(required(item, "content_base64")), validate=True)
+            files.append(ExportFile(path, content))
+        return files

@@ -1390,6 +1390,7 @@ QToolButton#buttonSaveSplit::menu-arrow {
     <addaction name="separator"/>
     <addaction name="actionToggleFileSidebar"/>
     <addaction name="actionToggleAiPanel"/>
+    <addaction name="actionToggleAiChat"/>
    </widget>
    <widget class="QMenu" name="menuSettings">
     <property name="title">
@@ -1497,6 +1498,47 @@ QToolButton#buttonSaveSplit::menu-arrow {
         </size>
        </property>
       </spacer>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QDockWidget" name="dockAiChat">
+   <property name="minimumSize"><size><width>320</width><height>300</height></size></property>
+   <property name="windowTitle"><string>AIチャット</string></property>
+   <attribute name="dockWidgetArea"><number>2</number></attribute>
+   <widget class="QWidget" name="dockAiChatContents">
+    <layout class="QVBoxLayout" name="layoutAiChat">
+     <property name="leftMargin"><number>12</number></property>
+     <property name="topMargin"><number>12</number></property>
+     <property name="rightMargin"><number>12</number></property>
+     <property name="bottomMargin"><number>12</number></property>
+     <item>
+      <layout class="QHBoxLayout" name="layoutChatHeader">
+       <item><spacer name="spacerChatHeader"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item>
+       <item><widget class="QPushButton" name="buttonChatNew"><property name="text"><string>新しい会話</string></property></widget></item>
+      </layout>
+     </item>
+     <item><widget class="QTextBrowser" name="browserChatHistory"><property name="openLinks"><bool>false</bool></property><property name="placeholderText"><string>翻訳の相談や、現在のファイルの文章の検索・選択を依頼できます。</string></property></widget></item>
+     <item>
+      <layout class="QHBoxLayout" name="layoutChatReferences">
+       <item><widget class="QLabel" name="labelChatReferences"><property name="text"><string>参照：なし</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+       <item><widget class="QPushButton" name="buttonChatClearReferences"><property name="text"><string>解除</string></property></widget></item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="layoutChatReferenceActions">
+       <item><widget class="QPushButton" name="buttonChatAddReferences"><property name="text"><string>＋ 選択した文章を参照に追加</string></property></widget></item>
+       <item><widget class="QPushButton" name="buttonChatViewReferences"><property name="text"><string>参照を見る</string></property></widget></item>
+      </layout>
+     </item>
+     <item><widget class="QLabel" name="labelChatStatus"><property name="text"><string>操作対象：現在のファイル（検索・選択のみ）</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+     <item><widget class="QPlainTextEdit" name="editChatMessage"><property name="maximumSize"><size><width>16777215</width><height>140</height></size></property><property name="placeholderText"><string>AIへのメッセージを入力…（Enterで送信、Shift＋Enterで改行）</string></property></widget></item>
+     <item>
+      <layout class="QHBoxLayout" name="layoutChatSend">
+       <item><widget class="QComboBox" name="comboChatProvider"><property name="toolTip"><string>チャットのプロバイダ。切り替え後の送信では過去の会話と参照も送信されます。</string></property><property name="sizeAdjustPolicy"><enum>QComboBox::SizeAdjustPolicy::AdjustToMinimumContentsLengthWithIcon</enum></property><property name="minimumContentsLength"><number>8</number></property></widget></item>
+       <item><widget class="QComboBox" name="comboChatModel"><property name="toolTip"><string>次の送信で使用するモデル</string></property><property name="sizeAdjustPolicy"><enum>QComboBox::SizeAdjustPolicy::AdjustToMinimumContentsLengthWithIcon</enum></property><property name="minimumContentsLength"><number>10</number></property></widget></item>
+       <item><widget class="QPushButton" name="buttonChatSend"><property name="text"><string>送信</string></property></widget></item>
+      </layout>
      </item>
     </layout>
    </widget>
@@ -1625,6 +1667,11 @@ QToolButton#buttonSaveSplit::menu-arrow {
    <property name="text">
     <string>バージョン情報</string>
    </property>
+  </action>
+  <action name="actionToggleAiChat">
+   <property name="checkable"><bool>true</bool></property>
+   <property name="checked"><bool>true</bool></property>
+   <property name="text"><string>AIチャット</string></property>
   </action>
   <action name="actionToggleAiPanel">
    <property name="checkable">

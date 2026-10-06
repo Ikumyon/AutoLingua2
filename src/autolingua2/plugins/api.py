@@ -8,7 +8,7 @@ from typing import Callable, Protocol, runtime_checkable
 from PySide6.QtGui import QSyntaxHighlighter, QTextDocument
 from PySide6.QtWidgets import QWidget
 
-from .contracts import FileAdapter, AiProviderPlugin
+from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter, ImportedTranslation
 from autolingua2.infrastructure.encoding import read_text_auto
 from autolingua2.services.settings_store import load_plugin_settings, save_plugin_settings
 from autolingua2.ui.creation_contract import CreationAdapter, CreationContext
@@ -25,6 +25,7 @@ __all__ = [
     "NewlineCodec",
     "PluginSettings",
     "UIContribution",
+    "ExportSettingsPanel",
 ]
 
 HighlighterFactory = Callable[[str, QTextDocument, Callable[[], bool], Callable[[], bool]], QSyntaxHighlighter | None]
@@ -80,6 +81,16 @@ class SettingsPageProvider(Protocol):
         ...
 
 
+@runtime_checkable
+class ExportSettingsPanel(Protocol):
+    def create_widget(self, workspaces: list[ImportedTranslation], parent: QWidget) -> QWidget:
+        ...
+
+    def read_settings(self, widget: QWidget) -> dict[str, object]:
+        """Validate input and return worker-safe settings, raising ValueError on invalid input."""
+        ...
+
+
 @dataclass(frozen=True)
 class UIContribution:
     """プラグインが4F（UI層）に提供する拡張機能コンテナ。"""
@@ -88,6 +99,7 @@ class UIContribution:
     settings_pages: list[SettingsPageProvider] = field(default_factory=list)
     text_presentation: Callable[[str], GameTextPresentation | None] | None = None
     highlighter_factory: HighlighterFactory | None = None
+    export_settings: dict[str, ExportSettingsPanel] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -101,6 +113,7 @@ class PluginContribution:
     parser: FileAdapter | None = None
     provider: AiProviderPlugin | None = None
     ui: UIContribution | None = None
+    exporters: list[TranslationExporter] = field(default_factory=list)
 
 
 class PluginContext:

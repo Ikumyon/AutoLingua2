@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from autolingua2.ir import TranslationProject
 from autolingua2.ir.imported import GameProfile, ImportedTranslation
 from autolingua2.ir.filter_rules import FilterRule
 
@@ -21,13 +20,6 @@ class FileAdapter(Protocol):
         ...
 
     def load(self, path: Path) -> ImportedTranslation:
-        ...
-
-    def save(self, path: Path, imported: ImportedTranslation, project: TranslationProject,
-             existing: ImportedTranslation | None = None) -> None:
-        ...
-
-    def output_name(self, path: Path, project: TranslationProject) -> str:
         ...
 
     def detect_source_language(self, path: Path) -> str | None:

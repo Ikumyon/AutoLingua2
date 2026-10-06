@@ -1,12 +1,54 @@
 from __future__ import annotations
 
 from typing import Any
+import json
 
-from autolingua2.plugins.contracts import BaseAiProvider, BaseHttpTranslator
+from autolingua2.plugins.contracts import (
+    BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
+    object_value, string_value,
+)
 
 
 class OpenAiTranslator(BaseHttpTranslator):
     """OpenAI API用の翻訳トランスレーター（BaseHttpTranslatorの差分のみ実装）。"""
+
+    supports_chat = True
+
+    def build_chat_payload(self, messages: list[ChatMessage], system_prompt: str,
+                           tools: list[dict[str, Any]], continuation: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "messages": [{"role": "system", "content": system_prompt}]
+            + [{"role": m.role, "content": m.content} for m in messages] + continuation,
+            "tools": [{"type": "function", "function": {
+                "name": t["name"], "description": t["description"], "parameters": t["inputSchema"],
+            }} for t in tools],
+        }
+
+    def extract_chat_reply(self, data: dict[str, Any]) -> ChatReply:
+        choices = data.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise ValueError("OpenAI: choices がありません。")
+        choice = object_value(choices[0], "choice")
+        if choice.get("finish_reason") == "length":
+            raise ValueError("応答が出力上限に達しました。")
+        message = object_value(choice.get("message"), "message")
+        calls: list[ChatToolCall] = []
+        for item in message.get("tool_calls", []):
+            entry = object_value(item, "tool_call")
+            function = object_value(entry.get("function"), "function")
+            calls.append(ChatToolCall(
+                string_value(entry.get("id"), "id"), string_value(function.get("name"), "name"),
+                object_value(json.loads(string_value(function.get("arguments"), "arguments")), "arguments"),
+            ))
+        content = message.get("content")
+        text = "" if content is None else string_value(content, "content")
+        if not text and not calls:
+            raise ValueError(str(message.get("refusal") or "AIの応答が空です。"))
+        return ChatReply(text, calls, message)
+
+    def chat_tool_result(self, call: ChatToolCall, result: dict[str, Any]) -> dict[str, Any]:
+        return {"role": "tool", "tool_call_id": call.id, "content": json.dumps(result, ensure_ascii=False)}
 
     @property
     def endpoint(self) -> str:

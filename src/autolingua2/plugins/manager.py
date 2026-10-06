@@ -22,8 +22,9 @@ from .api import (
     SettingsPageProvider,
     GameTextPresentation,
     UIContribution,
+    ExportSettingsPanel,
 )
-from .contracts import FileAdapter, AiProviderPlugin
+from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,8 @@ class PluginManager:
         self._language = language
         self._contexts: dict[str, PluginContext] = {}
         self._parsers: dict[str, FileAdapter] = {}
+        self._exporters: dict[str, TranslationExporter] = {}
+        self._export_settings: dict[str, ExportSettingsPanel] = {}
         self._providers: dict[str, AiProviderPlugin] = {}
         self._ui: dict[str, CreationAdapter] = {}
         self._ui_contributions: dict[str, UIContribution] = {}
@@ -94,6 +97,14 @@ class PluginManager:
     @property
     def parsers(self) -> Mapping[str, FileAdapter]:
         return MappingProxyType(self._parsers)
+
+    @property
+    def exporters(self) -> Mapping[str, TranslationExporter]:
+        return MappingProxyType(self._exporters)
+
+    @property
+    def export_settings(self) -> Mapping[str, ExportSettingsPanel]:
+        return MappingProxyType(self._export_settings)
 
     @property
     def ui_extensions(self) -> Mapping[str, CreationAdapter]:
@@ -156,8 +167,15 @@ class PluginManager:
             if contribution is None:
                 raise ValueError("Entry returned without registering a contribution")
             parser, provider, ui = contribution.parser, contribution.provider, contribution.ui
-            if parser is None and provider is None and ui is None:
+            if parser is None and provider is None and ui is None and not contribution.exporters:
                 raise ValueError("Plugin has no capabilities")
+            exporter_ids: set[str] = set()
+            for exporter in contribution.exporters:
+                if (not isinstance(exporter, TranslationExporter) or not exporter.id.strip()
+                        or not exporter.name.strip() or exporter.id in exporter_ids
+                        or f"{plugin_id}:{exporter.id}" in self._exporters):
+                    raise ValueError("Invalid or duplicate exporter")
+                exporter_ids.add(exporter.id)
             if parser is not None:
                 if not isinstance(parser, FileAdapter) or parser.id != plugin_id:
                     raise ValueError("Invalid parser contract or ID")
@@ -191,8 +209,11 @@ class PluginManager:
                     page_ids.add(page.id)
                 if (parser is None and provider is None and creation_adapter is None
                         and not ui.settings_pages and ui.text_presentation is None
-                        and ui.highlighter_factory is None):
+                        and ui.highlighter_factory is None and not contribution.exporters):
                     raise ValueError("Plugin has no capabilities")
+                for exporter_id, panel in ui.export_settings.items():
+                    if exporter_id not in exporter_ids or not isinstance(panel, ExportSettingsPanel):
+                        raise ValueError("Invalid export settings contribution")
 
                 if creation_adapter is not None and (not isinstance(creation_adapter, CreationAdapter) or any(
                     not callable(getattr(creation_adapter, name, None)) for name in (
@@ -205,6 +226,11 @@ class PluginManager:
             context._change_language(self._language)
             # Publish only after validation and initial language callbacks succeed.
             self._contexts[plugin_id] = context
+            for exporter in contribution.exporters:
+                self._exporters[f"{plugin_id}:{exporter.id}"] = exporter
+            if ui is not None:
+                for exporter_id, panel in ui.export_settings.items():
+                    self._export_settings[f"{plugin_id}:{exporter_id}"] = panel
             if parser is not None:
                 self._parsers[plugin_id] = parser
             if provider is not None:
@@ -245,6 +271,8 @@ class PluginManager:
                 self.report_error(plugin_id, exc)
         self._contexts.clear()
         self._parsers.clear()
+        self._exporters.clear()
+        self._export_settings.clear()
         self._providers.clear()
         self._ui.clear()
         self._ui_contributions.clear()
@@ -260,7 +288,8 @@ class PluginManager:
                 _python_entry(item, root, context)
             elif kind == "executable":
                 adapter = ExecutableAdapter(_resolve(root, required(item, "manifest")))
-                context.register(PluginContribution(adapter.id, parser=adapter))
+                context.register(PluginContribution(adapter.id, parser=adapter,
+                                                    exporters=list(adapter.exporters)))
             else:
                 raise ValueError(f"Unknown plugin kind: {kind}")
 

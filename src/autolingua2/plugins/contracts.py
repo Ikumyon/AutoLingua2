@@ -7,6 +7,10 @@ from autolingua2.adapters.base import FileAdapter
 from autolingua2.ir import Issue, TranslationProject, TranslationSource, TranslationUnit, UnitState
 from autolingua2.ir.filter_rules import FilterRule
 from autolingua2.ir.imported import GameProfile, GameSlot, ImportedTranslation, SourceRef
+from autolingua2.services.export_contract import ExportFile, TranslationExporter
+from autolingua2.services.ai_providers.chat import (
+    ChatMessage, ChatReply, ChatToolCall, object_value, string_value,
+)
 from autolingua2.services.ai_providers.base import (
     AiProviderPlugin,
     BaseAiProvider,
@@ -16,6 +20,8 @@ from autolingua2.services.ai_providers.base import (
 )
 
 __all__ = [
+    "ChatMessage", "ChatReply", "ChatToolCall", "object_value", "string_value",
+    "ExportFile", "TranslationExporter",
     "FileAdapter", "AiProviderPlugin", "TextTranslator", "TranslationProviderError",
     "BaseHttpTranslator", "BaseAiProvider",
     "Issue", "TranslationProject", "TranslationSource", "TranslationUnit", "UnitState",

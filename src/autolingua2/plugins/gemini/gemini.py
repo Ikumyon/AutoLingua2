@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from autolingua2.plugins.contracts import BaseAiProvider, BaseHttpTranslator
+from autolingua2.plugins.contracts import (
+    BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
+    object_value, string_value,
+)
 
 DEFAULT_GEMINI_MODELS: tuple[tuple[str, str], ...] = (
     ("Gemini 3.8 Flash", "gemini-3.8-flash"),
@@ -13,6 +16,48 @@ DEFAULT_GEMINI_MODELS: tuple[tuple[str, str], ...] = (
 
 class GeminiTranslator(BaseHttpTranslator):
     """Google Gemini API用の翻訳トランスレーター（BaseHttpTranslatorの差分のみ実装）。"""
+
+    supports_chat = True
+
+    def build_chat_payload(self, messages: list[ChatMessage], system_prompt: str,
+                           tools: list[dict[str, Any]], continuation: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "system_instruction": {"parts": [{"text": system_prompt}]},
+            "contents": [{"role": "model" if m.role == "assistant" else "user",
+                          "parts": [{"text": m.content}]} for m in messages] + continuation,
+            "tools": [{"functionDeclarations": [{
+                "name": t["name"], "description": t["description"], "parameters": t["inputSchema"],
+            } for t in tools]}],
+        }
+
+    def extract_chat_reply(self, data: dict[str, Any]) -> ChatReply:
+        candidates = data.get("candidates")
+        if not isinstance(candidates, list) or not candidates:
+            raise ValueError("Gemini: 応答がありません（ブロックされた可能性があります）。")
+        candidate = object_value(candidates[0], "candidate")
+        if candidate.get("finishReason") not in (None, "STOP"):
+            raise ValueError(f"Gemini: 応答が完了しませんでした: {candidate.get('finishReason')}")
+        message = object_value(candidate.get("content"), "content")
+        calls: list[ChatToolCall] = []
+        texts: list[str] = []
+        for item in message.get("parts", []):
+            part = object_value(item, "part")
+            if "functionCall" in part:
+                function = object_value(part["functionCall"], "functionCall")
+                name = string_value(function.get("name"), "name")
+                calls.append(ChatToolCall(str(function.get("id", name)), name,
+                                          object_value(function.get("args", {}), "args")))
+            elif "text" in part and not part.get("thought"):
+                texts.append(string_value(part["text"], "text"))
+        if not texts and not calls:
+            raise ValueError("AIの応答が空です。")
+        return ChatReply("\n".join(texts), calls, message)
+
+    def chat_tool_result(self, call: ChatToolCall, result: dict[str, Any]) -> dict[str, Any]:
+        response: dict[str, Any] = {"name": call.name, "response": result}
+        if call.id != call.name:
+            response["id"] = call.id
+        return {"role": "user", "parts": [{"functionResponse": response}]}
 
     @property
     def endpoint(self) -> str:

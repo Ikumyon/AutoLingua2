@@ -10,6 +10,7 @@ import urllib.error
 import urllib.request
 
 from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from autolingua2.services.ai_providers.chat import ChatMessage, ChatReply, ChatToolCall
 from autolingua2.ui.i18n import is_default_language, system_language
 
 logger = logging.getLogger(__name__)
@@ -172,6 +173,20 @@ class BaseHttpTranslator(TextTranslator, ABC):
     def extract_translation(self, response_data: dict[str, Any]) -> str:
         """APIレスポンスのJSONから翻訳後テキストを抽出して返します。"""
         ...
+
+    supports_chat = False
+
+    def build_chat_payload(
+        self, messages: list[ChatMessage], system_prompt: str,
+        tools: list[dict[str, Any]], continuation: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        raise NotImplementedError("このプロバイダはチャットに対応していません。")
+
+    def extract_chat_reply(self, data: dict[str, Any]) -> ChatReply:
+        raise NotImplementedError("このプロバイダはチャットに対応していません。")
+
+    def chat_tool_result(self, call: ChatToolCall, result: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError("このプロバイダはチャットに対応していません。")
 
     def extract_custom_error(self, error_data: dict[str, Any] | None, status_code: int) -> str | None:
         """プロバイダ固有のエラー形式からメッセージを抽出します（任意実装）。"""

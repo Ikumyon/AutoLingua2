@@ -188,23 +188,6 @@ class ParadoxYamlAdapter:
 
         return ImportedTranslation(project=project, source_refs=source_refs)
 
-    def output_name(self, path: Path, project: TranslationProject) -> str:
-        slot = project.target_file_language
-        if slot not in SLOT_LANGUAGE:
-            raise ValueError("出力言語スロットを選択してください。")
-        stem = re.sub(r"l_[A-Za-z_]+$", slot, path.stem)
-        if stem == path.stem and not stem.endswith(slot):
-            stem = f"{stem}_{slot}"
-        return f"{stem}{path.suffix}"
-
-    def save(self, path: Path, imported: ImportedTranslation, project: TranslationProject,
-             existing: ImportedTranslation | None = None) -> None:
-        from .writer import render_translation_file, save_translation_file
-        if project.target_file_language not in SLOT_LANGUAGE:
-            raise ValueError("出力言語スロットを選択してください。")
-        save_translation_file(path, render_translation_file(imported, project, existing))
-
-
 def parse_quoted_value(raw_value: str) -> str:
     if len(raw_value) >= 2 and raw_value[0] == '"' and raw_value[-1] == '"':
         return _unescape_quoted_value(raw_value[1:-1])

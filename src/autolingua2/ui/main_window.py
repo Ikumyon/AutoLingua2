@@ -70,6 +70,7 @@ from autolingua2.ui.components.translation_table_delegate import (
     StatusComboBoxDelegate,
 )
 from autolingua2.services.export import export_translation
+from autolingua2.ui.export_dialog import ExportDialog
 from autolingua2.services.project_archive import load_project, project_snapshot, save_project
 from autolingua2.services.settings_store import (
     AiSettings,
@@ -810,27 +811,40 @@ class MainWindowController(QObject):
         self.window.setWindowTitle(f"Autolingua Desktop - {self.project.name}")
 
     def save_translation(self) -> None:
-        workspace = self.active_workspace
-        if workspace is None:
+        if self.io_worker is not None:
             return
-        adapter = self.plugins.parsers.get(self.project.adapter_id)
-        if adapter is None:
+        if not self.workspace_service.workspaces:
+            QMessageBox.information(
+                self.window,
+                tr("MainWindow", "訳文を出力"),
+                tr("MainWindow", "出力する翻訳先のワークスペースを追加してください。"),
+            )
+            return
+        if not self.plugins.exporters:
             self._restart_target = None
-            QMessageBox.warning(self.window, "保存エラー", "このプロジェクトの保存パーサーがありません。")
+            QMessageBox.warning(self.window, tr("MainWindow", "出力エラー"),
+                                tr("MainWindow", "出力方式を提供するプラグインがありません。"))
             return
-        selected = QFileDialog.getExistingDirectory(
-            self.window, "訳文の出力先フォルダ", str(self.output_path or PROJECT_ROOT),
+        snapshot = deepcopy(self.workspace_service.export_data())
+        dialog = ExportDialog(
+            snapshot, self.plugins.exporters, self.plugins.export_settings,
+            self.output_path or PROJECT_ROOT, self.project.adapter_id, self.window,
         )
-        if not selected:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             self._restart_target = None
+            dialog.dialog.deleteLater()
             return
-        snapshot = deepcopy(self.workspace_service.export_data(workspace))
-        destination = Path(selected)
+        exporter = dialog.exporter
+        destination = dialog.destination
+        settings = deepcopy(dialog.settings)
+        dialog.dialog.deleteLater()
+        if exporter is None or destination is None:
+            raise RuntimeError("出力方式または出力先が選択されていません。")
 
         def completed(_result: object) -> None:
             self.output_path = destination
 
-        self._run_operation(lambda: export_translation(snapshot, adapter, destination), completed)
+        self._run_operation(lambda: export_translation(snapshot, exporter, destination, settings), completed)
 
     def _run_operation(self, operation, completed) -> None:
         if self.io_worker is not None:

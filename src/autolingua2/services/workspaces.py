@@ -76,11 +76,16 @@ class WorkspaceService:
     def units(self, workspace: Workspace) -> list[WorkspaceUnit]:
         return [WorkspaceUnit(unit, workspace.records[unit.id]) for unit in self.imported.project.units]
 
-    def export_data(self, workspace: Workspace) -> ImportedTranslation:
-        units = [replace(unit, target_text=workspace.records[unit.id].target_text,
-                         state=workspace.records[unit.id].state)
-                 for unit in self.imported.project.units]
-        return ImportedTranslation(replace(self.imported.project, units=units,
-                                          target_language=workspace.language_code,
-                                          target_file_language=workspace.output_slot),
-                                   self.imported.source_refs)
+    def export_data(self) -> list[ImportedTranslation]:
+        outputs: list[ImportedTranslation] = []
+        for workspace in self.workspaces.values():
+            units = [replace(unit, target_text=workspace.records[unit.id].target_text,
+                             state=workspace.records[unit.id].state)
+                     for unit in self.imported.project.units]
+            outputs.append(ImportedTranslation(
+                replace(self.imported.project, units=units,
+                        target_language=workspace.language_code,
+                        target_file_language=workspace.output_slot),
+                self.imported.source_refs,
+            ))
+        return outputs

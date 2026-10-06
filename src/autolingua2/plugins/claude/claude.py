@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from typing import Any
+import json
 
-from autolingua2.plugins.contracts import BaseAiProvider, BaseHttpTranslator
+from autolingua2.plugins.contracts import (
+    BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
+    object_value, string_value,
+)
 
 DEFAULT_CLAUDE_MODELS: tuple[tuple[str, str], ...] = (
     ("Claude Sonnet 5.5", "claude-sonnet-5-5"),
@@ -14,6 +18,41 @@ DEFAULT_CLAUDE_MODELS: tuple[tuple[str, str], ...] = (
 
 class ClaudeTranslator(BaseHttpTranslator):
     """Anthropic Claude API用の翻訳トランスレーター（BaseHttpTranslatorの差分のみ実装）。"""
+
+    supports_chat = True
+
+    def build_chat_payload(self, messages: list[ChatMessage], system_prompt: str,
+                           tools: list[dict[str, Any]], continuation: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "model": self.model, "max_tokens": 4096, "system": system_prompt,
+            "messages": [{"role": m.role, "content": m.content} for m in messages] + continuation,
+            "tools": [{"name": t["name"], "description": t["description"],
+                       "input_schema": t["inputSchema"]} for t in tools],
+        }
+
+    def extract_chat_reply(self, data: dict[str, Any]) -> ChatReply:
+        if data.get("stop_reason") == "max_tokens":
+            raise ValueError("応答が出力上限に達しました。")
+        blocks = data.get("content")
+        if not isinstance(blocks, list):
+            raise ValueError("Claude: content がありません。")
+        texts: list[str] = []
+        calls: list[ChatToolCall] = []
+        for item in blocks:
+            block = object_value(item, "content block")
+            if block.get("type") == "text":
+                texts.append(string_value(block.get("text"), "text"))
+            elif block.get("type") == "tool_use":
+                calls.append(ChatToolCall(string_value(block.get("id"), "id"),
+                                          string_value(block.get("name"), "name"),
+                                          object_value(block.get("input"), "input")))
+        if not texts and not calls:
+            raise ValueError("AIの応答が空です。")
+        return ChatReply("\n".join(texts), calls, {"role": "assistant", "content": blocks})
+
+    def chat_tool_result(self, call: ChatToolCall, result: dict[str, Any]) -> dict[str, Any]:
+        return {"role": "user", "content": [{"type": "tool_result", "tool_use_id": call.id,
+                "content": json.dumps(result, ensure_ascii=False), "is_error": "error" in result}]}
 
     @property
     def endpoint(self) -> str:

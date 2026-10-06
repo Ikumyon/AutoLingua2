@@ -7,6 +7,7 @@ from PySide6.QtCore import QByteArray, QObject, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 
 from autolingua2.services.ai_providers.base import AiProviderPlugin, BaseHttpTranslator
+from autolingua2.services.ai_providers.chat import ChatMessage
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ class AiNetworkClient(QObject):
     all_validated = Signal(int, int)          # (success_count, error_count)
     translation_completed = Signal(str, str)  # (request_id, translated_text)
     translation_failed = Signal(str, str)     # (request_id, error_message)
+    chat_completed = Signal(str, object)
+    chat_failed = Signal(str, str)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -164,29 +167,48 @@ class AiNetworkClient(QObject):
             payload = translator.build_payload(text, source_language, target_language, system_prompt)
             headers = translator.build_headers()
 
-            body_bytes = json.dumps(payload).encode("utf-8")
-            request = QNetworkRequest(QUrl(translator.endpoint))
-
-            for key, val in headers.items():
-                request.setRawHeader(key.encode("utf-8"), val.encode("utf-8"))
-
-            request.setTransferTimeout(int(timeout_sec * 1000))
-            reply = self._nam.post(request, QByteArray(body_bytes))
-            self._active_replies.append(reply)
-
-            reply.finished.connect(
-                lambda r=reply, req_id=request_id, t=translator: self._handle_translation_reply(r, req_id, t)
-            )
+            self._post_ai(request_id, translator, payload, headers, timeout_sec, chat=False)
         except Exception as exc:
             logger.warning("翻訳リクエスト生成失敗 (request_id=%s): %s", request_id, exc)
             self.translation_failed.emit(request_id, f"リクエスト生成失敗: {exc}")
 
-    def _handle_translation_reply(
+    def request_chat(
+        self, request_id: str, translator: BaseHttpTranslator,
+        messages: list[ChatMessage], system_prompt: str, tools: list[dict[str, Any]],
+        continuation: list[dict[str, Any]],
+    ) -> None:
+        try:
+            payload = translator.build_chat_payload(messages, system_prompt, tools, continuation)
+            self._post_ai(request_id, translator, payload, translator.build_headers(), 60.0, chat=True)
+        except Exception as exc:
+            self.chat_failed.emit(request_id, f"リクエスト生成失敗: {exc}")
+
+    def cancel_chat(self) -> None:
+        """Abort this chat client's requests; finished handlers own reply cleanup."""
+        for reply in tuple(self._active_replies):
+            if reply.isRunning():
+                reply.abort()
+
+    def _post_ai(
+        self, request_id: str, translator: BaseHttpTranslator, payload: dict[str, Any],
+        headers: dict[str, str], timeout_sec: float, *, chat: bool,
+    ) -> None:
+        request = QNetworkRequest(QUrl(translator.endpoint))
+        for key, value in headers.items():
+            request.setRawHeader(key.encode("utf-8"), value.encode("utf-8"))
+        request.setTransferTimeout(int(timeout_sec * 1000))
+        reply = self._nam.post(request, QByteArray(json.dumps(payload).encode("utf-8")))
+        self._active_replies.append(reply)
+        reply.finished.connect(lambda: self._handle_ai_reply(reply, request_id, translator, chat=chat))
+
+    def _handle_ai_reply(
         self,
         reply: QNetworkReply,
         request_id: str,
         translator: BaseHttpTranslator,
+        *, chat: bool,
     ) -> None:
+        failed = self.chat_failed if chat else self.translation_failed
         try:
             if reply in self._active_replies:
                 self._active_replies.remove(reply)
@@ -201,16 +223,20 @@ class AiNetworkClient(QObject):
             if reply.error() == QNetworkReply.NetworkError.NoError and 200 <= http_status < 300:
                 try:
                     data = json.loads(raw_text)
-                    translated = translator.extract_translation(data)
-                    self.translation_completed.emit(request_id, translated)
+                    if not isinstance(data, dict):
+                        raise ValueError("レスポンスがJSONオブジェクトではありません。")
+                    if chat:
+                        self.chat_completed.emit(request_id, translator.extract_chat_reply(data))
+                    else:
+                        self.translation_completed.emit(request_id, translator.extract_translation(data))
                 except Exception as exc:
-                    self.translation_failed.emit(request_id, f"レスポンス解析失敗: {exc}")
+                    failed.emit(request_id, f"レスポンス解析失敗: {exc}")
             else:
                 error_message = translator._resolve_http_error(raw_text, http_status)
                 if not error_message or error_message == raw_text:
                     error_message = reply.errorString()
-                self.translation_failed.emit(request_id, f"接続エラー: {error_message}")
+                failed.emit(request_id, f"接続エラー: {error_message}")
         except Exception as exc:
             logger.exception("翻訳レスポンス処理でエラー (request_id=%s): %s", request_id, exc)
-            self.translation_failed.emit(request_id, f"翻訳応答処理エラー: {exc}")
+            failed.emit(request_id, f"AI応答処理エラー: {exc}")
 
