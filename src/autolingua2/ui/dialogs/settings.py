@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSpinBox,
+    QSplitter,
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -268,6 +269,7 @@ from autolingua2.ui.i18n import (
 )
 from autolingua2.ui.resource_api import IconAPI
 from .base import SimpleDialogController, load_ui, require_child
+from .glossary import GlossaryPageController
 
 
 class SettingsDialogController(SimpleDialogController):
@@ -277,6 +279,10 @@ class SettingsDialogController(SimpleDialogController):
         selected_models: dict[str, str] | None = None,
         api_keys: dict[str, str] | None = None,
         concurrency: int = 4,
+        *, glossary_languages: dict[str, str] | None = None,
+        glossary_adapter_id: str = "", glossary_game_id: str = "",
+        glossary_id: str = "", glossary_source_language: str = "",
+        glossary_target_language: str = "",
     ) -> None:
         super().__init__("dialogs/settings/SettingsDialog.ui", parent)
         self.plugins = entrance.plugins
@@ -294,6 +300,15 @@ class SettingsDialogController(SimpleDialogController):
         self._unvalidated_models_for_save: list[ModelRowWidget] = []
 
         self._mount_pages()
+        self.glossary_page = GlossaryPageController(
+            require_child(self.dialog, QWidget, "SettingsGlossaryPage"), entrance,
+            glossary_languages or {}, glossary_adapter_id, glossary_game_id,
+            glossary_id, glossary_source_language, glossary_target_language,
+        )
+        settings_splitter = require_child(self.dialog, QSplitter, "splitterSettings")
+        settings_splitter.setSizes([160, 760])
+        settings_splitter.setStretchFactor(0, 0)
+        settings_splitter.setStretchFactor(1, 1)
         self._mount_plugin_settings_pages()
         self._connect_category_stack()
 
@@ -339,6 +354,9 @@ class SettingsDialogController(SimpleDialogController):
     def select_category(self, target: str) -> bool:
         """公開された設定ページIDに一致するカテゴリを選択。"""
         categories = require_child(self.dialog, QListWidget, "listCategories")
+        if target == "glossary":
+            categories.setCurrentRow(5)
+            return True
         for row in range(categories.count()):
             item = categories.item(row)
             if item is not None:

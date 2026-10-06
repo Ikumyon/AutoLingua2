@@ -57,6 +57,9 @@ from autolingua2.infrastructure.operations import OperationCancelled
 from autolingua2.ir import Issue, TranslationProject, TranslationSource, UnitState
 from autolingua2.ir.workspace import UnitView as TranslationUnit, Workspace
 from autolingua2.services.workspaces import WorkspaceService
+from autolingua2.services.glossary_store import GlossaryStore
+from autolingua2.ir.glossary import Glossary, glossary_chain
+from autolingua2.ui.dialogs.glossary import STORAGE_ERRORS
 from autolingua2.ui.dialogs.workspace_language import WorkspaceLanguageDialog
 from autolingua2.ir.filter_rules import AdapterFilterConfig, should_hide_unit
 from autolingua2.services.ai_network import AiNetworkClient
@@ -212,6 +215,9 @@ class MainWindowController(QObject):
         self.project = self.imported.project
         self.workspace_service = WorkspaceService(self.imported)
         self.active_workspace: Workspace | None = None
+        self.glossary_store = GlossaryStore()
+        self.selected_glossary_id = ""
+        self.glossary_choices: list[Glossary] = []
         self.units: list[TranslationUnit] = []
         self.filtered_units: list[TranslationUnit] = []
         self.current_unit: TranslationUnit | None = None
@@ -527,6 +533,10 @@ class MainWindowController(QObject):
         self.button_stop_translation = require_child(self.window, QPushButton, "buttonStopTranslation")
         self.combo_ai_provider = require_child(self.window, QComboBox, "comboAiProvider")
         self.combo_ai_model = require_child(self.window, QComboBox, "comboAiModel")
+        self.combo_glossary = require_child(self.window, QComboBox, "comboGlossary")
+        self.label_glossary_chain = require_child(self.window, QLabel, "labelGlossaryChain")
+        self.button_manage_glossary = require_child(self.window, QPushButton, "buttonManageGlossary")
+        self._refresh_glossary_choices()
         self._refresh_ai_choices()
 
         header = self.table.horizontalHeader()
@@ -625,6 +635,13 @@ class MainWindowController(QObject):
         self.action_settings.triggered.connect(self.open_settings)
         self.combo_ai_provider.currentIndexChanged.connect(self._on_ai_provider_changed)
         self.combo_ai_model.currentIndexChanged.connect(self._on_ai_model_changed)
+        self.combo_glossary.currentIndexChanged.connect(self._on_glossary_changed)
+        self.button_manage_glossary.clicked.connect(lambda: self.open_settings("glossary"))
+        self.action_glossary = QAction(tr("MainWindow", "用語集…"), self.window)
+        self.action_glossary.triggered.connect(lambda: self.open_settings("glossary"))
+        glossary_menu = require_child(self.window, QMenu, "menuTranslate")
+        glossary_menu.addSeparator()
+        glossary_menu.addAction(self.action_glossary)
         self.action_problems.triggered.connect(self.open_problems_dialog)
         self.action_about.triggered.connect(lambda: SimpleDialogController("AboutDialog.ui", self.window).exec())
 
@@ -805,6 +822,12 @@ class MainWindowController(QObject):
         controller = SettingsDialogController(
             self.entrance, self.window, self.ai_provider_id,
             self.ai_models, self.ai_selected_models, self.ai_api_keys, self.ai_concurrency,
+            glossary_languages={code: workspace_language_name(self.workspace_service, code)
+                                for code in self.workspace_service.languages},
+            glossary_adapter_id=self.project.adapter_id, glossary_game_id=self.project.game_id,
+            glossary_id=self.selected_glossary_id,
+            glossary_source_language=self.project.source_language,
+            glossary_target_language=self.project.target_language,
         )
         if initial_category is not None:
             controller.select_category(initial_category)
@@ -823,6 +846,34 @@ class MainWindowController(QObject):
             if self.units:
                 self.apply_filter_rules_to_units()
                 self.refresh_all()
+
+        self._refresh_glossary_choices()
+
+    def _refresh_glossary_choices(self) -> None:
+        self.glossary_choices = []
+        try:
+            if self.project.adapter_id and self.project.game_id:
+                self.glossary_choices = self.glossary_store.list_glossaries(
+                    self.project.adapter_id, self.project.game_id)
+            labels = [(item.id, " → ".join(g.name for g in glossary_chain(self.glossary_choices, item.id)))
+                      for item in self.glossary_choices]
+        except STORAGE_ERRORS as exc:
+            QMessageBox.warning(self.window, tr("MainWindow", "用語集を読み込めません"), str(exc))
+            labels = []
+            self.glossary_choices = []
+        with QSignalBlocker(self.combo_glossary):
+            self.combo_glossary.clear()
+            self.combo_glossary.addItem(tr("MainWindow", "なし"), "")
+            for glossary_id, label in labels:
+                self.combo_glossary.addItem(label, glossary_id)
+            selected = self.combo_glossary.findData(self.selected_glossary_id)
+            self.combo_glossary.setCurrentIndex(max(0, selected))
+        self.combo_glossary.setEnabled(bool(self.project.adapter_id and self.project.game_id))
+        self._on_glossary_changed()
+
+    def _on_glossary_changed(self, _index: int = 0) -> None:
+        self.selected_glossary_id = str(self.combo_glossary.currentData() or "")
+        self.label_glossary_chain.setText(self.combo_glossary.currentText())
 
     def _refresh_ai_choices(self) -> None:
         self.combo_ai_provider.blockSignals(True)
@@ -1305,6 +1356,8 @@ class MainWindowController(QObject):
         self.output_path = None
         self.imported = imported
         self.project = imported.project
+        self.selected_glossary_id = ""
+        self._refresh_glossary_choices()
         self.workspace_service = WorkspaceService(imported)
         self.active_workspace = None
         self.units = list(self.workspace_service.source_units())

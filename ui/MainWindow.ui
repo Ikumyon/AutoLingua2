@@ -1469,6 +1469,23 @@ QToolButton#buttonSaveSplit::menu-arrow {
       <widget class="QComboBox" name="comboAiModel"/>
      </item>
      <item>
+      <widget class="QLabel" name="labelGlossaryChoice">
+       <property name="text"><string>使用する用語集：</string></property>
+      </widget>
+     </item>
+     <item><widget class="QComboBox" name="comboGlossary"/></item>
+     <item>
+      <widget class="QLabel" name="labelGlossaryChain">
+       <property name="text"><string>なし</string></property>
+       <property name="wordWrap"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="buttonManageGlossary">
+       <property name="text"><string>用語集を管理…</string></property>
+      </widget>
+     </item>
+     <item>
       <spacer name="spacerDockAi">
        <property name="orientation">
         <enum>Qt::Orientation::Vertical</enum>
