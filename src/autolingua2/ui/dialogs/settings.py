@@ -376,6 +376,7 @@ class SettingsDialogController(SimpleDialogController):
         self.scroll_area_models = require_child(self.dialog, QScrollArea, "scrollAreaModels")
         self.layout_model_list = require_child(self.dialog, QVBoxLayout, "layoutModelList")
         self.button_add_model = require_child(self.dialog, QPushButton, "buttonAddModel")
+        self.button_reset_models = require_child(self.dialog, QPushButton, "buttonResetModels")
         self.spin_concurrency = require_child(self.dialog, QSpinBox, "spinConcurrency")
         self.spin_concurrency.setValue(concurrency)
         self._row_widgets: list[ModelRowWidget] = []
@@ -388,7 +389,7 @@ class SettingsDialogController(SimpleDialogController):
         self.combo_provider.setCurrentIndex(self.combo_provider.findData(provider_id))
         self._initial_provider_id = provider_id
         self._current_provider_id = provider_id
-        self._ensure_provider_defaults(provider_id)
+        self._ensure_provider_api_key(provider_id)
 
         self.edit_api_key.setText(self.ai_api_keys.get(provider_id, ""))
         self._populate_models()
@@ -397,6 +398,7 @@ class SettingsDialogController(SimpleDialogController):
         self._refresh_provider_errors()
         self.combo_provider.currentIndexChanged.connect(self._on_provider_changed)
         self.button_add_model.clicked.connect(self._add_model)
+        self.button_reset_models.clicked.connect(self._reset_models)
         self.button_test_connection = self.dialog.findChild(QPushButton, "buttonTestConnection")
         if self.button_test_connection is not None:
             self.button_test_connection.setEnabled(True)
@@ -440,11 +442,13 @@ class SettingsDialogController(SimpleDialogController):
         for r in targets:
             r.set_status(None, tr("SettingsDialog", "検証中..."))
 
+        self._test_results: dict[str, tuple[bool, str]] = {}
         self._testing_for_save = False
         models = [r.field_model.text().strip() for r in targets]
         self.ai_client.validate_models(provider, api_key, models, timeout_sec=8.0)
 
     def _on_model_validated(self, model: str, is_valid: bool, message: str) -> None:
+        self._test_results[model] = (is_valid, message)
         for r in self._row_widgets:
             if r.field_model.text().strip() == model:
                 r.set_status("valid" if is_valid else "invalid", message)
@@ -463,16 +467,62 @@ class SettingsDialogController(SimpleDialogController):
             QMessageBox.information(
                 self.dialog,
                 tr("SettingsDialog", "接続テスト"),
-                tr("SettingsDialog", f"接続テストに成功しました。（利用可能: {success_count} 件）"),
+                tr(
+                    "SettingsDialog",
+                    f"接続テストに成功しました。\n\nAPIキーおよび対象モデル（{success_count} 件）のすべてが正常に利用可能です。",
+                ),
             )
-        else:
-            QMessageBox.warning(
+            return
+
+        test_results = getattr(self, "_test_results", {})
+        error_items = [(m, msg) for m, (is_valid, msg) in test_results.items() if not is_valid]
+        all_auth_errors = (
+            len(error_items) > 0
+            and all("APIキーが無効" in msg or "401" in msg for _, msg in error_items)
+            and success_count == 0
+        )
+
+        if all_auth_errors:
+            first_msg = error_items[0][1]
+            QMessageBox.critical(
                 self.dialog,
                 tr("SettingsDialog", "接続テスト"),
                 tr(
                     "SettingsDialog",
-                    f"接続テストが完了しました。\n利用可能: {success_count} 件\nエラー/無効: {error_count} 件\n\n各モデルの背景色をご確認ください。",
+                    f"【APIキーが無効です】\n\n"
+                    f"入力されたAPIキーがプロバイダに認証されませんでした。\n"
+                    f"正しいAPIキーを入力してください。\n\n"
+                    f"詳細: {first_msg}",
                 ),
+            )
+        else:
+            missing_models = [
+                m for m, msg in error_items
+                if "見つかりません" in msg or "404" in msg or "not found" in msg.lower()
+            ]
+            other_errors = [
+                f"・{m}: {msg}" for m, msg in error_items
+                if m not in missing_models
+            ]
+
+            lines = ["接続テストが完了しました。\n"]
+            if missing_models:
+                lines.append("【以下のモデルが見つかりませんでした】")
+                for m in missing_models:
+                    lines.append(f"・{m}")
+                lines.append("")
+            if other_errors:
+                lines.append("【その他のエラー】")
+                lines.extend(other_errors)
+                lines.append("")
+
+            lines.append(f"利用可能: {success_count} 件 / エラー・無効: {error_count} 件")
+            lines.append("※各モデル行にマウスを合わせると詳細な理由を確認できます。")
+
+            QMessageBox.warning(
+                self.dialog,
+                tr("SettingsDialog", "接続テスト"),
+                tr("SettingsDialog", "\n".join(lines)),
             )
 
     def _switch_to_ai_category(self) -> None:
@@ -609,20 +659,21 @@ class SettingsDialogController(SimpleDialogController):
         self.ai_models[self._current_provider_id] = self._read_model_list()
         self.ai_api_keys[self._current_provider_id] = self.edit_api_key.text().strip()
 
-    def _ensure_provider_defaults(self, p_id: str) -> None:
-        if p_id not in self.ai_models or not self.ai_models[p_id]:
-            defaults = self.registry.get_default_models(p_id)
-            if defaults:
-                self.ai_models[p_id] = defaults
+    def _ensure_provider_api_key(self, p_id: str) -> None:
         if not self.ai_api_keys.get(p_id):
             env_key = self.registry.get_env_api_key(p_id)
             if env_key:
                 self.ai_api_keys[p_id] = env_key
 
+    def _reset_models(self) -> None:
+        self.ai_models[self._current_provider_id] = self.registry.get_default_models(self._current_provider_id)
+        self.ai_selected_models.pop(self._current_provider_id, None)
+        self._populate_models()
+
     def _on_provider_changed(self, index: int) -> None:
         self._save_current_ai_fields()
         self._current_provider_id = str(self.combo_provider.itemData(index) or "")
-        self._ensure_provider_defaults(self._current_provider_id)
+        self._ensure_provider_api_key(self._current_provider_id)
         self._populate_models()
         self.edit_api_key.setText(self.ai_api_keys.get(self._current_provider_id, ""))
         self._refresh_provider_errors()

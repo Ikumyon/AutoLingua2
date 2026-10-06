@@ -55,13 +55,14 @@ class OpenAiTranslator(BaseHttpTranslator):
             err = error_data.get("error")
             if isinstance(err, dict):
                 msg = str(err.get("message", "")).strip()
+                code = str(err.get("code", "")).strip()
+                if status_code == 401 or code == "invalid_api_key":
+                    return f"APIキーが無効です ({msg})"
+                if status_code == 404 or code == "model_not_found" or "does not exist" in msg:
+                    return f"指定されたモデル '{self.model}' が見つかりません ({msg})"
+                if status_code == 429 or code == "insufficient_quota":
+                    return f"OpenAI レート制限または残高不足です ({msg})"
                 if msg:
-                    if status_code == 401:
-                        return f"OpenAI APIキーが無効です ({msg})"
-                    if status_code == 429:
-                        return f"OpenAI レート制限または残高不足です ({msg})"
-                    if status_code == 404:
-                        return f"指定されたモデル '{self.model}' が見つかりません ({msg})"
                     return f"OpenAI エラー ({status_code}): {msg}"
         return None
 

@@ -61,13 +61,14 @@ class ClaudeTranslator(BaseHttpTranslator):
             err = error_data.get("error")
             if isinstance(err, dict):
                 msg = str(err.get("message", "")).strip()
+                err_type = str(err.get("type", "")).strip()
+                if status_code == 404 or err_type == "not_found_error" or "not_found" in err_type or "model:" in msg.lower():
+                    return f"指定されたモデル '{self.model}' が見つかりません ({msg})"
+                if status_code == 401 or err_type == "authentication_error" or "api-key" in msg.lower() or "permission" in msg.lower() or status_code == 403:
+                    return f"APIキーが無効です ({msg})"
+                if status_code == 429 or err_type == "rate_limit_error":
+                    return f"Claude レート制限または残高不足です ({msg})"
                 if msg:
-                    if status_code in (400, 401, 403):
-                        return f"Claude APIキーが無効または権限がありません ({msg})"
-                    if status_code == 429:
-                        return f"Claude レート制限または残高不足です ({msg})"
-                    if status_code == 404:
-                        return f"指定されたモデル '{self.model}' が見つかりません ({msg})"
                     return f"Claude エラー ({status_code}): {msg}"
         return None
 

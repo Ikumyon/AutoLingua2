@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from autolingua2_native.bootstrap import CoreSession
 
 _session: CoreSession | None = None
+_development_root: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -54,8 +55,10 @@ def spawn_launcher(arguments: list[str], environment: dict[str, str]) -> None:
 
 def enter() -> bool:
     """Return False after forwarding a public invocation; True for an authenticated core."""
-    global _session
+    global _development_root, _session
     credential = os.environ.pop("AUTOLINGUA_BOOT_TOKEN", None)
+    raw_development_root = os.environ.get("AUTOLINGUA_DEVELOPMENT_ROOT")
+    _development_root = Path(raw_development_root).resolve() if raw_development_root else None
     # Children/plugins must not inherit bootstrap credentials or internal launch context.
     os.environ.pop("AUTOLINGUA_DEVELOPMENT_ROOT", None)
     os.environ.pop("AUTOLINGUA_LAUNCHER", None)
@@ -66,6 +69,10 @@ def enter() -> bool:
     root = configuration().development_root
     _session = native.CoreSession(credential, str(root) if root is not None else None)
     return True
+
+
+def development_root() -> Path | None:
+    return _development_root
 
 
 def session() -> CoreSession:

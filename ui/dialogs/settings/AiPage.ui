@@ -94,6 +94,13 @@
         </widget>
        </item>
        <item>
+        <widget class="QPushButton" name="buttonResetModels">
+         <property name="text">
+          <string>初期モデルにリセット</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <spacer name="spacerModelActions">
          <property name="orientation">
           <enum>Qt::Orientation::Horizontal</enum>

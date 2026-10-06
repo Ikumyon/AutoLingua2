@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>WorkspaceLanguageDialog</class>
+ <widget class="QDialog" name="WorkspaceLanguageDialog">
+  <property name="windowTitle"><string>翻訳先言語を追加</string></property>
+  <property name="minimumSize"><size><width>640</width><height>440</height></size></property>
+  <layout class="QVBoxLayout" name="layoutMain">
+   <item><widget class="QTabWidget" name="tabs">
+    <widget class="QWidget" name="pageLanguages">
+     <attribute name="title"><string>言語一覧</string></attribute>
+     <layout class="QVBoxLayout" name="layoutLanguages">
+      <item><widget class="QLineEdit" name="editSearch"><property name="placeholderText"><string>名前・言語コードで検索</string></property></widget></item>
+      <item><widget class="QTableWidget" name="tableLanguages">
+       <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
+       <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+       <column><property name="text"><string>言語</string></property></column>
+       <column><property name="text"><string>コード</string></property></column>
+       <column><property name="text"><string>ワークスペース</string></property></column>
+      </widget></item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="pageCustom">
+     <attribute name="title"><string>任意の言語</string></attribute>
+     <layout class="QVBoxLayout" name="layoutCustom">
+      <item><widget class="QLabel" name="labelName"><property name="text"><string>表示名</string></property></widget></item>
+      <item><widget class="QLineEdit" name="editName"/></item>
+      <item><widget class="QLabel" name="labelCode"><property name="text"><string>言語コード</string></property></widget></item>
+      <item><widget class="QLineEdit" name="editCode"><property name="placeholderText"><string>例：pt-BR</string></property></widget></item>
+      <item><widget class="QLabel" name="labelExplanation"><property name="text"><string>言語を本体の候補に登録し、このプロジェクトにワークスペースを追加します。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+      <item><widget class="QPushButton" name="buttonRegister"><property name="text"><string>登録して追加</string></property></widget></item>
+      <item><spacer name="spacerCustom"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint"><size><width>20</width><height>40</height></size></property></spacer></item>
+     </layout>
+    </widget>
+   </widget></item>
+   <item><widget class="QPushButton" name="buttonClose"><property name="text"><string>閉じる</string></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

@@ -22,8 +22,9 @@ class PluginTranslations:
     def change_language(self, language: str) -> None:
         self.close()
         folder = Path(__file__).resolve().parents[1] / "translations"
-        for code in dict.fromkeys((language, language.split("_")[0])):
-            if not code or any(character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_" for character in code):
+        normalized = language.replace("-", "_")
+        for code in dict.fromkeys((language, normalized, language.split("-")[0], normalized.split("_")[0])):
+            if not code or any(character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for character in code):
                 raise ValueError("Invalid plugin language code")
             path = folder / f"{code}.qm"
             if not path.is_file():

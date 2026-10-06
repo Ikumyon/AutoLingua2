@@ -7,7 +7,7 @@ import sys
 from typing import Callable
 
 from PySide6.QtCore import QByteArray, QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QSize, Qt, QSignalBlocker, QTimer, QLocale
-from PySide6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QPixmap, QSyntaxHighlighter
+from PySide6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QPalette, QPixmap, QSyntaxHighlighter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -53,9 +54,18 @@ from autolingua2.infrastructure.filesystem import PROJECT_ROOT
 from autolingua2.infrastructure.platform import current_platform, log_directory
 from autolingua2.infrastructure.platform.base import PlatformDriver
 from autolingua2.infrastructure.operations import OperationCancelled
-from autolingua2.ir import Issue, TranslationProject, TranslationSource, TranslationUnit, UnitState
+from autolingua2.ir import Issue, TranslationProject, TranslationSource, UnitState
+from autolingua2.ir.workspace import UnitView as TranslationUnit, Workspace
+from autolingua2.services.workspaces import WorkspaceService
+from autolingua2.ui.dialogs.workspace_language import WorkspaceLanguageDialog
 from autolingua2.ir.filter_rules import AdapterFilterConfig, should_hide_unit
+from autolingua2.services.ai_network import AiNetworkClient
 from autolingua2.services.filter_rules import get_default_filter_config
+from autolingua2.ui.components.translation_table_delegate import (
+    ActionButtonDelegate,
+    MultiLineTextDelegate,
+    StatusComboBoxDelegate,
+)
 from autolingua2.services.export import export_translation
 from autolingua2.services.settings_store import (
     AiSettings,
@@ -79,7 +89,9 @@ from autolingua2.ui.dialogs import (
     require_child,
     show_not_implemented,
 )
+from autolingua2.ui.dialogs.multi_model_dialog import MultiModelTranslationDialog
 from autolingua2.ui.i18n import current_ui_language, language_events, tr
+from autolingua2.ui.language_names import workspace_language_name
 from autolingua2.ui.import_worker import ImportWorker
 from autolingua2.ui.operation_worker import OperationWorker
 from autolingua2.plugins.api import GameTextPresentation
@@ -191,13 +203,15 @@ class MainWindowController(QObject):
         self.imported = ImportedTranslation(project=TranslationProject())
         self.output_path: Path | None = None
         self.provider_registry = self.plugins.providers
-        ai_settings = load_ai_settings()
+        ai_settings = load_ai_settings(self.provider_registry)
         self.ai_provider_id = ai_settings.provider_id
         self.ai_models = ai_settings.models
         self.ai_selected_models = ai_settings.selected_models
         self.ai_concurrency = ai_settings.concurrency
         self.ai_api_keys = ai_settings.api_keys
         self.project = self.imported.project
+        self.workspace_service = WorkspaceService(self.imported)
+        self.active_workspace: Workspace | None = None
         self.units: list[TranslationUnit] = []
         self.filtered_units: list[TranslationUnit] = []
         self.current_unit: TranslationUnit | None = None
@@ -240,6 +254,7 @@ class MainWindowController(QObject):
         self._text_presentation: GameTextPresentation | None = None
         self.source_highlighter: QSyntaxHighlighter | None = None
         self.translation_highlighter: QSyntaxHighlighter | None = None
+        self.ai_client = AiNetworkClient(self.window)
 
         self._setup_widgets()
         self.plugins.on_display_changed(self._on_plugin_display_changed)
@@ -256,6 +271,10 @@ class MainWindowController(QObject):
         self.window.show()
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if watched is self.window and event.type() in {
+            QEvent.Type.PaletteChange, QEvent.Type.ApplicationPaletteChange,
+        }:
+            QTimer.singleShot(0, self._update_ai_button_colors)
         if watched is self.window and isinstance(event, QCloseEvent):
             if self.io_worker is not None:
                 event.ignore()
@@ -455,6 +474,15 @@ class MainWindowController(QObject):
         self.button_revert.setIcon(self.icon_manager.get_icon("rotate-ccw"))
         self.button_copy_source = require_child(self.window, QPushButton, "buttonCopySource")
         self.button_copy_source.setIcon(self.icon_manager.get_icon("copy"))
+        self.button_ai_translate = require_child(self.window, QPushButton, "buttonAiTranslate")
+        self.button_ai_translate.setIcon(self.icon_manager.get_icon("robot-edit"))
+        self.button_ai_translate_all_models = require_child(self.window, QPushButton, "buttonAiTranslateAllModels")
+        self.ai_translate_split = require_child(self.window, QWidget, "widgetAiTranslateSplit")
+        self._ai_button_style_template = self.ai_translate_split.styleSheet()
+        self._update_ai_button_colors()
+        ai_button_height = self.button_copy_source.sizeHint().height()
+        self.button_ai_translate.setFixedHeight(ai_button_height)
+        self.button_ai_translate_all_models.setFixedHeight(ai_button_height)
         self.button_save_split = require_child(self.window, QToolButton, "buttonSaveSplit")
         self.button_save_split.setIcon(self.icon_manager.get_icon("save"))
         self.button_save_split.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
@@ -481,7 +509,7 @@ class MainWindowController(QObject):
         self.edit_translation = require_child(self.window, QPlainTextEdit, "editTranslation")
         self.label_position = require_child(self.window, QLabel, "labelPosition")
         self.action_exit = require_child(self.window, QAction, "actionExit")
-        self.action_start_translation = require_child(self.window, QAction, "actionStartTranslation")
+        self.action_translate_all = require_child(self.window, QAction, "actionTranslateAll")
         self.action_translate_selected = require_child(self.window, QAction, "actionTranslateSelected")
         self.action_translate_untranslated = require_child(self.window, QAction, "actionTranslateUntranslated")
         self.action_pause_translation = require_child(self.window, QAction, "actionPauseTranslation")
@@ -495,7 +523,7 @@ class MainWindowController(QObject):
         self.dock_ai_settings = require_child(self.window, QDockWidget, "dockAiSettings")
         self.action_toggle_ai_panel = require_child(self.window, QAction, "actionToggleAiPanel")
         self.label_source_language_work = require_child(self.window, QLabel, "labelSourceLanguageWork")
-        self.button_start_translation = require_child(self.window, QPushButton, "buttonStartTranslation")
+        self.button_translate_all = require_child(self.window, QPushButton, "buttonTranslateAll")
         self.button_stop_translation = require_child(self.window, QPushButton, "buttonStopTranslation")
         self.combo_ai_provider = require_child(self.window, QComboBox, "comboAiProvider")
         self.combo_ai_model = require_child(self.window, QComboBox, "comboAiModel")
@@ -530,8 +558,20 @@ class MainWindowController(QObject):
         self.table_drop_indicator.setFixedWidth(3)
         self.table_drop_indicator.hide()
         self.table.setSortingEnabled(False)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.SelectedClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed
+        )
         self.table.setShowGrid(True)
+
+        self.status_delegate = StatusComboBoxDelegate(self.icon_manager.get_icon, self.table)
+        self.status_delegate.status_changed.connect(self._on_table_status_delegate_changed)
+        self.action_delegate = ActionButtonDelegate(self.icon_manager.get_icon, self.table)
+        self.action_delegate.action_clicked.connect(self._on_table_action_delegate_clicked)
+        self.action_delegate.action_all_models_clicked.connect(self._on_table_action_all_models_clicked)
+        self.target_text_delegate = MultiLineTextDelegate(self.table)
+        self.target_text_delegate.text_committed.connect(self._on_table_target_text_committed)
 
         self.window.statusBar().addPermanentWidget(self.progress)
 
@@ -545,8 +585,13 @@ class MainWindowController(QObject):
         self.edit_project_name = require_child(self.window, QLineEdit, "editProjectName")
         self.combo_game = require_child(self.window, QComboBox, "comboGame")
         self.combo_source_language = require_child(self.window, QComboBox, "comboSourceLanguage")
-        self.combo_target_language = require_child(self.window, QComboBox, "comboTargetLanguage")
         self.combo_target_slot = require_child(self.window, QComboBox, "comboTargetSlot")
+        self.combo_target_language = require_child(self.window, QComboBox, "comboTargetLanguage")
+        self.button_add_language = require_child(self.window, QPushButton, "buttonAddLanguage")
+
+
+
+
         self.frame_target_drop = require_child(self.window, QFrame, "frameDropZone")
         self.list_target_items = require_child(self.window, QListWidget, "listTargetItems")
         self.button_create_project = require_child(self.window, QPushButton, "buttonCreateProject")
@@ -556,6 +601,16 @@ class MainWindowController(QObject):
         self.frame_icon_drop.installEventFilter(self)
         self.frame_target_drop.installEventFilter(self)
         self._init_project_creation_ui()
+
+    def _update_ai_button_colors(self) -> None:
+        button_color = self.ai_translate_split.palette().color(QPalette.ColorRole.Button)
+        normal = button_color.darker(135).name()
+        border = button_color.darker(110).name()
+        style = self._ai_button_style_template.replace(
+            "background-color: palette(button);", f"background-color: {normal};", 1)
+        style = style.replace("border: 1px solid palette(mid);", f"border: 1px solid {border};")
+        if self.ai_translate_split.styleSheet() != style:
+            self.ai_translate_split.setStyleSheet(style)
 
     def _connect_actions(self) -> None:
         self.action_new_project.triggered.connect(self.show_new_project_page)
@@ -581,12 +636,16 @@ class MainWindowController(QObject):
         self.dock_ai_settings.visibilityChanged.connect(self._on_dock_ai_visibility_changed)
         self.stack_main.currentChanged.connect(self._on_main_page_changed)
 
-        self.button_start_translation.clicked.connect(self.action_start_translation.trigger)
+        self.button_translate_all.clicked.connect(self.action_translate_all.trigger)
         self.button_stop_translation.clicked.connect(self.action_stop_translation.trigger)
-        self.action_start_translation.changed.connect(lambda: self.button_start_translation.setEnabled(self.action_start_translation.isEnabled()))
+        self.action_translate_all.changed.connect(lambda: self.button_translate_all.setEnabled(self.action_translate_all.isEnabled()))
         self.action_stop_translation.changed.connect(lambda: self.button_stop_translation.setEnabled(self.action_stop_translation.isEnabled()))
-        self.combo_target_language.currentIndexChanged.connect(self._on_target_language_changed)
         self.combo_target_slot.currentIndexChanged.connect(self._on_target_slot_changed)
+        self.combo_target_language.currentIndexChanged.connect(self._on_workspace_selected)
+        self.button_add_language.clicked.connect(self._open_workspace_languages)
+
+
+
 
         self.button_list_mode.clicked.connect(self.show_list_mode)
         self.button_focus_mode.clicked.connect(self.show_focus_mode)
@@ -594,6 +653,8 @@ class MainWindowController(QObject):
         self.button_next.clicked.connect(self.next_entry)
         self.button_revert.clicked.connect(self.refresh_focus)
         self.button_copy_source.clicked.connect(self.copy_source_to_translation)
+        self.button_ai_translate.clicked.connect(self.ai_translate_current_unit)
+        self.button_ai_translate_all_models.clicked.connect(self.ai_translate_all_models_current_unit)
         self.button_focus_first.clicked.connect(self.first_focus_page)
         self.button_focus_prev.clicked.connect(self.prev_focus_page)
         self.button_focus_next.clicked.connect(self.next_focus_page)
@@ -606,6 +667,7 @@ class MainWindowController(QObject):
         self.search.textChanged.connect(self.apply_filters)
         self.status_filter.currentTextChanged.connect(self.apply_filters)
         self.table.itemSelectionChanged.connect(self.sync_focus_from_table)
+        self.table.cellClicked.connect(self._on_table_cell_clicked)
 
         self.edit_translation.textChanged.connect(self.mark_focus_edited)
 
@@ -663,6 +725,9 @@ class MainWindowController(QObject):
         return [(unit.id, unit.target_text) for unit in self.units]
 
     def save_translation(self) -> None:
+        workspace = self.active_workspace
+        if workspace is None:
+            return
         adapter = self.plugins.parsers.get(self.project.adapter_id)
         if adapter is None:
             self._restart_target = None
@@ -674,13 +739,14 @@ class MainWindowController(QObject):
         if not selected:
             self._restart_target = None
             return
-        snapshot = deepcopy(self.imported)
+        snapshot = deepcopy(self.workspace_service.export_data(workspace))
         saved_targets = [(unit.id, unit.target_text) for unit in snapshot.project.units]
         destination = Path(selected)
 
         def completed(_result: object) -> None:
             self.output_path = destination
-            self._saved_targets = saved_targets
+            if self.active_workspace is workspace:
+                self._saved_targets = saved_targets
             if self._restart_target is not None:
                 self.window.close()
 
@@ -770,10 +836,6 @@ class MainWindowController(QObject):
         self._refresh_ai_models()
 
     def _refresh_ai_models(self) -> None:
-        if self.ai_provider_id not in self.ai_models or not self.ai_models[self.ai_provider_id]:
-            defaults = self.provider_registry.get_default_models(self.ai_provider_id)
-            if defaults:
-                self.ai_models[self.ai_provider_id] = defaults
         self.combo_ai_model.blockSignals(True)
         self.combo_ai_model.clear()
         for entry in self.ai_models.get(self.ai_provider_id, []):
@@ -847,7 +909,7 @@ class MainWindowController(QObject):
     def apply_filter_rules_to_units(self) -> None:
         configs: dict[str, AdapterFilterConfig] = {}
 
-        for unit in self.units:
+        for unit in self.project.units:
             adapter_id = self.project.adapter_id
 
             if adapter_id not in configs:
@@ -867,9 +929,8 @@ class MainWindowController(QObject):
                 self.combo_game.addItem(f"{game.name} ({adapter.name})", (adapter, game))
         self.combo_game.blockSignals(False)
 
-        self.combo_target_language.clear()
-
         self._on_game_selection_changed()
+
 
     def _on_game_selection_changed(self) -> None:
         if self._changing_game:
@@ -1113,9 +1174,10 @@ class MainWindowController(QObject):
             name=self.edit_project_name.text().strip() or "Untitled",
             icon_path=str(self.selected_icon_path or ""),
             game_id=game.id,
-            target_language="ja",
+            target_language="",
             target_file_language=default_slot,
         )
+
         worker = ImportWorker(adapter, self.target_paths,
                               str(self.combo_source_language.currentData() or "auto"), self)
         self.import_worker = worker
@@ -1180,6 +1242,8 @@ class MainWindowController(QObject):
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
         self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
+        self._refresh_workspace_selection()
+        self._set_workspace_controls()
         self.refresh_all()
         self._restore_window_layout()
 
@@ -1241,13 +1305,17 @@ class MainWindowController(QObject):
         self.output_path = None
         self.imported = imported
         self.project = imported.project
-        self.units = self.project.units
+        self.workspace_service = WorkspaceService(imported)
+        self.active_workspace = None
+        self.units = list(self.workspace_service.source_units())
         self._saved_targets = self._target_snapshot()
         self.apply_filter_rules_to_units()
         self.current_unit = self.units[0] if self.units else None
         self.focus_current_page = 1
         self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
         self._sync_workspace_language_ui()
+        self._refresh_workspace_selection()
+        self._set_workspace_controls()
         self._configure_text_presentation()
         self.refresh_all()
         self.show_list_mode()
@@ -1271,11 +1339,8 @@ class MainWindowController(QObject):
 
         src_code = self.project.source_language or "auto"
         src_label = tr("MainWindow", "自動検出") if src_code == "auto" else src_code
-        if game:
-            for slot in game.slots:
-                if slot.language_code == src_code:
-                    src_label = slot.name
-                    break
+        if src_code in self.workspace_service.languages:
+            src_label = workspace_language_name(self.workspace_service, src_code)
         self.label_source_language_work.setText(src_label)
 
         with QSignalBlocker(self.combo_target_slot):
@@ -1291,25 +1356,69 @@ class MainWindowController(QObject):
                 self.combo_target_slot.addItem(tr("MainWindow", "該当なし"), "")
                 self.combo_target_slot.setEnabled(False)
 
-        with QSignalBlocker(self.combo_target_language):
-            if self.project.target_language:
-                idx = self.combo_target_language.findData(self.project.target_language)
-                if idx >= 0:
-                    self.combo_target_language.setCurrentIndex(idx)
-                else:
-                    self.combo_target_language.setCurrentText(self.project.target_language)
-
-    def _on_target_language_changed(self) -> None:
-        data = self.combo_target_language.currentData()
-        text = self.combo_target_language.currentText().strip()
-        val = str(data) if data else text
-        if val:
-            self.project.target_language = val
-
     def _on_target_slot_changed(self) -> None:
+
+
+
+
+
+
         data = self.combo_target_slot.currentData()
         val = str(data) if data else ""
         self.project.target_file_language = val
+
+    def _open_workspace_languages(self) -> None:
+        WorkspaceLanguageDialog(self.workspace_service, self._workspaces_changed, self.window).exec()
+
+    def _workspaces_changed(self, code: str | None) -> None:
+        if code is not None:
+            self._select_workspace(code)
+        elif self.active_workspace is not None and self.workspace_service.workspaces.get(
+                self.active_workspace.language_code) is not self.active_workspace:
+            self._select_workspace(None)
+        self._refresh_workspace_selection()
+
+    def _refresh_workspace_selection(self) -> None:
+        with QSignalBlocker(self.combo_target_language):
+            self.combo_target_language.clear()
+            self.combo_target_language.addItem(tr("MainWindow", "未選択"), "")
+            for code in self.workspace_service.workspaces:
+                name = workspace_language_name(self.workspace_service, code)
+                self.combo_target_language.addItem(f"{name} ({code})", code)
+            code = self.active_workspace.language_code if self.active_workspace is not None else ""
+            self.combo_target_language.setCurrentIndex(self.combo_target_language.findData(code))
+
+    def _on_workspace_selected(self) -> None:
+        code = self.combo_target_language.currentData()
+        self._select_workspace(str(code) if code else None)
+
+    def _select_workspace(self, code: str | None) -> None:
+        workspace = self.workspace_service.workspaces.get(code) if code is not None else None
+        self.active_workspace = workspace
+        self.project.target_language = workspace.language_code if workspace is not None else ""
+        self.units = list(self.workspace_service.units(workspace)) if workspace is not None else list(self.workspace_service.source_units())
+        self.current_unit = None
+        self.focus_current_page = 1
+        with QSignalBlocker(self.search), QSignalBlocker(self.status_filter):
+            self.search.clear()
+            self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
+        self._saved_targets = self._target_snapshot()
+        self._set_workspace_controls()
+        self.apply_filters()
+        self.show_list_mode()
+
+    def _set_workspace_controls(self) -> None:
+        enabled = self.active_workspace is not None
+        self.edit_translation.setReadOnly(not enabled)
+        for widget in (self.button_ai_translate, self.button_ai_translate_all_models,
+                       self.button_copy_source, self.button_save_split, self.button_revert):
+            widget.setEnabled(enabled)
+        for action in (self.action_translate_all, self.action_translate_selected,
+                       self.action_translate_untranslated):
+            action.setEnabled(enabled)
+
+    def _workspace_is_alive(self, workspace: Workspace) -> bool:
+        return self.workspace_service.workspaces.get(workspace.language_code) is workspace
 
     def refresh_all(self) -> None:
         self.apply_filters()
@@ -1489,13 +1598,11 @@ class MainWindowController(QObject):
             self.focus_current_page = (idx // self.focus_page_size) + 1
         else:
             self.focus_current_page = 1
-        self.refresh_table()
-        self.refresh_focus_unit_list()
-        self.refresh_table()
         if self.filtered_units and self.current_unit not in self.filtered_units:
             self.current_unit = self.filtered_units[0]
         elif not self.filtered_units:
             self.current_unit = None
+        self.refresh_table()
         self.refresh_focus_unit_list()
         self.refresh_focus()
 
@@ -1568,16 +1675,217 @@ class MainWindowController(QObject):
         self.table.setColumnCount(len(visible_columns))
         self.table.setHorizontalHeaderLabels([column.label for column in visible_columns])
         self.table.setRowCount(len(self.filtered_units))
+        self.table.verticalHeader().setDefaultSectionSize(60)
+
+        # カラムIDに基づいてDelegateを動的バインド（列番号のハードコードなし）
+        default_delegate = self.table.itemDelegate()
+        for col_idx, col in enumerate(visible_columns):
+            if col.id == "status":
+                self.table.setItemDelegateForColumn(col_idx, self.status_delegate)
+            elif col.id == "actions":
+                self.table.setItemDelegateForColumn(col_idx, self.action_delegate)
+            elif col.id == "target_text":
+                self.table.setItemDelegateForColumn(col_idx, self.target_text_delegate)
+            else:
+                self.table.setItemDelegateForColumn(col_idx, default_delegate)
+
         for row, unit in enumerate(self.filtered_units):
             for column_index, column in enumerate(visible_columns):
-                value = column.value_for(unit, self.source_name_for_unit)
-                if self.render_literal_newlines and column.id in {"source_text", "target_text"}:
-                    value = self._expand_display_text(value)
-                item = QTableWidgetItem(value)
+                item = QTableWidgetItem()
                 item.setData(Qt.ItemDataRole.UserRole, unit)
+
+                if column.id == "target_text":
+                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable |
+                                  (Qt.ItemFlag.ItemIsEditable if self.active_workspace is not None else Qt.ItemFlag.NoItemFlags))
+                    display_text = unit.target_text
+                    if self.render_literal_newlines:
+                        display_text = self._expand_display_text(display_text)
+                    item.setText(display_text)
+                elif column.id == "actions":
+                    item.setFlags(Qt.ItemFlag.ItemIsSelectable |
+                                  (Qt.ItemFlag.ItemIsEnabled if self.active_workspace is not None else Qt.ItemFlag.NoItemFlags))
+                    item.setText("")
+                elif column.id == "status":
+                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable |
+                                  (Qt.ItemFlag.ItemIsEditable if self.active_workspace is not None else Qt.ItemFlag.NoItemFlags))
+                    item.setText(self.status_text(unit))
+                    item.setIcon(self.status_icon(unit))
+                else:
+                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                    value = column.value_for(unit, self.source_name_for_unit)
+                    if self.render_literal_newlines and column.id == "source_text":
+                        value = self._expand_display_text(value)
+                    item.setText(value)
+
                 self.table.setItem(row, column_index, item)
+
         self.apply_header_visual_order()
         self.table.resizeColumnsToContents()
+        h_header = self.table.horizontalHeader()
+        for col_idx, col in enumerate(visible_columns):
+            h_header.setSectionResizeMode(col_idx, QHeaderView.ResizeMode.Interactive)
+            if col.id == "actions" and self.table.columnWidth(col_idx) < 70:
+                self.table.setColumnWidth(col_idx, 70)
+
+    def status_icon(self, unit: TranslationUnit) -> QIcon:
+        icon = self._unit_status_icon(unit)
+        return icon or self.icon_manager.get_icon("circle")
+
+    def _on_table_status_delegate_changed(self, row: int, data: object) -> None:
+        if self.active_workspace is None:
+            return
+        if not (0 <= row < len(self.filtered_units)):
+            return
+        unit = self.filtered_units[row]
+        if data == "locked":
+            unit.locked = True
+            unit.hidden = False
+        elif data == "hidden":
+            unit.hidden = True
+            unit.locked = False
+        elif isinstance(data, UnitState):
+            unit.locked = False
+            unit.hidden = False
+            unit.state = data
+
+        self._sync_unit_row_content(row, unit)
+        if self.current_unit is unit:
+            self.refresh_focus(sync_list=False)
+        self.refresh_focus_unit_list()
+
+    def _on_table_action_delegate_clicked(self, row: int) -> None:
+        if not (0 <= row < len(self.filtered_units)):
+            return
+        unit = self.filtered_units[row]
+        self._translate_single_unit(unit, row)
+
+    def _on_table_target_text_committed(self, row: int, new_text: str) -> None:
+        if self.active_workspace is None:
+            return
+        if not (0 <= row < len(self.filtered_units)):
+            return
+        unit = self.filtered_units[row]
+        if unit.target_text == new_text:
+            return
+        unit.target_text = new_text
+        if unit.state == UnitState.UNTRANSLATED and new_text.strip():
+            unit.state = UnitState.HUMAN_TRANSLATED
+
+        self._sync_unit_row_content(row, unit)
+        if self.current_unit is unit:
+            if not self._updating_focus and self.edit_translation.toPlainText() != new_text:
+                self.edit_translation.setPlainText(new_text)
+
+    def _translate_single_unit(self, unit: TranslationUnit, row: int) -> None:
+        workspace = self.active_workspace
+        if workspace is None:
+            return
+        if not self.ai_provider_id:
+            QMessageBox.warning(self.window, tr("MainWindow", "AI設定"), tr("MainWindow", "AIプロバイダーが選択されていません。"))
+            return
+        provider = self.plugins.providers.get(self.ai_provider_id)
+        if provider is None:
+            QMessageBox.warning(self.window, tr("MainWindow", "AI設定"), tr("MainWindow", "選択中のAIプロバイダーが見つかりません。"))
+            return
+        api_key = self.ai_api_keys.get(self.ai_provider_id, "")
+        if not api_key:
+            QMessageBox.warning(self.window, tr("MainWindow", "AI設定"), tr("MainWindow", "APIキーが設定されていません。設定画面で設定してください。"))
+            return
+        model = self.combo_ai_model.currentText().strip()
+        if not model:
+            QMessageBox.warning(self.window, tr("MainWindow", "AI設定"), tr("MainWindow", "AIモデルが選択されていません。"))
+            return
+
+        source_text = unit.source_text.strip()
+        if not source_text:
+            return
+
+        self.window.statusBar().showMessage(tr("MainWindow", f"[{unit.label}] を翻訳中..."), 3000)
+
+        source_lang = self.project.source_language or "en"
+        target_lang = self.project.target_language
+        req_id = f"row_{row}_{id(unit)}"
+
+        def on_completed(r_id: str, translated_text: str) -> None:
+            if r_id != req_id:
+                return
+            _cleanup()
+            if not self._workspace_is_alive(workspace):
+                return
+            unit.target_text = translated_text
+            unit.state = UnitState.AI_TRANSLATED
+            if self.active_workspace is not workspace:
+                return
+            row = self.filtered_units.index(unit) if unit in self.filtered_units else -1
+            if row >= 0:
+                self._sync_unit_row_content(row, unit)
+            else:
+                self.refresh_table()
+            if self.current_unit is not None and self.current_unit.id == unit.id:
+                self.refresh_focus(sync_list=False)
+            self.refresh_focus_unit_list()
+            self.window.statusBar().showMessage(tr("MainWindow", f"[{unit.label}] の翻訳が完了しました。"), 4000)
+
+        def on_failed(r_id: str, error_message: str) -> None:
+            if r_id != req_id:
+                return
+            _cleanup()
+            self.window.statusBar().showMessage(tr("MainWindow", f"翻訳エラー: {error_message}"), 6000)
+
+        def _cleanup() -> None:
+            try:
+                self.ai_client.translation_completed.disconnect(on_completed)
+            except Exception:
+                pass
+            try:
+                self.ai_client.translation_failed.disconnect(on_failed)
+            except Exception:
+                pass
+
+        self.ai_client.translation_completed.connect(on_completed)
+        self.ai_client.translation_failed.connect(on_failed)
+        self.ai_client.translate_text(
+            request_id=req_id,
+            provider=provider,
+            api_key=api_key,
+            model=model,
+            text=unit.source_text,
+            source_language=source_lang,
+            target_language=target_lang,
+            source_language_name=workspace_language_name(self.workspace_service, source_lang)
+                if source_lang in self.workspace_service.languages else "",
+            target_language_name=workspace_language_name(self.workspace_service, target_lang),
+        )
+
+    def _sync_unit_row_content(self, row: int, unit: TranslationUnit) -> None:
+        visible_columns = self.visible_columns()
+        for col_idx, col in enumerate(visible_columns):
+            item = self.table.item(row, col_idx)
+            if item is None:
+                continue
+            item.setData(Qt.ItemDataRole.UserRole, unit)
+            if col.id == "target_text":
+                display_text = unit.target_text
+                if self.render_literal_newlines:
+                    display_text = self._expand_display_text(display_text)
+                item.setText(display_text)
+            elif col.id == "status":
+                item.setText(self.status_text(unit))
+                item.setIcon(self.status_icon(unit))
+
+    def _on_table_cell_clicked(self, row: int, column: int) -> None:
+        if 0 <= row < len(self.filtered_units):
+            unit = self.filtered_units[row]
+            if self.current_unit is not unit:
+                self.current_unit = unit
+                self.refresh_focus()
+
+            visible_columns = self.visible_columns()
+            if 0 <= column < len(visible_columns):
+                col = visible_columns[column]
+                if col.id in {"status", "target_text"}:
+                    model_index = self.table.model().index(row, column)
+                    self.table.edit(model_index)
 
     def sync_focus_from_table(self) -> None:
         selected = self.table.selectedItems()
@@ -1623,7 +1931,7 @@ class MainWindowController(QObject):
             self._updating_focus = False
 
     def mark_focus_edited(self) -> None:
-        if self._updating_focus or self.current_unit is None:
+        if self._updating_focus or self.current_unit is None or self.active_workspace is None:
             return
         new_target = self.edit_translation.toPlainText()
         if new_target == self._expand_display_text(self.current_unit.target_text):
@@ -1632,11 +1940,103 @@ class MainWindowController(QObject):
         if self.render_literal_newlines and presentation is not None and presentation.newline_codec is not None:
             new_target = presentation.newline_codec.collapse(new_target)
         self.current_unit.target_text = new_target
-        self.refresh_table()
+        if self.current_unit in self.filtered_units:
+            row = self.filtered_units.index(self.current_unit)
+            self._sync_unit_row_content(row, self.current_unit)
+        else:
+            self.refresh_table()
+
 
     def copy_source_to_translation(self) -> None:
+        if self.active_workspace is None:
+            return
         source_text = self.edit_source.toPlainText()
         self.edit_translation.setPlainText(source_text)
+
+    def ai_translate_current_unit(self) -> None:
+        if self.current_unit is None:
+            return
+        try:
+            row = self.filtered_units.index(self.current_unit)
+        except ValueError:
+            row = -1
+        self._translate_single_unit(self.current_unit, row)
+
+    def _get_active_models_list(self) -> list[tuple[str, str, str, str]]:
+        return self.provider_registry.get_active_models(self.ai_models)
+
+    def _open_multi_model_dialog(self, unit: TranslationUnit, row: int = -1) -> None:
+        workspace = self.active_workspace
+        if workspace is None:
+            return
+        active_models = self._get_active_models_list()
+        if not active_models:
+            QMessageBox.warning(
+                self.window,
+                tr("MainWindow", "AI設定"),
+                tr("MainWindow", "利用可能な登録モデルがありません。設定画面でモデルの設定を確認してください。"),
+            )
+            return
+
+        source_text = unit.source_text.strip()
+        if not source_text:
+            return
+
+        source_lang = self.project.source_language or "en"
+        target_lang = self.project.target_language
+        selected_model = self.combo_ai_model.currentData()
+        default_model = str(selected_model) if selected_model is not None else ""
+
+        dialog = MultiModelTranslationDialog(
+            source_text=unit.source_text,
+            active_models=active_models,
+            providers=self.plugins.providers,
+            api_keys_map=self.ai_api_keys,
+            default_model_id=default_model,
+            default_provider_id=self.ai_provider_id,
+            ai_client=self.ai_client,
+            source_lang=source_lang,
+            target_lang=target_lang,
+            source_language_name=workspace_language_name(self.workspace_service, source_lang)
+                if source_lang in self.workspace_service.languages else "",
+            target_language_name=workspace_language_name(self.workspace_service, target_lang),
+            parent=self.window,
+        )
+
+        def on_adopted(adopted_text: str) -> None:
+            if not self._workspace_is_alive(workspace):
+                return
+            unit.target_text = adopted_text
+            unit.state = UnitState.AI_TRANSLATED
+            if self.active_workspace is not workspace:
+                return
+            row = self.filtered_units.index(unit) if unit in self.filtered_units else -1
+            if row >= 0:
+                self._sync_unit_row_content(row, unit)
+            else:
+                self.refresh_table()
+            if self.current_unit is not None and self.current_unit.id == unit.id:
+                self.refresh_focus(sync_list=False)
+            self.refresh_focus_unit_list()
+            self.window.statusBar().showMessage(tr("MainWindow", f"[{unit.label}] に翻訳を採用しました。"), 4000)
+
+        dialog.translation_adopted.connect(on_adopted)
+        dialog.exec()
+
+    def ai_translate_all_models_current_unit(self) -> None:
+        if self.current_unit is None:
+            return
+        try:
+            row = self.filtered_units.index(self.current_unit)
+        except ValueError:
+            row = -1
+        self._open_multi_model_dialog(self.current_unit, row)
+
+    def _on_table_action_all_models_clicked(self, row: int) -> None:
+        if not (0 <= row < len(self.filtered_units)):
+            return
+        unit = self.filtered_units[row]
+        self._open_multi_model_dialog(unit, row)
 
     def _setup_save_button_menu(self) -> None:
         menu = QMenu(self.window)
@@ -1696,12 +2096,16 @@ class MainWindowController(QObject):
         self._save_current_unit_changes(next_entry=False)
 
     def save_with_state(self, state: UnitState) -> None:
+        if self.active_workspace is None:
+            return
         if self.current_unit is not None:
             self.current_unit.target_text = self.edit_translation.toPlainText()
             self.current_unit.state = state
             self._after_unit_saved(next_entry=True)
 
     def save_as_locked(self) -> None:
+        if self.active_workspace is None:
+            return
         if self.current_unit is not None:
             self.current_unit.target_text = self.edit_translation.toPlainText()
             self.current_unit.locked = True
@@ -1709,6 +2113,8 @@ class MainWindowController(QObject):
             self._after_unit_saved(next_entry=True)
 
     def save_as_hidden(self) -> None:
+        if self.active_workspace is None:
+            return
         if self.current_unit is not None:
             self.current_unit.target_text = self.edit_translation.toPlainText()
             self.current_unit.hidden = True
@@ -1716,12 +2122,14 @@ class MainWindowController(QObject):
             self._after_unit_saved(next_entry=True)
 
     def save_as_untranslated(self) -> None:
+        if self.active_workspace is None:
+            return
         if self.current_unit is not None:
             self.current_unit.state = UnitState.UNTRANSLATED
             self._after_unit_saved(next_entry=True)
 
     def _save_current_unit_changes(self, next_entry: bool) -> None:
-        if self.current_unit is None:
+        if self.current_unit is None or self.active_workspace is None:
             return
         text = self.edit_translation.toPlainText()
         self.current_unit.target_text = text

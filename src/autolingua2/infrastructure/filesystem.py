@@ -11,5 +11,12 @@ else:
     PACKAGE_DIR = Path(__file__).resolve().parents[1]
     PROJECT_ROOT = PACKAGE_DIR.parents[1]
 
-UI_DIR = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)) / "ui"
-ASSETS_DIR = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)) / "assets"
+try:
+    from autolingua2.infrastructure.bootstrap import development_root
+except ImportError:
+    RESOURCE_ROOT = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT))
+else:
+    RESOURCE_ROOT = development_root() or Path(getattr(sys, "_MEIPASS", PROJECT_ROOT))
+
+UI_DIR = RESOURCE_ROOT / "ui"
+ASSETS_DIR = RESOURCE_ROOT / "assets"

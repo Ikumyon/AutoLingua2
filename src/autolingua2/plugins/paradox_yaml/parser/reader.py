@@ -20,23 +20,23 @@ ENTRY_RE = re.compile(
 
 
 EU4_SLOTS: list[GameSlot] = [
-    GameSlot("l_english", "English", "en_US"),
-    GameSlot("l_french", "French", "fr_FR"),
-    GameSlot("l_german", "German", "de_DE"),
-    GameSlot("l_spanish", "Spanish", "es_ES"),
+    GameSlot("l_english", "English", "en-US"),
+    GameSlot("l_french", "French", "fr-FR"),
+    GameSlot("l_german", "German", "de-DE"),
+    GameSlot("l_spanish", "Spanish", "es-ES"),
 ]
 
 PARADOX_STANDARD_SLOTS: list[GameSlot] = [
-    GameSlot("l_english", "English", "en_US"),
-    GameSlot("l_japanese", "Japanese", "ja_JP"),
-    GameSlot("l_simp_chinese", "Simplified Chinese", "zh_CN"),
-    GameSlot("l_german", "German", "de_DE"),
-    GameSlot("l_french", "French", "fr_FR"),
-    GameSlot("l_spanish", "Spanish", "es_ES"),
-    GameSlot("l_russian", "Russian", "ru_RU"),
-    GameSlot("l_polish", "Polish", "pl_PL"),
-    GameSlot("l_korean", "Korean", "ko_KR"),
-    GameSlot("l_braz_por", "Portuguese", "pt_BR"),
+    GameSlot("l_english", "English", "en-US"),
+    GameSlot("l_japanese", "Japanese", "ja-JP"),
+    GameSlot("l_simp_chinese", "Simplified Chinese", "zh-CN"),
+    GameSlot("l_german", "German", "de-DE"),
+    GameSlot("l_french", "French", "fr-FR"),
+    GameSlot("l_spanish", "Spanish", "es-ES"),
+    GameSlot("l_russian", "Russian", "ru-RU"),
+    GameSlot("l_polish", "Polish", "pl-PL"),
+    GameSlot("l_korean", "Korean", "ko-KR"),
+    GameSlot("l_braz_por", "Portuguese", "pt-BR"),
 ]
 
 SLOT_LANGUAGE: dict[str, str] = {slot.slot_id: slot.language_code for slot in PARADOX_STANDARD_SLOTS}

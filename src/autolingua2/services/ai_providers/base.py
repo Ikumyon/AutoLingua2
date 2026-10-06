@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import hashlib
 import json
-import locale
 import logging
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -11,6 +10,7 @@ import urllib.error
 import urllib.request
 
 from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from autolingua2.ui.i18n import is_default_language, system_language
 
 logger = logging.getLogger(__name__)
 
@@ -58,17 +58,6 @@ def get_prompt_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
-def get_os_language() -> str:
-    """ユーザーのOS言語コード（例: 'ja', 'en'）を取得します。"""
-    try:
-        lang, _ = locale.getlocale()
-        if lang:
-            return lang.split("_")[0].lower()
-    except Exception:
-        pass
-    return "ja"
-
-
 def _load_prompt_cache() -> dict[str, dict[str, str]]:
     if PROMPT_CACHE_FILE.is_file():
         try:
@@ -91,20 +80,24 @@ def _save_prompt_cache(cache_data: dict[str, dict[str, str]]) -> None:
 
 
 def build_system_prompt_template(
-    os_language: str,
+    target_language: str | None = None,
     translator: BaseHttpTranslator | None = None,
+    *,
+    allow_sync_translation: bool = False,
 ) -> str:
-    """OS言語に応じたシステムプロンプトのテンプレートを取得します。
+    """言語に応じたシステムプロンプトのテンプレートを取得します。
 
-    原本ハッシュを用いてキャッシュの有効性を検証し、未作成または原本変更時は
-    AIによりOS言語向けプロンプトを再生成・キャッシュ保存します。
+    デフォルト言語（ja-JP）の場合は原本を即座に返します。
+    他言語でキャッシュがない場合、安全ガード（allow_sync_translation）が有効な場合のみ
+    翻訳を実行し、それ以外（接続テスト中など）は原本を返してUIフリーズを防ぎます。
     """
-    if os_language == "ja":
+    lang = target_language or system_language()
+    if is_default_language(lang):
         return MASTER_SYSTEM_PROMPT
 
     current_hash = get_prompt_hash(MASTER_SYSTEM_PROMPT)
     cache = _load_prompt_cache()
-    cached_entry = cache.get(os_language)
+    cached_entry = cache.get(lang)
 
     if (
         cached_entry
@@ -113,19 +106,19 @@ def build_system_prompt_template(
     ):
         return cached_entry["prompt"]
 
-    # キャッシュ未作成または原本更新時
-    if translator is not None:
+    # キャッシュ未作成かつ同期翻訳が明示的に許可されている場合のみ実行（UIフリーズ防止）
+    if allow_sync_translation and translator is not None:
         try:
-            translated = translator.translate(MASTER_SYSTEM_PROMPT, "Japanese", os_language)
+            translated = translator.translate(MASTER_SYSTEM_PROMPT, "Japanese", lang)
             if "{source_language}" in translated and "{target_language}" in translated:
-                cache[os_language] = {
+                cache[lang] = {
                     "source_hash": current_hash,
                     "prompt": translated,
                 }
                 _save_prompt_cache(cache)
                 return translated
         except Exception as exc:
-            logger.warning("OS言語(%s)へのプロンプト翻訳に失敗しました: %s", os_language, exc)
+            logger.warning("言語(%s)へのプロンプト翻訳に失敗しました: %s", lang, exc)
 
     return MASTER_SYSTEM_PROMPT
 
@@ -189,10 +182,15 @@ class BaseHttpTranslator(TextTranslator, ABC):
         source_language: str,
         target_language: str,
         tone: str | None = None,
+        *,
+        allow_sync_translation: bool = False,
     ) -> str:
         """ゲーム翻訳用のシステムプロンプトを構築します。"""
-        os_lang = get_os_language()
-        template = build_system_prompt_template(os_lang, translator=self)
+        template = build_system_prompt_template(
+            system_language(),
+            translator=self,
+            allow_sync_translation=allow_sync_translation,
+        )
         tone_section = f"口調: {tone}\n" if tone and tone.strip() else ""
         return template.format(
             source_language=source_language,
@@ -210,7 +208,9 @@ class BaseHttpTranslator(TextTranslator, ABC):
         if not text.strip():
             return text
 
-        system_prompt = self.build_system_prompt(source_language, target_language, tone=tone)
+        system_prompt = self.build_system_prompt(
+            source_language, target_language, tone=tone, allow_sync_translation=True
+        )
         payload = self.build_payload(text, source_language, target_language, system_prompt)
         headers = self.build_headers()
 

@@ -43,4 +43,16 @@ class ProviderRegistry:
             return ""
         return os.environ.get(env_var, "").strip()
 
+    def get_active_models(self, configured: Mapping[str, list[AiModel]]) -> list[tuple[str, str, str, str]]:
+        """Collect registered, enabled models across accepted providers."""
+        result: list[tuple[str, str, str, str]] = []
+        for provider_id, provider in self.providers.items():
+            models = configured.get(provider_id, [])
+            for model in models:
+                model_id = model.model.strip()
+                if model.enabled and model_id:
+                    result.append((provider_id, provider.display_name, model_id,
+                                   model.name.strip() or model_id))
+        return result
+
 

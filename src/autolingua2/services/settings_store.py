@@ -4,7 +4,11 @@ from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+
+if TYPE_CHECKING:
+    from autolingua2.services.ai_providers.registry import ProviderRegistry
 
 
 GROUP_TRANSLATION_TABLE = "translation_table"
@@ -92,8 +96,16 @@ class AiSettings:
     concurrency: int = 4
 
 
-def load_ai_settings() -> AiSettings:
-    group = _read_settings_file().get(GROUP_AI, {})
+def load_ai_settings(registry: ProviderRegistry) -> AiSettings:
+    settings = _read_settings_file()
+    if GROUP_AI not in settings:
+        initial = AiSettings(DEFAULT_AI_PROVIDER, {
+            provider_id: registry.get_default_models(provider_id)
+            for provider_id in registry.providers
+        })
+        save_ai_settings(initial)
+        return initial
+    group = settings[GROUP_AI]
     if not isinstance(group, dict):
         return AiSettings(DEFAULT_AI_PROVIDER, {})
 
@@ -316,6 +328,20 @@ def save_plugin_settings(plugin_id: str, data: dict[str, object]) -> None:
         plugins_group = {}
     plugins_group[plugin_id] = data
     settings[GROUP_PLUGINS] = plugins_group
+    _write_settings_file(settings)
+
+
+def load_custom_languages() -> dict[str, str]:
+    value = _read_settings_file().get("translation_languages", {})
+    if not isinstance(value, dict):
+        return {}
+    return {code: name for code, name in value.items()
+            if isinstance(code, str) and isinstance(name, str)}
+
+
+def save_custom_languages(languages: dict[str, str]) -> None:
+    settings = _read_settings_file()
+    settings["translation_languages"] = dict(languages)
     _write_settings_file(settings)
 
 

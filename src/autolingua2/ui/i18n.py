@@ -12,7 +12,7 @@ from types import MappingProxyType
 from autolingua2.ir.validation import record, required, text
 
 
-DEFAULT_LANGUAGE = "ja_JP"
+DEFAULT_LANGUAGE = "ja-JP"
 
 _current_language = DEFAULT_LANGUAGE
 
@@ -50,16 +50,21 @@ def tr(context: str, text: str) -> str:
 def normalize_language(language: str | None) -> str:
     if not language:
         return DEFAULT_LANGUAGE
-    lang = language.strip().replace("-", "_")
-    parts = lang.split("_")
+    lang = language.strip().replace("_", "-")
+    parts = lang.split("-")
+    part0 = parts[0].lower()
+    if part0 in ("ja", "japanese"):
+        return "ja-JP"
+    if part0 in ("en", "english"):
+        return "en-US"
     if len(parts) == 1:
-        part0 = parts[0].lower()
-        if part0 == "ja":
-            return "ja_JP"
-        if part0 == "en":
-            return "en_US"
         return part0
-    return f"{parts[0].lower()}_{parts[1].upper()}"
+    return f"{part0}-{parts[1].upper()}"
+
+
+def is_default_language(language: str | None) -> bool:
+    """指定された言語コードがデフォルト言語（ja-JP）と一致するか判定します。"""
+    return normalize_language(language) == DEFAULT_LANGUAGE
 
 
 def system_language() -> str:
@@ -95,9 +100,9 @@ class LocalizationManager:
             code = system_language()
             if code in self._languages:
                 return code
-            prefix = code.split("_")[0]
+            prefix = code.split("-")[0]
             for available in self._languages:
-                if available.split("_")[0] == prefix:
+                if available.split("-")[0] == prefix:
                     return available
             return DEFAULT_LANGUAGE
         return normalize_language(configured_language)

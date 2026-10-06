@@ -73,13 +73,19 @@ class GeminiTranslator(BaseHttpTranslator):
             err = error_data.get("error")
             if isinstance(err, dict):
                 msg = str(err.get("message", "")).strip()
+                status_str = str(err.get("status", "")).strip()
+                if status_code == 404 or status_str == "NOT_FOUND" or "not found" in msg.lower():
+                    return f"指定されたモデル '{self.model}' が見つかりません ({msg})"
+                if (
+                    "api key not valid" in msg.lower()
+                    or "api_key_invalid" in msg.lower()
+                    or "unregistered callers" in msg.lower()
+                    or status_code in (401, 403)
+                ):
+                    return f"APIキーが無効です ({msg})"
+                if status_code == 429 or status_str == "RESOURCE_EXHAUSTED" or "quota" in msg.lower():
+                    return f"Gemini レート制限または利用枠を超過しました ({msg})"
                 if msg:
-                    if status_code in (400, 401, 403):
-                        return f"Gemini APIキーが無効または権限がありません ({msg})"
-                    if status_code == 429:
-                        return f"Gemini レート制限または利用枠を超過しました ({msg})"
-                    if status_code == 404:
-                        return f"指定されたモデル '{self.model}' が見つかりません ({msg})"
                     return f"Gemini エラー ({status_code}): {msg}"
         return None
 

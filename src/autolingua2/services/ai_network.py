@@ -96,28 +96,32 @@ class AiNetworkClient(QObject):
         model: str,
         translator: BaseHttpTranslator,
     ) -> None:
-        if reply in self._active_replies:
-            self._active_replies.remove(reply)
+        try:
+            if reply in self._active_replies:
+                self._active_replies.remove(reply)
 
-        reply.deleteLater()
-        status_code = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
-        http_status = int(status_code) if status_code is not None else 0
+            reply.deleteLater()
+            status_code = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
+            http_status = int(status_code) if status_code is not None else 0
 
-        raw_bytes = bytes(reply.readAll().data())
-        raw_text = raw_bytes.decode("utf-8", errors="replace")
+            raw_bytes = bytes(reply.readAll().data())
+            raw_text = raw_bytes.decode("utf-8", errors="replace")
 
-        if reply.error() == QNetworkReply.NetworkError.NoError and 200 <= http_status < 300:
-            try:
-                data = json.loads(raw_text)
-                _ = translator.extract_translation(data)
-                self._on_single_validation_finished(model, True, "接続確認済み（利用可能）")
-            except Exception as exc:
-                self._on_single_validation_finished(model, False, f"レスポンス解析失敗: {exc}")
-        else:
-            error_message = translator._resolve_http_error(raw_text, http_status)
-            if not error_message or error_message == raw_text:
-                error_message = reply.errorString()
-            self._on_single_validation_finished(model, False, f"接続エラー: {error_message}")
+            if reply.error() == QNetworkReply.NetworkError.NoError and 200 <= http_status < 300:
+                try:
+                    data = json.loads(raw_text)
+                    _ = translator.extract_translation(data)
+                    self._on_single_validation_finished(model, True, "接続確認済み（利用可能）")
+                except Exception as exc:
+                    self._on_single_validation_finished(model, False, f"レスポンス解析失敗: {exc}")
+            else:
+                error_message = translator._resolve_http_error(raw_text, http_status)
+                if not error_message or error_message == raw_text:
+                    error_message = reply.errorString()
+                self._on_single_validation_finished(model, False, f"接続エラー: {error_message}")
+        except Exception as exc:
+            logger.exception("検証レスポンス処理で予期せぬエラー (%s): %s", model, exc)
+            self._on_single_validation_finished(model, False, f"応答処理エラー: {exc}")
 
     def _on_single_validation_finished(self, model: str, is_valid: bool, message: str) -> None:
         if is_valid:
@@ -131,3 +135,82 @@ class AiNetworkClient(QObject):
         if self._validation_remaining <= 0:
             self._validation_remaining = 0
             self.all_validated.emit(self._validation_success, self._validation_error)
+
+    def translate_text(
+        self,
+        request_id: str,
+        provider: AiProviderPlugin,
+        api_key: str,
+        model: str,
+        text: str,
+        source_language: str = "en",
+        target_language: str = "ja",
+        timeout_sec: float = 30.0,
+        *,
+        source_language_name: str = "",
+        target_language_name: str = "",
+    ) -> None:
+        """指定されたプロバイダとモデルを用いて単一テキストを完全非同期で翻訳します。"""
+        try:
+            raw_translator = provider.create(api_key, model)
+            if not isinstance(raw_translator, BaseHttpTranslator):
+                self.translation_failed.emit(request_id, f"未対応のプロバイダ型です: {type(raw_translator)}")
+                return
+
+            translator: BaseHttpTranslator = raw_translator
+            source_description = f"{source_language_name}[{source_language}]" if source_language_name else source_language
+            target_description = f"{target_language_name}[{target_language}]" if target_language_name else target_language
+            system_prompt = translator.build_system_prompt(source_description, target_description)
+            payload = translator.build_payload(text, source_language, target_language, system_prompt)
+            headers = translator.build_headers()
+
+            body_bytes = json.dumps(payload).encode("utf-8")
+            request = QNetworkRequest(QUrl(translator.endpoint))
+
+            for key, val in headers.items():
+                request.setRawHeader(key.encode("utf-8"), val.encode("utf-8"))
+
+            request.setTransferTimeout(int(timeout_sec * 1000))
+            reply = self._nam.post(request, QByteArray(body_bytes))
+            self._active_replies.append(reply)
+
+            reply.finished.connect(
+                lambda r=reply, req_id=request_id, t=translator: self._handle_translation_reply(r, req_id, t)
+            )
+        except Exception as exc:
+            logger.warning("翻訳リクエスト生成失敗 (request_id=%s): %s", request_id, exc)
+            self.translation_failed.emit(request_id, f"リクエスト生成失敗: {exc}")
+
+    def _handle_translation_reply(
+        self,
+        reply: QNetworkReply,
+        request_id: str,
+        translator: BaseHttpTranslator,
+    ) -> None:
+        try:
+            if reply in self._active_replies:
+                self._active_replies.remove(reply)
+
+            reply.deleteLater()
+            status_code = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
+            http_status = int(status_code) if status_code is not None else 0
+
+            raw_bytes = bytes(reply.readAll().data())
+            raw_text = raw_bytes.decode("utf-8", errors="replace")
+
+            if reply.error() == QNetworkReply.NetworkError.NoError and 200 <= http_status < 300:
+                try:
+                    data = json.loads(raw_text)
+                    translated = translator.extract_translation(data)
+                    self.translation_completed.emit(request_id, translated)
+                except Exception as exc:
+                    self.translation_failed.emit(request_id, f"レスポンス解析失敗: {exc}")
+            else:
+                error_message = translator._resolve_http_error(raw_text, http_status)
+                if not error_message or error_message == raw_text:
+                    error_message = reply.errorString()
+                self.translation_failed.emit(request_id, f"接続エラー: {error_message}")
+        except Exception as exc:
+            logger.exception("翻訳レスポンス処理でエラー (request_id=%s): %s", request_id, exc)
+            self.translation_failed.emit(request_id, f"翻訳応答処理エラー: {exc}")
+
