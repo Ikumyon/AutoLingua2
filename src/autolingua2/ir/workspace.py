@@ -17,6 +17,7 @@ class TranslationRecord:
 class Workspace:
     language_code: str
     records: dict[str, TranslationRecord] = field(default_factory=dict)
+    output_slot: str = ""
 
 
 @dataclass(slots=True, eq=False)
@@ -64,7 +65,7 @@ class WorkspaceUnit:
 
     @property
     def hidden(self) -> bool:
-        return self.source.hidden or self.state == UnitState.HIDDEN
+        return self.state == UnitState.HIDDEN
 
     @hidden.setter
     def hidden(self, value: bool) -> None:

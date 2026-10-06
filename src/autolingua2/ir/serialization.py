@@ -73,6 +73,7 @@ def imported_from_dict(value: object) -> ImportedTranslation:
         icon_path=string_field(project_data, "icon_path"),
         game_id=string_field(project_data, "game_id"),
         source_language=string_field(project_data, "source_language"),
+        source_slot=string_field(project_data, "source_slot"),
         target_language=string_field(project_data, "target_language"),
         target_file_language=string_field(project_data, "target_file_language"),
         adapter_id=string_field(project_data, "adapter_id"),

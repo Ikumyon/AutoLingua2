@@ -19,6 +19,10 @@ class TranslationProject:
     icon_path: str = ""
     game_id: str = ""
     source_language: str = ""
+    source_slot: str = ""
+    source_root: str = ""
+    loaded_files: list[str] = field(default_factory=list)
+    loaded_folders: list[str] = field(default_factory=list)
     target_language: str = ""
     target_file_language: str = ""
     adapter_id: str = ""
@@ -36,6 +40,8 @@ class TranslationProject:
             self.game_id = other.game_id
         if not self.source_language and other.source_language:
             self.source_language = other.source_language
+        if not self.source_slot and other.source_slot:
+            self.source_slot = other.source_slot
         if not self.target_language and other.target_language:
             self.target_language = other.target_language
         if not self.target_file_language and other.target_file_language:

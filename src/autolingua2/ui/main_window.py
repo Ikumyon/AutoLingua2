@@ -70,6 +70,7 @@ from autolingua2.ui.components.translation_table_delegate import (
     StatusComboBoxDelegate,
 )
 from autolingua2.services.export import export_translation
+from autolingua2.services.project_archive import load_project, project_snapshot, save_project
 from autolingua2.services.settings_store import (
     AiSettings,
     ColumnLayout,
@@ -194,7 +195,8 @@ class MainWindowController(QObject):
         self._close_after_io = False
         self._restart_target: bool | None = None
         self._restart_started = False
-        self._saved_targets: list[tuple[str, str]] = []
+        self.project_path: Path | None = None
+        self._saved_project: bytes | None = None
         widget = load_ui("MainWindow.ui")
         if not isinstance(widget, QMainWindow):
             raise TypeError("MainWindow.ui は QMainWindow ではありません")
@@ -292,19 +294,11 @@ class MainWindowController(QObject):
                 self._close_after_import = True
                 self.import_worker.requestInterruption()
                 return True
+            if not self._confirm_project_change():
+                self._restart_target = None
+                event.ignore()
+                return True
             if self._restart_target is not None:
-                if self._target_snapshot() != self._saved_targets:
-                    answer = QMessageBox.question(self.window, "再起動", "未保存の訳文を保存しますか？",
-                        QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
-                        QMessageBox.StandardButton.Cancel)
-                    if answer == QMessageBox.StandardButton.Cancel:
-                        self._restart_target = None
-                        event.ignore()
-                        return True
-                    if answer == QMessageBox.StandardButton.Save:
-                        event.ignore()
-                        self.save_translation()
-                        return True
                 try:
                     self._save_window_layout()
                     self.platform.restart_process(self._restart_target)
@@ -623,6 +617,19 @@ class MainWindowController(QObject):
             self.ai_translate_split.setStyleSheet(style)
 
     def _connect_actions(self) -> None:
+        file_menu = require_child(self.window, QMenu, "menuFile")
+        for title, callback in (
+            ("プロジェクトを開く…", self.open_project),
+            ("プロジェクトを保存", self.save_project),
+            ("プロジェクトを別名で保存…", self.save_project_as),
+        ):
+            action = QAction(tr("MainWindow", title), self.window)
+            action.triggered.connect(callback)
+            file_menu.insertAction(self.action_new_project, action)
+        file_menu.insertSeparator(self.action_new_project)
+        export_action = QAction(tr("MainWindow", "訳文を出力…"), self.window)
+        export_action.triggered.connect(self.save_translation)
+        file_menu.insertAction(self.action_exit, export_action)
         self.action_new_project.triggered.connect(self.show_new_project_page)
         self.action_exit.triggered.connect(self.window.close)
 
@@ -738,8 +745,69 @@ class MainWindowController(QObject):
         except Exception as exc:
             QMessageBox.warning(self.window, "フォルダを開けません", str(exc))
 
-    def _target_snapshot(self) -> list[tuple[str, str]]:
-        return [(unit.id, unit.target_text) for unit in self.units]
+    def _confirm_project_change(self) -> bool:
+        if not self.project.sources or project_snapshot(self.workspace_service) == self._saved_project:
+            return True
+        answer = QMessageBox.question(
+            self.window, tr("MainWindow", "未保存のプロジェクト"),
+            tr("MainWindow", "プロジェクトに未保存の変更があります。保存しますか？"),
+            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer == QMessageBox.StandardButton.Save:
+            return self.save_project()
+        return answer == QMessageBox.StandardButton.Discard
+
+    def save_project_as(self) -> bool:
+        return self.save_project(choose_path=True)
+
+    def save_project(self, _checked: bool = False, *, choose_path: bool = False) -> bool:
+        if self.io_worker is not None or not self.project.sources:
+            return False
+        path = self.project_path
+        if choose_path or path is None:
+            selected, _ = QFileDialog.getSaveFileName(
+                self.window, tr("MainWindow", "プロジェクトを保存"),
+                str(path or (PROJECT_ROOT / "Untitled.alproj")), "Autolingua Project (*.alproj)",
+            )
+            if not selected:
+                return False
+            path = Path(selected)
+            if path.suffix.lower() != ".alproj":
+                path = path.with_suffix(".alproj")
+        try:
+            save_project(path, self.workspace_service)
+            self._saved_project = project_snapshot(self.workspace_service)
+        except Exception as exc:
+            QMessageBox.warning(self.window, tr("MainWindow", "保存エラー"), str(exc))
+            return False
+        self.project_path = path
+        self.window.statusBar().showMessage(tr("MainWindow", "プロジェクトを保存しました。"), 5000)
+        return True
+
+    def open_project(self) -> None:
+        if self.import_worker is not None or self.io_worker is not None:
+            return
+        selected, _ = QFileDialog.getOpenFileName(
+            self.window, tr("MainWindow", "プロジェクトを開く"),
+            str(self.project_path or PROJECT_ROOT), "Autolingua Project (*.alproj)",
+        )
+        if not selected:
+            return
+        try:
+            archive = load_project(Path(selected))
+            service = WorkspaceService(archive.imported)
+            service.languages.update(archive.languages)
+            service.workspaces = archive.workspaces
+        except Exception as exc:
+            QMessageBox.warning(self.window, tr("MainWindow", "読み込みエラー"), str(exc))
+            return
+        if not self._confirm_project_change():
+            return
+        self.load_import(archive.imported, service)
+        self.project_path = Path(selected)
+        self._saved_project = project_snapshot(self.workspace_service)
+        self.window.setWindowTitle(f"Autolingua Desktop - {self.project.name}")
 
     def save_translation(self) -> None:
         workspace = self.active_workspace
@@ -757,15 +825,10 @@ class MainWindowController(QObject):
             self._restart_target = None
             return
         snapshot = deepcopy(self.workspace_service.export_data(workspace))
-        saved_targets = [(unit.id, unit.target_text) for unit in snapshot.project.units]
         destination = Path(selected)
 
         def completed(_result: object) -> None:
             self.output_path = destination
-            if self.active_workspace is workspace:
-                self._saved_targets = saved_targets
-            if self._restart_target is not None:
-                self.window.close()
 
         self._run_operation(lambda: export_translation(snapshot, adapter, destination), completed)
 
@@ -1209,7 +1272,7 @@ class MainWindowController(QObject):
         self._refresh_all_target_labels()
 
     def create_project(self) -> None:
-        if self.import_worker is not None or not self._creation_valid:
+        if self.import_worker is not None or self.io_worker is not None or not self._creation_valid:
             return
         if not self.target_paths:
             QMessageBox.warning(self.window, tr("MainWindow", "警告"), tr("MainWindow", "翻訳対象のファイルまたはフォルダを追加してください。"))
@@ -1220,13 +1283,11 @@ class MainWindowController(QObject):
 
         if adapter is None or game is None:
             return
-        default_slot = game.default_slot_id if game else ""
         self._import_metadata = dict(
             name=self.edit_project_name.text().strip() or "Untitled",
             icon_path=str(self.selected_icon_path or ""),
             game_id=game.id,
             target_language="",
-            target_file_language=default_slot,
         )
 
         worker = ImportWorker(adapter, self.target_paths,
@@ -1270,9 +1331,10 @@ class MainWindowController(QObject):
                 if suggestions.get("game_id"):
                     game = next(g for g in adapter.supported_games if g.id == suggestions["game_id"])
                     imported.project.game_id = game.id
-                    imported.project.target_file_language = game.default_slot_id
+        if not self._confirm_project_change():
+            return
         self.load_import(imported)
-        self.window.setWindowTitle(f"AutoLingua Desktop - {imported.project.name}")
+        self.window.setWindowTitle(f"Autolingua Desktop - {imported.project.name}")
 
     def _on_import_failed(self, message: str) -> None:
         self._operation_progress(message)
@@ -1352,17 +1414,23 @@ class MainWindowController(QObject):
             self.action_toggle_ai_panel.setChecked(self._ai_dock_workspace_visible)
             self.dock_ai_settings.setVisible(self._ai_dock_workspace_visible)
 
-    def load_import(self, imported: ImportedTranslation) -> None:
+    def load_import(self, imported: ImportedTranslation, service: WorkspaceService | None = None) -> None:
         self.output_path = None
         self.imported = imported
         self.project = imported.project
         self.selected_glossary_id = ""
         self._refresh_glossary_choices()
-        self.workspace_service = WorkspaceService(imported)
+        self.workspace_service = service if service is not None else WorkspaceService(imported)
         self.active_workspace = None
         self.units = list(self.workspace_service.source_units())
-        self._saved_targets = self._target_snapshot()
-        self.apply_filter_rules_to_units()
+        self.project_path = None
+        self._saved_project = None
+        if service is None:
+            self.apply_filter_rules_to_units()
+            for unit in self.project.units:
+                if unit.hidden:
+                    for workspace in self.workspace_service.workspaces.values():
+                        workspace.records[unit.id].state = UnitState.HIDDEN
         self.current_unit = self.units[0] if self.units else None
         self.focus_current_page = 1
         self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
@@ -1401,24 +1469,25 @@ class MainWindowController(QObject):
             if game and game.slots:
                 for slot in game.slots:
                     self.combo_target_slot.addItem(f"{slot.slot_id} ({slot.name})", slot.slot_id)
-                target_slot = self.project.target_file_language or game.default_slot_id
+                workspace = self.active_workspace
+                target_slot = workspace.output_slot if workspace is not None else self.project.source_slot
                 idx = self.combo_target_slot.findData(target_slot)
-                self.combo_target_slot.setCurrentIndex(max(0, idx))
-                self.combo_target_slot.setEnabled(True)
+                if idx < 0 and target_slot:
+                    self.combo_target_slot.addItem(target_slot, target_slot)
+                    idx = self.combo_target_slot.count() - 1
+                self.combo_target_slot.setCurrentIndex(idx)
+                self.combo_target_slot.setEnabled(workspace is not None)
             else:
                 self.combo_target_slot.addItem(tr("MainWindow", "該当なし"), "")
                 self.combo_target_slot.setEnabled(False)
 
     def _on_target_slot_changed(self) -> None:
-
-
-
-
-
-
+        workspace = self.active_workspace
+        if workspace is None:
+            return
         data = self.combo_target_slot.currentData()
         val = str(data) if data else ""
-        self.project.target_file_language = val
+        workspace.output_slot = val
 
     def _open_workspace_languages(self) -> None:
         WorkspaceLanguageDialog(self.workspace_service, self._workspaces_changed, self.window).exec()
@@ -1450,12 +1519,12 @@ class MainWindowController(QObject):
         self.active_workspace = workspace
         self.project.target_language = workspace.language_code if workspace is not None else ""
         self.units = list(self.workspace_service.units(workspace)) if workspace is not None else list(self.workspace_service.source_units())
+        self._sync_workspace_language_ui()
         self.current_unit = None
         self.focus_current_page = 1
         with QSignalBlocker(self.search), QSignalBlocker(self.status_filter):
             self.search.clear()
             self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
-        self._saved_targets = self._target_snapshot()
         self._set_workspace_controls()
         self.apply_filters()
         self.show_list_mode()

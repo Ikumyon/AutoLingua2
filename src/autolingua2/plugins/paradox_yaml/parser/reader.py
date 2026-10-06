@@ -143,22 +143,18 @@ class ParadoxYamlAdapter:
         project = TranslationProject(sources=[source])
         source_refs: dict[str, SourceRef] = {}
         language_header = ""
-        pending_comment_lines: list[str] = []
 
         for line_number, raw_line in enumerate(text.splitlines(), start=1):
             stripped = raw_line.strip()
             if not stripped:
-                pending_comment_lines.clear()
                 continue
             if stripped.startswith("#"):
-                pending_comment_lines.append(raw_line)
                 continue
 
             if not language_header:
                 header = LANGUAGE_HEADER_RE.match(raw_line)
                 if header:
                     language_header = header.group(1)
-                    pending_comment_lines.clear()
                     continue
 
             match = ENTRY_RE.match(raw_line)
@@ -167,11 +163,9 @@ class ParadoxYamlAdapter:
                 continue
 
             key = match.group("key")
-            raw_value, inline_comment = split_inline_comment(match.group("value").strip())
+            raw_value, _ = split_inline_comment(match.group("value").strip())
             value = parse_quoted_value(raw_value)
             unit_id = f"{source_id}#{line_number}:{key}"
-            leading_comment_lines = pending_comment_lines.copy()
-            pending_comment_lines.clear()
 
             project.units.append(
                 TranslationUnit(
@@ -186,19 +180,11 @@ class ParadoxYamlAdapter:
                 source_id=source_id,
                 external_id=key,
                 location=str(line_number),
-                data={
-                    "language_header": language_header,
-                    "line_number": str(line_number),
-                    "raw_line": raw_line,
-                    "raw_value": raw_value,
-                    "version": match.group("version") or "",
-                    "leading_comments": "\n".join(leading_comment_lines),
-                    "inline_comment": inline_comment,
-                },
             )
 
         if not language_header:
             source.issues.append(Issue(message="言語ヘッダが見つかりません"))
+        project.source_slot = language_header
 
         return ImportedTranslation(project=project, source_refs=source_refs)
 
@@ -216,7 +202,7 @@ class ParadoxYamlAdapter:
         from .writer import render_translation_file, save_translation_file
         if project.target_file_language not in SLOT_LANGUAGE:
             raise ValueError("出力言語スロットを選択してください。")
-        save_translation_file(path, render_translation_file(imported, project, existing, read_text=self._read_text))
+        save_translation_file(path, render_translation_file(imported, project, existing))
 
 
 def parse_quoted_value(raw_value: str) -> str:

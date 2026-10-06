@@ -1,67 +1,29 @@
+"""Generate localisation from workspace entries, without source-file IO."""
 from __future__ import annotations
 
 from pathlib import Path
-from collections.abc import Callable
 
 from autolingua2.plugins.contracts import ImportedTranslation, TranslationProject, TranslationUnit
-
-from .reader import ENTRY_RE, LANGUAGE_HEADER_RE, split_inline_comment
 
 
 def render_translation_file(
     source: ImportedTranslation,
     project: TranslationProject,
     existing: ImportedTranslation | None = None,
-    *, read_text: Callable[[Path], str],
 ) -> str:
     if len(source.project.sources) != 1 or (existing is not None and len(existing.project.sources) != 1):
-        raise ValueError("保存できるのは原文1ファイルと既存訳1ファイルの組だけです")
-    base = existing or source
-    template = read_text(Path(base.project.sources[0].id))
-    newline = "\r\n" if "\r\n" in template else "\n"
-    source_units = _units_by_key(source, project)
-    base_keys = {ref.external_id for ref in base.source_refs.values()}
-    lines: list[str] = []
-    header_written = False
-
-    for line in template.splitlines(keepends=True):
-        body = line.rstrip("\r\n")
-        ending = line[len(body) :]
-        if not header_written and LANGUAGE_HEADER_RE.match(body):
-            target_header = project.target_file_language
-            if not target_header:
-                raise ValueError("出力言語スロットを選択してください。")
-            lines.append(f"{target_header}:{ending}")
-            header_written = True
-            continue
-        match = ENTRY_RE.match(body)
-        if match is None or match.group("key") not in source_units:
-            lines.append(line)
-            continue
-
-        unit = source_units[match.group("key")]
-        if existing is None and not unit.target_text.strip():
-            lines.append(line)
-            continue
-        value = unit.target_text if existing is not None or unit.target_text.strip() else unit.source_text
-        _, inline_comment = split_inline_comment(match.group("value"))
-        if existing is not None and value == base_value_for_key(base, match.group("key")):
-            lines.append(line)
-            continue
-        prefix = body[: match.start("value")]
-        comment = f" # {inline_comment}" if inline_comment else ""
-        lines.append(f'{prefix}"{_escape_value(value)}"{comment}{ending}')
-
-    if not header_written:
-        raise ValueError("言語ヘッダが見つかりません")
-
-    for key, unit in source_units.items():
-        if key in base_keys:
-            continue
-        if lines and not lines[-1].endswith(("\r", "\n")):
-            lines.append(newline)
+        raise ValueError("出力対象は原文1ファイルと既存訳1ファイルの組にしてください。")
+    if not project.target_file_language:
+        raise ValueError("出力言語スロットを選択してください。")
+    units = _units_by_key(source, project)
+    if existing is not None:
+        previous = _units_by_key(existing, existing.project)
+        previous.update(units)
+        units = previous
+    lines = [f"{project.target_file_language}:\n"]
+    for key, unit in units.items():
         value = unit.target_text if unit.target_text.strip() else unit.source_text
-        lines.append(f' {key}: "{_escape_value(value)}"{newline}')
+        lines.append(f' {key}:0 "{_escape_value(value)}"\n')
     return "".join(lines)
 
 
@@ -79,14 +41,6 @@ def _units_by_key(source: ImportedTranslation, project: TranslationProject) -> d
             raise ValueError(f"同じキーが複数あります: {ref.external_id}")
         result[ref.external_id] = unit
     return result
-
-
-def base_value_for_key(imported: ImportedTranslation, key: str) -> str:
-    for unit in imported.project.units:
-        ref = imported.source_refs.get(unit.id)
-        if ref is not None and ref.external_id == key:
-            return unit.source_text
-    return ""
 
 
 def _escape_value(value: str) -> str:

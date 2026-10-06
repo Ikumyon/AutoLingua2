@@ -42,6 +42,8 @@ class WorkspaceService:
         self.custom_languages = load_custom_languages()
         for code, name in self.custom_languages.items():
             self.languages[code] = Language(code, name)
+        if imported.project.sources:
+            self.add(imported.project.source_language)
 
     def register(self, name: str, code: str) -> str:
         name = name.strip()
@@ -59,12 +61,14 @@ class WorkspaceService:
     def add(self, code: str) -> Workspace:
         if code not in self.languages or code in self.workspaces:
             raise ValueError("未登録または追加済みの言語です。")
-        workspace = Workspace(code, {unit.id: TranslationRecord() for unit in self.imported.project.units})
+        workspace = Workspace(code, {unit.id: TranslationRecord() for unit in self.imported.project.units},
+                              self.imported.project.source_slot)
         self.workspaces[code] = workspace
         return workspace
 
     def source_units(self) -> list[WorkspaceUnit]:
-        return [WorkspaceUnit(unit, TranslationRecord()) for unit in self.imported.project.units]
+        return [WorkspaceUnit(unit, TranslationRecord(state=unit.state))
+                for unit in self.imported.project.units]
 
     def remove(self, code: str) -> None:
         del self.workspaces[code]
@@ -77,5 +81,6 @@ class WorkspaceService:
                          state=workspace.records[unit.id].state)
                  for unit in self.imported.project.units]
         return ImportedTranslation(replace(self.imported.project, units=units,
-                                          target_language=workspace.language_code),
+                                          target_language=workspace.language_code,
+                                          target_file_language=workspace.output_slot),
                                    self.imported.source_refs)
