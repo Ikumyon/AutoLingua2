@@ -7,7 +7,7 @@ import sys
 from typing import Callable
 
 from PySide6.QtCore import QByteArray, QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QSize, Qt, QSignalBlocker, QTimer, QLocale, QItemSelection, QItemSelectionModel
-from PySide6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QPixmap, QSyntaxHighlighter
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QContextMenuEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QPixmap, QSyntaxHighlighter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -34,6 +34,8 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QSplitter,
     QStackedWidget,
+    QTabBar,
+    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QToolButton,
@@ -71,6 +73,7 @@ from autolingua2.ui.components.translation_table_delegate import (
     MultiLineTextDelegate,
     StatusComboBoxDelegate,
 )
+from autolingua2.ui.components.dock_tab_style import DockTabStyle
 from autolingua2.services.export import export_translation
 from autolingua2.ui.export_dialog import ExportDialog
 from autolingua2.services.project_archive import load_project, project_snapshot, save_project
@@ -83,6 +86,7 @@ from autolingua2.ui.dialogs.source_watch import SourceUpdateDialog
 from autolingua2.services.settings_store import (
     AiSettings,
     ColumnLayout,
+    DockTabPosition,
     WindowLayout,
     load_adapter_filter_rules,
     load_ai_settings,
@@ -172,9 +176,6 @@ class MainWindowCreationContext:
             raise ValueError(f"Unknown output slot: {slot_code}")
         self.controller.combo_target_slot.setCurrentIndex(idx)
 
-    def get_icon(self, name: str) -> QIcon:
-        return self.controller.icon_manager.get_icon(name)
-
     def cancel_operation(self) -> None:
         if not self.active:
             return
@@ -188,7 +189,7 @@ class MainWindowCreationContext:
             cancel_operation=self.cancel_operation, add_target_path=self.add_target_path,
             remove_target_path=self.remove_target_path, set_project_name=self.set_project_name,
             select_game=self.select_game, set_source_language=self.set_source_language,
-            set_target_slot=self.set_target_slot, get_icon=self.get_icon,
+            set_target_slot=self.set_target_slot,
         )
 
 
@@ -272,12 +273,19 @@ class MainWindowController(QObject):
         self.source_highlighter: QSyntaxHighlighter | None = None
         self.translation_highlighter: QSyntaxHighlighter | None = None
         self.ai_client = AiNetworkClient(self.window)
+        self._dock_tab_position: DockTabPosition = "bottom"
+        self._dock_tab_vertical_text = True
+        self._dock_tab_styles: dict[QTabBar, DockTabStyle] = {}
+        self._dock_tab_refresh_timer = QTimer(self)
+        self._dock_tab_refresh_timer.setSingleShot(True)
+        self._dock_tab_refresh_timer.timeout.connect(self._refresh_dock_tab_bars)
 
         self._setup_widgets()
         self.chat_dock = AiChatDockController(
             self.window, self.provider_registry, self._chat_settings,
             self._chat_current_file, self._chat_selected_references, self._chat_select_units,
             voice_input_providers=self.plugins.voice_inputs,
+            get_icon=self.icon_manager.get_icon, chat_icon=self._chat_icon,
         )
         self.chat_dock.send_button.setIcon(self.icon_manager.get_icon("send-24"))
         self.chat_dock.voice_button.setIcon(self.icon_manager.get_icon("microphone"))
@@ -304,6 +312,15 @@ class MainWindowController(QObject):
         self.window.show()
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if watched is self.window and event.type() in (
+            QEvent.Type.ChildAdded, QEvent.Type.LayoutRequest, QEvent.Type.Show,
+        ):
+            self._dock_tab_refresh_timer.start(0)
+        if isinstance(watched, QTabBar) and watched in self._dock_tab_styles:
+            if isinstance(event, QContextMenuEvent) and watched.tabAt(event.pos()) >= 0:
+                self._show_dock_tab_menu(event.globalPos())
+                event.accept()
+                return True
         if watched is self.window and isinstance(event, QCloseEvent):
             if self.io_worker is not None:
                 event.ignore()
@@ -659,7 +676,7 @@ class MainWindowController(QObject):
 
         self.action_settings.triggered.connect(self.open_settings)
         self.check_project_notification.toggled.connect(self._toggle_project_notification)
-        self.button_project_notification_settings.clicked.connect(lambda: self.open_settings("file"))
+        self.button_project_notification_settings.clicked.connect(lambda: self.open_settings("source_watch"))
         self.combo_ai_provider.currentIndexChanged.connect(self._on_ai_provider_changed)
         self.combo_ai_model.currentIndexChanged.connect(self._on_ai_model_changed)
         self.combo_glossary.currentIndexChanged.connect(self._on_glossary_changed)
@@ -1066,7 +1083,7 @@ class MainWindowController(QObject):
         controller.watch_page.update_requested.connect(self.request_source_update)
         if initial_category is not None:
             controller.select_category(initial_category)
-            if initial_category == "file" and self.project.source_root:
+            if initial_category == "source_watch" and self.project.source_root:
                 controller.watch_page.select_project(str(Path(self.project.source_root).resolve()))
         if controller.exec() == QDialog.DialogCode.Accepted:
             self.ai_models = controller.ai_models
@@ -1078,7 +1095,7 @@ class MainWindowController(QObject):
             self._save_ai_choice()
             _, icon_theme = load_theme_settings()
             self.icon_manager.set_current_iconset(icon_theme)
-            self.chat_dock.voice_button.setIcon(self.icon_manager.get_icon("microphone"))
+            self.chat_dock.refresh_icons()
             self.chat_dock.refresh_voice_input()
             if self.active_creation_panel:
                 from PySide6.QtCore import QCoreApplication
@@ -1603,6 +1620,8 @@ class MainWindowController(QObject):
         if layout.state:
             self.window.restoreState(QByteArray.fromHex(layout.state.encode("ascii")))
             self.chat_dock.restore_visibility()
+        self._dock_tab_vertical_text = layout.dock_tab_vertical_text
+        self._set_dock_tab_position(layout.dock_tab_position)
         if layout.splitter_main:
             self.splitter_main.restoreState(QByteArray.fromHex(layout.splitter_main.encode("ascii")))
         if layout.splitter_focus:
@@ -1630,7 +1649,81 @@ class MainWindowController(QObject):
             splitter_focus=sp_focus,
             sidebar_visible=self._focus_sidebar_visible,
             ai_panel_visible=self._ai_dock_workspace_visible,
+            dock_tab_position=self._dock_tab_position,
+            dock_tab_vertical_text=self._dock_tab_vertical_text,
         ))
+
+    def _set_dock_tab_position(
+        self, position: DockTabPosition, vertical_text: bool | None = None,
+    ) -> None:
+        self._dock_tab_position = position
+        if vertical_text is not None:
+            self._dock_tab_vertical_text = vertical_text
+        self.window.setDockOptions(
+            self.window.dockOptions() & ~QMainWindow.DockOption.VerticalTabs
+        )
+        positions = {
+            "top": QTabWidget.TabPosition.North,
+            "bottom": QTabWidget.TabPosition.South,
+            "left": QTabWidget.TabPosition.West,
+            "right": QTabWidget.TabPosition.East,
+        }
+        self.window.setTabPosition(Qt.DockWidgetArea.AllDockWidgetAreas, positions[position])
+        self._refresh_dock_tab_bars()
+
+    def _refresh_dock_tab_bars(self) -> None:
+        horizontal = not self._dock_tab_vertical_text
+        # QMainWindow owns dock tab bars directly; nested page tabs are excluded.
+        for bar in self.window.findChildren(
+            QTabBar, "", Qt.FindChildOption.FindDirectChildrenOnly,
+        ):
+            style = self._dock_tab_styles.get(bar)
+            if style is None:
+                style = DockTabStyle(bar, horizontal)
+                self._dock_tab_styles[bar] = style
+                bar.destroyed.connect(lambda _object=None, tab=bar: self._dock_tab_styles.pop(tab, None))
+                bar.setStyle(style)
+                bar.installEventFilter(self)
+            elif style.horizontal_text != horizontal:
+                style.horizontal_text = horizontal
+                # StyleChange invalidates QTabBar's cached tab sizes.
+                QApplication.sendEvent(bar, QEvent(QEvent.Type.StyleChange))
+                bar.updateGeometry()
+                bar.update()
+
+    def _show_dock_tab_menu(self, global_pos: QPoint) -> None:
+        menu = QMenu(self.window)
+        group = QActionGroup(menu)
+        group.setExclusive(True)
+        choices: dict[QAction, tuple[DockTabPosition, bool | None]] = {}
+        top_bottom: tuple[tuple[DockTabPosition, str], ...] = (
+            ("top", tr("MainWindow", "上")), ("bottom", tr("MainWindow", "下")),
+        )
+        sides: tuple[tuple[DockTabPosition, str], ...] = (
+            ("left", tr("MainWindow", "左")), ("right", tr("MainWindow", "右")),
+        )
+        directions = ((True, tr("MainWindow", "縦表示")), (False, tr("MainWindow", "横表示")))
+        for position, label in top_bottom:
+            action = menu.addAction(label)
+            action.setCheckable(True)
+            action.setChecked(self._dock_tab_position == position)
+            group.addAction(action)
+            choices[action] = (position, None)
+        for position, label in sides:
+            side_menu = menu.addMenu(label)
+            for vertical, text in directions:
+                action = side_menu.addAction(text)
+                action.setCheckable(True)
+                action.setChecked(
+                    self._dock_tab_position == position and self._dock_tab_vertical_text == vertical
+                )
+                group.addAction(action)
+                choices[action] = (position, vertical)
+        selected = menu.exec(global_pos)
+        if selected is not None and selected in choices:
+            position, vertical = choices[selected]
+            self._set_dock_tab_position(position, vertical)
+        menu.deleteLater()
 
     def _on_action_toggle_ai_panel_triggered(self, checked: bool) -> None:
         if self.stack_main.currentIndex() != 0:
@@ -2018,10 +2111,19 @@ class MainWindowController(QObject):
         self.action_open_color_settings.setText(presentation.settings_label if presentation is not None else "")
 
     def _on_plugin_display_changed(self, plugin_id: str) -> None:
+        self.chat_dock.refresh_icons(plugin_id)
         if plugin_id == self.project.adapter_id:
             self._configure_text_presentation()
             self.refresh_focus()
             self.refresh_table()
+
+    def _chat_icon(self, provider_id: str) -> QIcon:
+        contribution = self.plugins.ui_contributions.get(provider_id)
+        if contribution is not None and contribution.chat_icon is not None:
+            icon = contribution.chat_icon()
+            if not icon.isNull():
+                return icon
+        return self.icon_manager.get_icon("robot-head")
 
     def _open_game_color_settings(self) -> None:
         presentation = self._text_presentation

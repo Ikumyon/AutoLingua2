@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from html import escape
 
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSize, Qt, QTimer, Slot
-from PySide6.QtGui import QAction, QActionGroup, QInputMethodEvent, QKeyEvent, QTextCursor
+from PySide6.QtGui import QAction, QActionGroup, QIcon, QInputMethodEvent, QKeyEvent, QPainter, QPaintEvent, QPalette
 from PySide6.QtWidgets import (
-    QComboBox, QDockWidget, QLabel, QMainWindow, QMenu, QPlainTextEdit,
-    QPushButton, QTextBrowser,
+    QApplication, QComboBox, QDockWidget, QHBoxLayout, QLabel, QMainWindow, QMenu, QPlainTextEdit,
+    QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from autolingua2.services.ai_chat import AiChatSession, ChatFile, ChatReference
@@ -21,6 +20,15 @@ from autolingua2.ui.dialogs.base import SimpleDialogController, require_child
 from autolingua2.ui.i18n import tr
 
 
+class ChatUserMessage(QWidget):
+    def paintEvent(self, event: QPaintEvent) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self.palette().brush(QPalette.ColorRole.AlternateBase))
+        painter.drawRoundedRect(self.rect(), 14, 14)
+
+
 class AiChatDockController(QObject):
     def __init__(
         self, window: QMainWindow, registry: ProviderRegistry, settings: Callable[[], AiSettings],
@@ -28,6 +36,8 @@ class AiChatDockController(QObject):
         selected_references: Callable[[], tuple[ChatReference, ...]],
         select_units: Callable[[list[str]], None],
         *, voice_input_providers: Mapping[str, VoiceInputProvider],
+        get_icon: Callable[[str], QIcon],
+        chat_icon: Callable[[str], QIcon],
     ) -> None:
         super().__init__(window)
         self.window = window
@@ -35,11 +45,23 @@ class AiChatDockController(QObject):
         self.settings = settings
         self.selected_references = selected_references
         self.select_units = select_units
+        self._get_icon = get_icon
+        self._chat_icon = chat_icon
+        self._answer_icons: list[tuple[str, QLabel, QPushButton]] = []
         self.session = AiChatSession(current_file, self)
         self.voice_input = VoiceInputService(voice_input_providers, self)
         self.dock = require_child(window, QDockWidget, "dockAiChat")
         self.action = require_child(window, QAction, "actionToggleAiChat")
-        self.history = require_child(window, QTextBrowser, "browserChatHistory")
+        self.history = require_child(window, QScrollArea, "scrollChatHistory")
+        self.history_content = QWidget()
+        self.history_content.setAutoFillBackground(True)
+        self.history_content.setBackgroundRole(QPalette.ColorRole.Base)
+        self.history_layout = QVBoxLayout(self.history_content)
+        self.history_layout.setContentsMargins(8, 8, 8, 8)
+        self.history_layout.setSpacing(24)
+        self.history_layout.addStretch()
+        self.history.setWidget(self.history_content)
+        self.history.verticalScrollBar().rangeChanged.connect(self._scroll_to_end)
         self.input = require_child(window, QPlainTextEdit, "editChatMessage")
         self._ime_placeholder: str | None = None
         self.model_button = require_child(window, ComboMenuButton, "buttonChatModel")
@@ -249,19 +271,84 @@ class AiChatDockController(QObject):
         self._update_input_controls()
 
     def _append(self, role: str, text: str) -> None:
-        labels = {"user": tr("AiChat", "あなた"), "assistant": tr("AiChat", "AI"),
-                  "operation": tr("AiChat", "操作"), "error": tr("AiChat", "エラー")}
-        label = labels.get(role, role)
+        message = ChatUserMessage() if role == "user" else QWidget()
+        layout = QVBoxLayout(message)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(10)
+        provider_id: str | None = None
+        icon_label: QLabel | None = None
         if role == "assistant":
             if self._choice is not None:
-                provider_name, model_name = self._choices[self._choice]
-                label += f" · {provider_name} / {model_name}"
-        cursor = self.history.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        cursor.insertHtml(f"<p><b>{escape(label)}</b><br>{escape(text).replace(chr(10), '<br>')}</p>")
-        cursor.insertBlock()
-        self.history.setTextCursor(cursor)
-        self.history.ensureCursorVisible()
+                provider_id = self._choice[0]
+                _, model_name = self._choices[self._choice]
+                header = QHBoxLayout()
+                icon_label = QLabel(message)
+                icon_label.setFixedSize(20, 20)
+                icon_label.setPixmap(self._chat_icon(provider_id).pixmap(QSize(20, 20)))
+                header.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
+                model = self._text_label(model_name, message)
+                font = model.font()
+                font.setPointSizeF(max(1.0, font.pointSizeF() - 1.0))
+                model.setFont(font)
+                header.addWidget(model, 1)
+                layout.addLayout(header)
+        elif role != "user":
+            label = tr("AiChat", "エラー") if role == "error" else tr("AiChat", "操作")
+            layout.addWidget(self._text_label(label, message))
+        layout.addWidget(self._text_label(text, message))
+        if role == "assistant":
+            actions = QHBoxLayout()
+            actions.addStretch()
+            copy_button = QPushButton(message)
+            copy_button.setFlat(True)
+            copy_button.setFixedSize(28, 28)
+            copy_button.setIcon(self._get_icon("copy"))
+            copy_label = tr("AiChat", "回答をコピー")
+            copy_button.setToolTip(copy_label)
+            copy_button.setAccessibleName(copy_label)
+            copy_timer = QTimer(copy_button)
+            copy_timer.setSingleShot(True)
+            copy_timer.setInterval(1500)
+            copy_timer.timeout.connect(lambda: self._reset_copy_button(copy_button))
+            copy_button.clicked.connect(lambda: self._copy_answer(text, copy_button, copy_timer))
+            actions.addWidget(copy_button)
+            layout.addLayout(actions)
+            if provider_id is not None and icon_label is not None:
+                self._answer_icons.append((provider_id, icon_label, copy_button))
+        self.history_layout.insertWidget(self.history_layout.count() - 1, message)
+
+    @staticmethod
+    def _text_label(text: str, parent: QWidget) -> QLabel:
+        label = QLabel(text, parent)
+        label.setTextFormat(Qt.TextFormat.PlainText)
+        label.setWordWrap(True)
+        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        return label
+
+    def _copy_answer(self, text: str, button: QPushButton, timer: QTimer) -> None:
+        clipboard = QApplication.clipboard()
+        if clipboard is None:
+            raise RuntimeError("Clipboard is unavailable")
+        clipboard.setText(text)
+        button.setProperty("answerCopied", True)
+        button.setIcon(self._get_icon("check"))
+        timer.start()
+
+    def _reset_copy_button(self, button: QPushButton) -> None:
+        button.setProperty("answerCopied", False)
+        button.setIcon(self._get_icon("copy"))
+
+    def _scroll_to_end(self, minimum: int, maximum: int) -> None:
+        self.history.verticalScrollBar().setValue(maximum)
+
+    def refresh_icons(self, provider_id: str | None = None) -> None:
+        for answer_provider, label, button in self._answer_icons:
+            if provider_id is None or provider_id == answer_provider:
+                label.setPixmap(self._chat_icon(answer_provider).pixmap(QSize(20, 20)))
+            button.setIcon(self._get_icon("check" if button.property("answerCopied") is True else "copy"))
+        self.send_button.setIcon(self._get_icon("send-24"))
+        self.voice_button.setIcon(self._get_icon("microphone"))
 
     def _add_references(self) -> None:
         references = self.selected_references()
@@ -292,7 +379,16 @@ class AiChatDockController(QObject):
     def reset(self) -> None:
         self.voice_input.cancel()
         self.session.reset()
-        self.history.clear()
+        self._answer_icons.clear()
+        while self.history_layout.count() > 1:
+            item = self.history_layout.takeAt(0)
+            if item is None:
+                raise RuntimeError("Missing chat layout item")
+            widget = item.widget()
+            if widget is None:
+                raise RuntimeError("Missing chat message widget")
+            widget.hide()
+            widget.deleteLater()
         self.input.clear()
 
     def context_changed(self) -> None:

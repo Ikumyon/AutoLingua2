@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 import sys
 from types import MappingProxyType, ModuleType
+from PySide6.QtGui import QIcon
 
 from autolingua2.adapters.executable import ExecutableAdapter
 from autolingua2.adapters.validation import validate_adapter
@@ -69,8 +70,9 @@ def _python_entry(config: dict[str, object], root: Path, context: PluginContext)
 
 class PluginManager:
     """Host-side composition root, never passed to plugins or lower-layer services."""
-    def __init__(self, language: str) -> None:
+    def __init__(self, language: str, get_icon: Callable[[str], QIcon]) -> None:
         self._language = language
+        self._get_icon = get_icon
         self._contexts: dict[str, PluginContext] = {}
         self._parsers: dict[str, FileAdapter] = {}
         self._exporters: dict[str, TranslationExporter] = {}
@@ -159,7 +161,8 @@ class PluginManager:
         logger.error("Plugin failure: %s", message)
 
     def _load(self, plugin_id: str, entry: Callable[[PluginContext], None]) -> bool:
-        context = PluginContext(plugin_id, self._language, self._notify_display_changed)
+        context = PluginContext(plugin_id, self._language, self._notify_display_changed,
+                                get_icon=self._get_icon)
         try:
             if self._closed:
                 raise RuntimeError("Plugin manager is closed")
@@ -212,6 +215,8 @@ class PluginManager:
                     raise ValueError("Invalid UI extension contract")
                 ui_contribution = ui
                 creation_adapter = ui.creation_panel
+                if ui.chat_icon is not None and not callable(ui.chat_icon):
+                    raise ValueError("Invalid chat icon provider")
                 if ui.highlighter_factory is not None and not callable(ui.highlighter_factory):
                     raise ValueError("Invalid highlighter factory")
                 if ui.text_presentation is not None and not callable(ui.text_presentation):

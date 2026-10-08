@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
-from PySide6.QtGui import QSyntaxHighlighter, QTextDocument
+from PySide6.QtGui import QIcon, QSyntaxHighlighter, QTextDocument
 from PySide6.QtWidgets import QWidget
 
 from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter, ImportedTranslation, VoiceInputProvider
@@ -98,6 +98,7 @@ class UIContribution:
     """プラグインが4F（UI層）に提供する拡張機能コンテナ。"""
 
     creation_panel: CreationAdapter | None = None
+    chat_icon: Callable[[], QIcon] | None = None
     settings_pages: list[SettingsPageProvider] = field(default_factory=list)
     text_presentation: Callable[[str], GameTextPresentation | None] | None = None
     highlighter_factory: HighlighterFactory | None = None
@@ -130,8 +131,10 @@ class PluginContribution:
 class PluginContext:
     """The only host API supplied to a plugin, retained for its entire lifetime."""
     def __init__(self, plugin_id: str, language: str,
-                 display_changed: Callable[[str], None] | None = None) -> None:
+                 display_changed: Callable[[str], None] | None = None,
+                 *, get_icon: Callable[[str], QIcon]) -> None:
         self.id = plugin_id
+        self._get_icon = get_icon
         self._language = language
         self.files = FileAccess(read_text_auto)
         self.settings = PluginSettings(self._load_settings, self._save_settings)
@@ -145,6 +148,12 @@ class PluginContext:
         self._creation: CreationContext | None = None
         self._language_callbacks: list[Callable[[str], None]] = []
         self._close_callbacks: list[Callable[[], None]] = []
+
+    def get_icon(self, name: str, /) -> QIcon:
+        """Obtain a host icon for any plugin UI using the current icon set."""
+        if self._closed:
+            raise RuntimeError("Plugin context is closed")
+        return self._get_icon(name)
 
     def _system_voice_input_available(self) -> bool:
         if self._closed:

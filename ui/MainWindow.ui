@@ -1563,18 +1563,18 @@ QToolButton#buttonSaveSplit::menu-arrow {
       </layout>
      </item>
      <item>
-      <widget class="QTextBrowser" name="browserChatHistory">
+      <widget class="QScrollArea" name="scrollChatHistory">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Ignored" vsizetype="Expanding">
          <horstretch>0</horstretch>
          <verstretch>1</verstretch>
         </sizepolicy>
        </property>
-       <property name="placeholderText">
-        <string>翻訳の相談や、現在のファイルの文章の検索・選択を依頼できます。</string>
+       <property name="widgetResizable">
+        <bool>true</bool>
        </property>
-       <property name="openLinks">
-        <bool>false</bool>
+       <property name="horizontalScrollBarPolicy">
+        <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
        </property>
       </widget>
      </item>

@@ -89,20 +89,20 @@ class ParadoxCreationPanel(QWidget):
 
         # .modから自動入力
         self.btn_import_mod = QPushButton(tr("ParadoxPlugin", ".modから自動入力..."), self)
-        self.btn_import_mod.setIcon(self.context.creation.get_icon("file"))
+        self.btn_import_mod.setIcon(self.context.get_icon("file"))
         self.btn_import_mod.setToolTip(tr("ParadoxPlugin", "ParadoxゲームのMOD定義ファイル（.mod / descriptor.mod）から自動設定"))
         self.btn_import_mod.clicked.connect(self._browse_mod_file)
         btn_layout.addWidget(self.btn_import_mod)
 
         # フォルダ追加
         self.btn_browse_folder = QPushButton(tr("ParadoxPlugin", "フォルダ追加"), self)
-        self.btn_browse_folder.setIcon(self.context.creation.get_icon("folder"))
+        self.btn_browse_folder.setIcon(self.context.get_icon("folder"))
         self.btn_browse_folder.clicked.connect(self._browse_folder)
         btn_layout.addWidget(self.btn_browse_folder)
 
         # ファイル追加
         self.btn_browse_file = QPushButton(tr("ParadoxPlugin", "ファイル追加"), self)
-        self.btn_browse_file.setIcon(self.context.creation.get_icon("file"))
+        self.btn_browse_file.setIcon(self.context.get_icon("file"))
         self.btn_browse_file.clicked.connect(self._browse_file)
         btn_layout.addWidget(self.btn_browse_file)
 
@@ -117,9 +117,9 @@ class ParadoxCreationPanel(QWidget):
         self.btn_import_mod.setToolTip(tr("ParadoxPlugin", "ParadoxゲームのMOD定義ファイル（.mod / descriptor.mod）から自動設定"))
         self.btn_browse_folder.setText(tr("ParadoxPlugin", "フォルダ追加"))
         self.btn_browse_file.setText(tr("ParadoxPlugin", "ファイル追加"))
-        self.btn_import_mod.setIcon(self.context.creation.get_icon("file"))
-        self.btn_browse_folder.setIcon(self.context.creation.get_icon("folder"))
-        self.btn_browse_file.setIcon(self.context.creation.get_icon("file"))
+        self.btn_import_mod.setIcon(self.context.get_icon("file"))
+        self.btn_browse_folder.setIcon(self.context.get_icon("folder"))
+        self.btn_browse_file.setIcon(self.context.get_icon("file"))
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.Type.LanguageChange:

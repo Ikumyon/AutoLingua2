@@ -5,7 +5,6 @@ from typing import Protocol, TYPE_CHECKING, runtime_checkable
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QWidget
 
 if TYPE_CHECKING:
@@ -34,10 +33,6 @@ class CreationContext(Protocol):
     def set_target_slot(self, slot_code: str, /) -> None:
         ...
 
-    def get_icon(self, name: str, /) -> QIcon:
-        ...
-
-
 class CreationActions:
     """Only supported actions, never the host window or its controller."""
 
@@ -50,7 +45,6 @@ class CreationActions:
         select_game: Callable[[str], None],
         set_source_language: Callable[[str], None],
         set_target_slot: Callable[[str], None],
-        get_icon: Callable[[str], QIcon],
     ) -> None:
         self._cancel_operation = cancel_operation
         self._add_target_path = add_target_path
@@ -59,7 +53,6 @@ class CreationActions:
         self._select_game = select_game
         self._set_source_language = set_source_language
         self._set_target_slot = set_target_slot
-        self._get_icon = get_icon
 
     def cancel_operation(self) -> None:
         self._cancel_operation()
@@ -81,10 +74,6 @@ class CreationActions:
 
     def set_target_slot(self, slot_code: str, /) -> None:
         self._set_target_slot(slot_code)
-
-    def get_icon(self, name: str, /) -> QIcon:
-        return self._get_icon(name)
-
 
 @runtime_checkable
 class CreationAdapter(Protocol):

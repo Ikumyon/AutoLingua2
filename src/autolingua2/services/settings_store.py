@@ -5,7 +5,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from dataclasses import asdict
 from PySide6.QtCore import QIODevice, QSaveFile
 from autolingua2.ir.source_watch import WatchSettings, WatchTarget
@@ -45,6 +45,9 @@ KEY_SPLITTER_MAIN = "splitter_main"
 KEY_SPLITTER_FOCUS = "splitter_focus"
 KEY_SIDEBAR_VISIBLE = "sidebar_visible"
 KEY_AI_PANEL_VISIBLE = "ai_panel_visible"
+KEY_DOCK_TAB_POSITION = "dock_tab_position"
+KEY_DOCK_TAB_VERTICAL_TEXT = "dock_tab_vertical_text"
+DockTabPosition = Literal["top", "bottom", "left", "right"]
 SETTINGS_ENV_VAR = "AUTOLINGUA_SETTINGS_PATH"
 SETTINGS_FILE_NAME = "settings.json"
 
@@ -250,6 +253,8 @@ class WindowLayout:
     splitter_focus: str = ""
     sidebar_visible: bool = True
     ai_panel_visible: bool = True
+    dock_tab_position: DockTabPosition = "bottom"
+    dock_tab_vertical_text: bool = True
 
 
 def load_window_layout() -> WindowLayout:
@@ -257,6 +262,14 @@ def load_window_layout() -> WindowLayout:
     ui_settings = settings.get(GROUP_UI, {})
     if not isinstance(ui_settings, dict):
         return WindowLayout()
+    position = ui_settings.get(KEY_DOCK_TAB_POSITION)
+    tab_position: DockTabPosition = "bottom"
+    if position == "top":
+        tab_position = "top"
+    elif position == "left":
+        tab_position = "left"
+    elif position == "right":
+        tab_position = "right"
     return WindowLayout(
         geometry=str(ui_settings.get(KEY_WINDOW_GEOMETRY) or ""),
         state=str(ui_settings.get(KEY_WINDOW_STATE) or ""),
@@ -264,6 +277,8 @@ def load_window_layout() -> WindowLayout:
         splitter_focus=str(ui_settings.get(KEY_SPLITTER_FOCUS) or ""),
         sidebar_visible=bool(ui_settings.get(KEY_SIDEBAR_VISIBLE, True)),
         ai_panel_visible=bool(ui_settings.get(KEY_AI_PANEL_VISIBLE, True)),
+        dock_tab_position=tab_position,
+        dock_tab_vertical_text=bool(ui_settings.get(KEY_DOCK_TAB_VERTICAL_TEXT, True)),
     )
 
 
@@ -278,6 +293,8 @@ def save_window_layout(layout: WindowLayout) -> None:
     ui_settings[KEY_SPLITTER_FOCUS] = layout.splitter_focus
     ui_settings[KEY_SIDEBAR_VISIBLE] = layout.sidebar_visible
     ui_settings[KEY_AI_PANEL_VISIBLE] = layout.ai_panel_visible
+    ui_settings[KEY_DOCK_TAB_POSITION] = layout.dock_tab_position
+    ui_settings[KEY_DOCK_TAB_VERTICAL_TEXT] = layout.dock_tab_vertical_text
     settings[GROUP_UI] = ui_settings
     _write_settings_file(settings)
 

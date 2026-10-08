@@ -12,13 +12,49 @@
   </property>
   <layout class="QFormLayout" name="formDisplay">
    <item row="0" column="0">
+    <widget class="QLabel" name="labelTheme">
+     <property name="text"><string>テーマ</string></property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QListWidget" name="listThemes">
+     <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+     <property name="minimumSize"><size><width>0</width><height>140</height></size></property>
+     <property name="maximumSize"><size><width>16777215</width><height>160</height></size></property>
+     <property name="movement"><enum>QListView::Movement::Static</enum></property>
+     <property name="flow"><enum>QListView::Flow::LeftToRight</enum></property>
+     <property name="viewMode"><enum>QListView::ViewMode::IconMode</enum></property>
+     <property name="iconSize"><size><width>120</width><height>75</height></size></property>
+     <property name="spacing"><number>10</number></property>
+     <property name="selectionMode"><enum>QAbstractItemView::SelectionMode::SingleSelection</enum></property>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="labelIconTheme">
+     <property name="text"><string>アイコンセット</string></property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QListWidget" name="listIconThemes">
+     <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+     <property name="minimumSize"><size><width>0</width><height>140</height></size></property>
+     <property name="maximumSize"><size><width>16777215</width><height>160</height></size></property>
+     <property name="movement"><enum>QListView::Movement::Static</enum></property>
+     <property name="flow"><enum>QListView::Flow::LeftToRight</enum></property>
+     <property name="viewMode"><enum>QListView::ViewMode::IconMode</enum></property>
+     <property name="iconSize"><size><width>120</width><height>75</height></size></property>
+     <property name="spacing"><number>10</number></property>
+     <property name="selectionMode"><enum>QAbstractItemView::SelectionMode::SingleSelection</enum></property>
+    </widget>
+   </item>
+   <item row="2" column="0">
     <widget class="QLabel" name="labelFontSize">
      <property name="text">
       <string>文字サイズ</string>
      </property>
     </widget>
    </item>
-   <item row="0" column="1">
+   <item row="2" column="1">
     <widget class="QSpinBox" name="spinFontSize">
      <property name="minimum">
       <number>8</number>
@@ -31,7 +67,7 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="1">
+   <item row="3" column="1">
     <widget class="QCheckBox" name="checkWrapTable">
      <property name="text">
       <string>一覧で文章を折り返す</string>

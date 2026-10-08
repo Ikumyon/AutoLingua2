@@ -19,44 +19,35 @@
      <property name="orientation">
       <enum>Qt::Orientation::Horizontal</enum>
      </property>
-     <widget class="QListWidget" name="listCategories">
+     <widget class="QTreeWidget" name="treeCategories">
       <property name="minimumSize">
        <size>
-        <width>160</width>
+        <width>230</width>
         <height>0</height>
        </size>
       </property>
-      <item>
-       <property name="text">
-        <string>一般</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>AI</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>ファイル</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>表示</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>非表示ルール</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>用語集</string>
-       </property>
-      </item>
+      <property name="headerHidden"><bool>true</bool></property>
+      <property name="styleSheet">
+       <string notr="true">QTreeWidget#treeCategories { font-size: 14px; }
+QTreeWidget#treeCategories::item { height: 36px; }</string>
+      </property>
+      <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+      <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
+      <column><property name="text"><string>設定項目</string></property></column>
      </widget>
+     <widget class="QWidget" name="widgetSettingsContent">
+      <layout class="QVBoxLayout" name="layoutSettingsContent">
+       <property name="leftMargin"><number>12</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <widget class="QLabel" name="labelCategoryTitle">
+         <property name="font"><font><pointsize>13</pointsize><bold>true</bold></font></property>
+         <property name="text"><string>アプリ</string></property>
+        </widget>
+       </item>
+       <item>
      <widget class="QStackedWidget" name="stackSettings">
       <property name="currentIndex">
        <number>0</number>
@@ -157,6 +148,45 @@
         </property>
        </layout>
       </widget>
+      <widget class="QWidget" name="pageInput">
+       <layout class="QVBoxLayout" name="layoutPageInput">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="pageTranslation">
+       <layout class="QVBoxLayout" name="layoutPageTranslation">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="pageSourceWatch">
+       <layout class="QVBoxLayout" name="layoutPageSourceWatch">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="pagePlugins">
+       <layout class="QVBoxLayout" name="layoutPagePlugins">
+        <item><widget class="QLabel" name="labelPluginSettingsHelp">
+         <property name="text"><string>左のツリーからプラグインを選択してください。</string></property>
+         <property name="wordWrap"><bool>true</bool></property>
+        </widget></item>
+        <item><spacer name="spacerPluginsBottom">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+        </spacer></item>
+       </layout>
+      </widget>
+     </widget>
+       </item>
+      </layout>
      </widget>
     </widget>
    </item>

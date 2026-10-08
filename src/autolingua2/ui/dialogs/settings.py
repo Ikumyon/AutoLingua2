@@ -27,6 +27,8 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QToolButton,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -296,6 +298,10 @@ class SettingsDialogController(SimpleDialogController):
         self._filter_configs: dict[str, AdapterFilterConfig] = {}
         self._current_adapter_id: str = ""
         self._plugin_settings_widgets: list[tuple[SettingsPageProvider, QWidget]] = []
+        self._categories = require_child(self.dialog, QTreeWidget, "treeCategories")
+        self._stack = require_child(self.dialog, QStackedWidget, "stackSettings")
+        self._category_title = require_child(self.dialog, QLabel, "labelCategoryTitle")
+        self._category_items: dict[str, QTreeWidgetItem] = {}
 
         self.ai_client = AiNetworkClient(self.dialog)
         self.ai_client.model_validated.connect(self._on_model_validated)
@@ -311,7 +317,7 @@ class SettingsDialogController(SimpleDialogController):
             glossary_id, glossary_source_language, glossary_target_language,
         )
         settings_splitter = require_child(self.dialog, QSplitter, "splitterSettings")
-        settings_splitter.setSizes([160, 760])
+        settings_splitter.setSizes([230, 690])
         settings_splitter.setStretchFactor(0, 0)
         settings_splitter.setStretchFactor(1, 1)
         self._mount_plugin_settings_pages()
@@ -330,49 +336,64 @@ class SettingsDialogController(SimpleDialogController):
 
     def _mount_pages(self) -> None:
         pages = [
-            ("pageGeneral", "dialogs/settings/GeneralPage.ui"),
-            ("pageAI", "dialogs/settings/AiPage.ui"),
-            ("pageFile", "dialogs/settings/FilePage.ui"),
-            ("pageDisplay", "dialogs/settings/DisplayPage.ui"),
-            ("pageFilterRules", "dialogs/settings/FilterRulesPage.ui"),
-            ("pageGlossary", "dialogs/settings/GlossaryPage.ui"),
+            ("application", "アプリ", "pageGeneral", "GeneralPage.ui", ""),
+            ("appearance", "外観", "pageDisplay", "DisplayPage.ui", "application"),
+            ("input", "入力", "pageInput", "InputPage.ui", "application"),
+            ("translation", "翻訳", "pageTranslation", "TranslationPage.ui", ""),
+            ("ai", "AI", "pageAI", "AiPage.ui", "translation"),
+            ("glossary", "用語集", "pageGlossary", "GlossaryPage.ui", "translation"),
+            ("filter_rules", "非表示ルール", "pageFilterRules", "FilterRulesPage.ui", "translation"),
+            ("file", "ファイル", "pageFile", "FilePage.ui", ""),
+            ("source_watch", "翻訳元フォルダ監視", "pageSourceWatch", "SourceWatchPage.ui", "file"),
         ]
-        for page_name, ui_name in pages:
+        for target, title, page_name, ui_name, parent_id in pages:
             container = require_child(self.dialog, QWidget, page_name)
             layout = container.layout()
-            sub_widget = load_ui(ui_name, container)
-            if layout is not None:
-                layout.addWidget(sub_widget)
+            if layout is None:
+                raise RuntimeError(f"設定ページのレイアウトがありません: {page_name}")
+            sub_widget = load_ui(f"dialogs/settings/{ui_name}", container)
+            layout.addWidget(sub_widget)
+            parent = self._category_items[parent_id] if parent_id else None
+            self._add_category(target, tr("SettingsDialog", title), container, parent)
+
+        self._add_category(
+            "plugins", tr("SettingsDialog", "プラグイン"),
+            require_child(self.dialog, QWidget, "pagePlugins"),
+        )
+
+    def _add_category(
+        self, target: str, title: str, page: QWidget,
+        parent: QTreeWidgetItem | None = None,
+    ) -> None:
+        if target in self._category_items:
+            raise ValueError(f"設定ページIDが重複しています: {target}")
+        item = QTreeWidgetItem([title])
+        item.setData(0, Qt.ItemDataRole.UserRole, page)
+        if parent is None:
+            self._categories.addTopLevelItem(item)
+        else:
+            parent.addChild(item)
+        self._category_items[target] = item
 
     def _mount_plugin_settings_pages(self) -> None:
-        categories = require_child(self.dialog, QListWidget, "listCategories")
-        stack = require_child(self.dialog, QStackedWidget, "stackSettings")
-
         for provider in self.plugins.all_settings_pages:
-            item = QListWidgetItem(provider.title)
-            item.setData(Qt.ItemDataRole.UserRole, provider.id)
-            categories.addItem(item)
-
-            widget = provider.create_widget(stack)
-            stack.addWidget(widget)
+            widget = provider.create_widget(self._stack)
+            self._stack.addWidget(widget)
+            self._add_category(provider.id, provider.title, widget, self._category_items["plugins"])
             self._plugin_settings_widgets.append((provider, widget))
 
     def select_category(self, target: str) -> bool:
         """公開された設定ページIDに一致するカテゴリを選択。"""
-        categories = require_child(self.dialog, QListWidget, "listCategories")
-        if target == "glossary":
-            categories.setCurrentRow(5)
-            return True
-        if target == "file":
-            categories.setCurrentRow(2)
-            return True
-        for row in range(categories.count()):
-            item = categories.item(row)
-            if item is not None:
-                if item.data(Qt.ItemDataRole.UserRole) == target:
-                    categories.setCurrentRow(row)
-                    return True
-        return False
+        item = self._category_items.get(target)
+        if item is None:
+            return False
+        parent = item.parent()
+        while parent is not None:
+            parent.setExpanded(True)
+            parent = parent.parent()
+        self._categories.setCurrentItem(item)
+        self._categories.scrollToItem(item)
+        return True
 
     def _setup_dialog_buttons(self) -> None:
         button_box = self.dialog.findChild(QDialogButtonBox, "buttonBox")
@@ -553,12 +574,7 @@ class SettingsDialogController(SimpleDialogController):
             )
 
     def _switch_to_ai_category(self) -> None:
-        categories = require_child(self.dialog, QListWidget, "listCategories")
-        for idx in range(categories.count()):
-            item = categories.item(idx)
-            if item is not None and "AI" in item.text():
-                categories.setCurrentRow(idx)
-                break
+        self.select_category("ai")
 
     def _on_save_attempt(self) -> None:
         self._save_current_ai_fields()
@@ -710,11 +726,20 @@ class SettingsDialogController(SimpleDialogController):
         return self._current_provider_id
 
     def _connect_category_stack(self) -> None:
-        categories = require_child(self.dialog, QListWidget, "listCategories")
-        stack = require_child(self.dialog, QStackedWidget, "stackSettings")
-        categories.currentRowChanged.connect(stack.setCurrentIndex)
-        if categories.currentRow() < 0 and categories.count() > 0:
-            categories.setCurrentRow(stack.currentIndex())
+        self._categories.currentItemChanged.connect(self._on_category_changed)
+        self._categories.expandAll()
+        self.select_category("application")
+
+    def _on_category_changed(
+        self, current: QTreeWidgetItem | None, _previous: QTreeWidgetItem | None,
+    ) -> None:
+        if current is None:
+            return
+        page = current.data(0, Qt.ItemDataRole.UserRole)
+        if not isinstance(page, QWidget):
+            raise TypeError("設定カテゴリにページが登録されていません")
+        self._stack.setCurrentWidget(page)
+        self._category_title.setText(current.text(0))
 
     def _setup_ui_language(self) -> None:
         self.combo_ui_language = require_child(self.dialog, QComboBox, "comboUiLanguage")

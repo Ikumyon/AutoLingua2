@@ -288,7 +288,7 @@ class WatchPageController(QObject):
         if card is not None:
             card.setFocus()
             from PySide6.QtWidgets import QScrollArea
-            page = require_child(self.dialog, QScrollArea, "SettingsFilePage")
+            page = require_child(self.dialog, QScrollArea, "SettingsSourceWatchPage")
             page.ensureWidgetVisible(card)
 
     def add(self) -> None:

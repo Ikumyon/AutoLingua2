@@ -22,10 +22,10 @@ class ExtensionEntrance:
     """Routes admission only; consumers call each manager's public API directly."""
 
     def __init__(self) -> None:
-        self._plugins = PluginManager(current_ui_language())
+        self._icons = IconManager()
+        self._plugins = PluginManager(current_ui_language(), self._icons.get_icon)
         self._localization = LocalizationManager()
         self._themes = ThemeManager()
-        self._icons = IconManager()
         self._errors: list[str] = []
         self._closed = False
         language_events().changed.connect(self._plugins.change_language)

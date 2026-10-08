@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SettingsTranslationPage</class>
+ <widget class="QWidget" name="SettingsTranslationPage">
+  <layout class="QFormLayout" name="formTranslation">
+   <item row="0" column="0">
+    <widget class="QLabel" name="labelConcurrency">
+     <property name="text"><string>同時リクエスト数</string></property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QSpinBox" name="spinConcurrency">
+     <property name="minimum"><number>1</number></property>
+     <property name="maximum"><number>32</number></property>
+     <property name="value"><number>4</number></property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

@@ -92,8 +92,8 @@ class CommonCreationPanel(QWidget):
         self.files.setText(tr("MainWindow", "ファイル追加"))
         self.folders.setText(tr("MainWindow", "フォルダ追加"))
         self.cancel.setText(tr("MainWindow", "キャンセル"))
-        self.files.setIcon(self.context.creation.get_icon("file"))
-        self.folders.setIcon(self.context.creation.get_icon("folder"))
+        self.files.setIcon(self.context.get_icon("file"))
+        self.folders.setIcon(self.context.get_icon("folder"))
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.Type.LanguageChange:
