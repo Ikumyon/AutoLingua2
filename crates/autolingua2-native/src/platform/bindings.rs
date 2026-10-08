@@ -39,6 +39,16 @@ pub fn configure_desktop_integration(app_id: &str) -> PyResult<()> {
 }
 
 #[pyfunction]
+pub fn system_voice_input_available() -> bool {
+    os_impl::system_voice_input_available()
+}
+
+#[pyfunction]
+pub fn start_system_voice_input() -> PyResult<()> {
+    os_impl::start_system_voice_input().map_err(PyOSError::new_err)
+}
+
+#[pyfunction]
 pub fn allocate_debug_console(py: Python<'_>) -> PyResult<(String, String)> {
     let result = os_impl::allocate_debug_console();
     #[cfg(windows)]
@@ -79,6 +89,25 @@ pub fn plugin_platform_key() -> &'static str {
 
 #[pyfunction(name = "executable_name")]
 pub fn executable_filename(name: &str) -> String { os_impl::executable_name(name) }
+
+#[pyfunction]
+pub fn qt_file_path(path: String) -> String {
+    #[cfg(windows)]
+    {
+        if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+            return format!(r"\\{}", rest);
+        }
+        if let Some(rest) = path.strip_prefix(r"\\?\") {
+            let bytes = rest.as_bytes();
+            if bytes.len() >= 3 && bytes[0].is_ascii_alphabetic()
+                && bytes[1] == b':' && bytes[2] == b'\\'
+            {
+                return rest.to_owned();
+            }
+        }
+    }
+    path
+}
 
 #[pyfunction(name = "open_folder")]
 pub fn show_folder(py: Python<'_>, path: String) -> PyResult<()> {

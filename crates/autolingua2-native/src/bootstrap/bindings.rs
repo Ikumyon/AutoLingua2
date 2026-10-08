@@ -29,6 +29,7 @@ impl CoreSession {
     }
     fn check(&self) -> PyResult<()> { self.session.check().map_err(os_error) }
     fn take_activation(&self) -> bool { self.session.take_activation() }
+    fn take_source_update(&self) -> PyResult<Option<String>> { self.session.take_source_update().map_err(os_error) }
     fn prepare_restart(&self) -> PyResult<String> { self.session.prepare_restart().map_err(os_error) }
     fn wait_restart(&self, py: Python<'_>) -> PyResult<()> {
         py.detach(|| self.session.wait_restart(Duration::from_secs(5))).map_err(os_error)

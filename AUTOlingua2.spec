@@ -18,7 +18,8 @@ a = Analysis(
     ['main.py'],
     pathex=['src', '.', 'build/native'],
     binaries=[],
-    datas=[('ui', 'ui'), ('assets/images/app.ico', 'assets/images')]
+    datas=[('ui', 'ui'), ('assets/images/app.ico', 'assets/images'),
+           ('assets/images/app.png', 'assets/images')]
           + plugin_datas,
     hiddenimports=['autolingua2_native'] + plugin_imports,
     hookspath=[],

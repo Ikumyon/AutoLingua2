@@ -63,7 +63,7 @@ class ClaudeTranslator(BaseHttpTranslator):
             "Content-Type": "application/json",
             "x-api-key": self.api_key,
             "anthropic-version": "2023-06-01",
-            "User-Agent": "AUTOlingua2/0.1.0",
+            "User-Agent": "Autolingua Desktop/0.1.0",
         }
 
     def build_payload(

@@ -13,6 +13,7 @@ struct State {
     ready: AtomicBool,
     failure: Mutex<Option<String>>,
     restart: Mutex<Option<(String, bool)>>,
+    source_updates: Mutex<std::collections::VecDeque<String>>,
 }
 
 pub struct Session {
@@ -71,6 +72,15 @@ impl Session {
                                 shared.activate.store(true, Ordering::Release);
                                 *receipt = Some(Message::Activate);
                                 connection.send(&Message::Ack).is_err()
+                            }
+                            Ok(Some(Message::SourceUpdate(project))) if receipt.is_none() => {
+                                let mut requests = shared.source_updates.lock().map_err(|_| error("Source update requests poisoned"))?;
+                                if requests.len() < 16 {
+                                    requests.push_back(project.clone());
+                                    shared.activate.store(true, Ordering::Release);
+                                    *receipt = Some(Message::SourceUpdate(project));
+                                    connection.send(&Message::Ack).is_err()
+                                } else { true }
                             }
                             Ok(Some(Message::Restart(ticket))) if receipt.is_none() => {
                                 let restart = shared.restart.lock().map_err(|_| error("Restart state poisoned"))?;
@@ -131,6 +141,11 @@ impl Session {
 
     pub fn take_activation(&self) -> bool {
         self.state.ready.load(Ordering::Acquire) && self.state.activate.swap(false, Ordering::AcqRel)
+    }
+
+    pub fn take_source_update(&self) -> io::Result<Option<String>> {
+        if !self.state.ready.load(Ordering::Acquire) { return Ok(None); }
+        Ok(self.state.source_updates.lock().map_err(|_| error("Source update requests poisoned"))?.pop_front())
     }
 
     pub fn prepare_restart(&self) -> io::Result<String> {

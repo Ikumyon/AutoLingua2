@@ -31,7 +31,6 @@ class _AddressBar(QObject):
         self._page = require_child(dialog, QWidget, "pageBreadcrumbs")
         self._input_page = require_child(dialog, QWidget, "pageLocationInput")
         self._edit = require_child(dialog, QLineEdit, "editLocation")
-        self._host = require_child(dialog, QWidget, "breadcrumbHost")
         self._layout = require_child(dialog, QHBoxLayout, "layoutBreadcrumbs")
         self._ancestors = require_child(dialog, QToolButton, "buttonAncestors")
         self._blank = require_child(dialog, QPushButton, "buttonEditLocation")
@@ -49,6 +48,7 @@ class _AddressBar(QObject):
         self._blank.clicked.connect(self._begin_edit)
         self._ancestors.clicked.connect(self._show_ancestors)
         self._model.directoryLoaded.connect(self._directory_loaded)
+        self._model.rowsInserted.connect(self._children_inserted)
         for key in ("Ctrl+L", "Alt+D"):
             shortcut = QShortcut(QKeySequence(key), dialog)
             shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
@@ -68,12 +68,12 @@ class _AddressBar(QObject):
                 widget.deleteLater()
         self._buttons.clear()
         for ancestor in [*reversed(path.parents), path]:
-            name = QToolButton(self._host)
+            name = QToolButton(self._page)
             name.setAutoRaise(True)
             name.setText(ancestor.name or str(ancestor))
             name.setToolTip(str(ancestor))
             name.clicked.connect(lambda checked=False, target=ancestor: self._navigate(target))
-            arrow = QToolButton(self._host)
+            arrow = QToolButton(self._page)
             arrow.setAutoRaise(True)
             arrow.setText("›")
             arrow.setToolTip(tr("ExportDialog", "子フォルダを表示"))
@@ -170,12 +170,15 @@ class _AddressBar(QObject):
     def _show_children(self, path: Path, button: QToolButton) -> None:
         menu = QMenu(button)
         index = self._model.index(str(path))
-        if not index.isValid() or not self._model.fileInfo(index).isReadable():
+        if not index.isValid() or not self._model.isDir(index):
             self._menu_message(menu, tr("ExportDialog", "子フォルダを取得できません。"))
         elif path in self._loaded:
             self._populate_children(path, menu)
         else:
-            self._menu_message(menu, tr("ExportDialog", "読み込み中…"))
+            if self._model.rowCount(index) > 0:
+                self._populate_children(path, menu)
+            else:
+                self._menu_message(menu, tr("ExportDialog", "読み込み中…"))
             self._pending_menu = (path, menu)
             timer = QTimer(menu)
             timer.setSingleShot(True)
@@ -192,7 +195,7 @@ class _AddressBar(QObject):
 
     def _populate_children(self, path: Path, menu: QMenu) -> None:
         index = self._model.index(str(path))
-        if not index.isValid() or not self._model.fileInfo(index).isReadable():
+        if not index.isValid() or not self._model.isDir(index):
             self._menu_message(menu, tr("ExportDialog", "子フォルダを取得できません。"))
             return
         children: list[tuple[str, Path]] = []
@@ -215,10 +218,22 @@ class _AddressBar(QObject):
             self._pending_menu = None
             self._populate_children(path, menu)
 
+    def _children_inserted(self, parent: QModelIndex, _first: int, _last: int) -> None:
+        if self._pending_menu is None:
+            return
+        path, menu = self._pending_menu
+        if parent.isValid() and Path(self._model.filePath(parent)) == path:
+            self._populate_children(path, menu)
+
     def _children_timeout(self, menu: QMenu) -> None:
         if self._pending_menu is not None and self._pending_menu[1] is menu:
+            path, _ = self._pending_menu
             self._pending_menu = None
-            self._menu_message(menu, tr("ExportDialog", "子フォルダを取得できません。"))
+            index = self._model.index(str(path))
+            if index.isValid() and self._model.rowCount(index) > 0:
+                self._populate_children(path, menu)
+            else:
+                self._menu_message(menu, tr("ExportDialog", "子フォルダを取得できません。"))
 
     def _close_children_menu(self, menu: QMenu) -> None:
         if self._pending_menu is not None and self._pending_menu[1] is menu:
@@ -291,7 +306,7 @@ class ExportDialog(SimpleDialogController):
             path = path.expanduser()
             if not path.is_absolute():
                 path = self._current / path
-            path = path.resolve()
+            path = Path(QDir.fromNativeSeparators(str(path.resolve())))
             if not path.is_dir():
                 raise ValueError(tr("ExportDialog", "フォルダがありません。"))
         except (OSError, RuntimeError, ValueError) as exc:

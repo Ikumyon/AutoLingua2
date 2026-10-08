@@ -41,7 +41,7 @@ def main() -> int:
         startup.check()
         current_platform.configure_desktop_integration("autolingua.desktop.app")
         app = QApplication(sys.argv)
-        app.setApplicationName("AutoLingua Desktop")
+        app.setApplicationName("Autolingua Desktop")
         app.setOrganizationName("AutoLingua")
         app.setDesktopFileName("autolingua-desktop")
         from PySide6.QtGui import QIcon
@@ -64,12 +64,19 @@ def main() -> int:
         window = MainWindowController(entrance, platform_driver=current_platform)
         window.show()
         is_ready = False
+        notification_project: str | None = None
+        for index, argument in enumerate(sys.argv[1:], start=1):
+            if argument == "--source-update" and index + 1 < len(sys.argv):
+                notification_project = sys.argv[index + 1]
+                break
 
         def ready() -> None:
             nonlocal is_ready
             try:
                 startup.ready()
                 is_ready = True
+                if notification_project is not None:
+                    window.request_source_update(notification_project)
             except Exception:
                 logging.getLogger(__name__).exception("Ready handshake failed")
                 app.exit(1)
@@ -77,6 +84,10 @@ def main() -> int:
         def control_tick() -> None:
             try:
                 startup.check()
+                project = startup.take_source_update()
+                if project is not None:
+                    window.request_source_update(project)
+                window.process_source_update_request()
                 if startup.take_activation():
                     if window.window.isMinimized():
                         window.window.showNormal()
@@ -111,7 +122,7 @@ def main() -> int:
             error_app = QApplication.instance()
             if error_app is None:
                 error_app = QApplication(sys.argv)
-            QMessageBox.critical(None, "AutoLingua Desktop 起動エラー", str(exc))
+            QMessageBox.critical(None, "Autolingua Desktop 起動エラー", str(exc))
         return 1
     finally:
         if entrance is not None:

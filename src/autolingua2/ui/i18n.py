@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, QLocale, QTranslator, QObject, Signal
+from PySide6.QtCore import QCoreApplication, QLibraryInfo, QLocale, QTranslator, QObject, Signal
 
 from collections.abc import Mapping
 from types import MappingProxyType
@@ -72,7 +72,7 @@ def system_language() -> str:
 
 
 class LocalizationManager:
-    """Owns only application dictionaries; plugin dictionaries remain independent."""
+    """Owns application and Qt dictionaries; plugin dictionaries remain independent."""
 
     def __init__(self) -> None:
         self._languages: dict[str, LanguageInfo] = {}
@@ -113,6 +113,15 @@ class LocalizationManager:
         self._app = app
         code = self.resolve_language(language)
         _current_language = code
+        qt_translator = QTranslator(app)
+        if qt_translator.load(
+            QLocale(code.replace("-", "_")), "qtbase", "_",
+            QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath),
+        ):
+            app.installTranslator(qt_translator)
+            self._installed.append(qt_translator)
+        else:
+            qt_translator.deleteLater()
         info = self._languages.get(code)
         if info is not None:
             for qm in info.qm_paths:

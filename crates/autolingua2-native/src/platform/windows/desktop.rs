@@ -40,3 +40,57 @@ pub fn open_folder(path: &Path) -> std::io::Result<()> {
     std::process::Command::new("explorer.exe").arg(path).spawn()?;
     Ok(())
 }
+
+#[cfg(feature = "python")]
+pub fn system_voice_input_available() -> bool {
+    true
+}
+
+#[cfg(feature = "python")]
+pub fn start_system_voice_input() -> Result<(), String> {
+    use windows_sys::Win32::System::Threading::GetCurrentProcessId;
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT,
+        KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, VK_CONTROL, VK_H, VK_LWIN,
+        VK_MENU, VK_RWIN, VK_SHIFT,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindowThreadProcessId,
+    };
+
+    // Do not send a system shortcut to another application or modify held keys.
+    let mut foreground_pid = 0;
+    unsafe {
+        GetWindowThreadProcessId(GetForegroundWindow(), &mut foreground_pid);
+        if foreground_pid != GetCurrentProcessId() {
+            return Err("Focus AUTOlingua2 before starting voice input".into());
+        }
+        for key in [VK_CONTROL, VK_MENU, VK_SHIFT, VK_LWIN, VK_RWIN, VK_H] {
+            if GetAsyncKeyState(i32::from(key)) < 0 {
+                return Err("Release keyboard keys before starting voice input".into());
+            }
+        }
+    }
+    let keyboard_input = |key, flags| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT { wVk: key, wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: 0 },
+        },
+    };
+    let inputs = [
+        keyboard_input(VK_LWIN, KEYEVENTF_EXTENDEDKEY),
+        keyboard_input(VK_H, 0),
+        keyboard_input(VK_H, KEYEVENTF_KEYUP),
+        keyboard_input(VK_LWIN, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP),
+    ];
+    let input_size = std::mem::size_of::<INPUT>() as i32;
+    let sent = unsafe { SendInput(inputs.len() as u32, inputs.as_ptr(), input_size) };
+    if sent != inputs.len() as u32 {
+        // Release any keys injected before a partial failure.
+        if sent > 0 {
+            unsafe { SendInput(2, inputs[2..].as_ptr(), input_size); }
+        }
+        return Err(format!("Could not open Windows voice input ({sent}/4 keyboard events sent)"));
+    }
+    Ok(())
+}

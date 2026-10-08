@@ -17,6 +17,10 @@ def log_directory() -> Path:
     return PROJECT_ROOT / "logs"
 
 
+def qt_file_path(path: Path) -> str:
+    return _native().qt_file_path(str(path))
+
+
 class SystemPlatformDriver:
     def __init__(self) -> None:
         self._console = ConsoleResult("unavailable")
@@ -66,6 +70,12 @@ class SystemPlatformDriver:
 
     def start_plugin(self, executable: Path, args: list[str], cwd: Path) -> PluginProcess:
         return _native().start_plugin(str(executable), args, str(cwd))
+
+    def system_voice_input_available(self) -> bool:
+        return _native().system_voice_input_available()
+
+    def start_system_voice_input(self) -> None:
+        _native().start_system_voice_input()
 
 
 current_platform: PlatformDriver = SystemPlatformDriver()

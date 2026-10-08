@@ -83,7 +83,7 @@ def project_documents(service: WorkspaceService) -> dict[str, object]:
             "output_slot": workspace.output_slot,
         }
         for source in project.sources:
-            entries: list[dict[str, str]] = []
+            entries: list[dict[str, object]] = []
             for unit in project.units:
                 ref = service.imported.source_refs.get(unit.id)
                 if ref is None:
@@ -94,7 +94,9 @@ def project_documents(service: WorkspaceService) -> dict[str, object]:
                 if entry is None:
                     raise ValueError("ワークスペースの翻訳行がありません。")
                 entries.append({"key": ref.external_id, "original": unit.source_text,
-                                "translation": entry.target_text, "state": entry.state.value})
+                                "translation": entry.target_text, "state": entry.state.value,
+                                "context": unit.context,
+                                "source_changed": entry.source_changed})
             documents[prefix + f"files/{relative_path(source.id)}.json"] = entries
     return documents
 
@@ -131,8 +133,6 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
     folders = [text(value, nonempty=True) for value in array(required(metadata, "folders"))]
     root = text(required(metadata, "source_root"), nonempty=True)
     paths = _relative_files(root, files, folders)
-    if not files:
-        raise ValueError("原文ファイルが記録されていません。")
     project = TranslationProject(
         name=text(required(metadata, "name")), adapter_id=text(required(metadata, "plugin_id"), nonempty=True),
         game_id=text(required(metadata, "game_id")), source_slot=text(required(metadata, "source_slot")),
@@ -147,7 +147,7 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
     languages: dict[str, Language] = {}
     restored: dict[str, Workspace] = {}
     refs: dict[str, SourceRef] = {}
-    originals: dict[str, dict[str, str]] = {}
+    originals: dict[str, dict[str, tuple[str, str]]] = {}
     for name in names:
         if normalize_language_code(name) != name:
             raise ValueError("ワークスペース名が不正です。")
@@ -168,23 +168,30 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
             filename = prefix + f"files/{path}.json"
             expected.add(filename)
             entries = array(required(documents, filename))
-            seen: dict[str, str] = {}
+            seen: dict[str, tuple[str, str]] = {}
             for item in entries:
                 row = record(item)
-                if set(row) != {"key", "original", "translation", "state"}:
+                if not {"key", "original", "translation", "state"} <= set(row) or not set(row) <= {
+                    "key", "original", "translation", "state", "context", "source_changed"
+                }:
                     raise ValueError("翻訳行の項目が不正です。")
                 key = text(required(row, "key"), nonempty=True)
                 if key in seen:
                     raise ValueError(f"同じファイルにキーが重複しています: {path}: {key}")
                 original = text(required(row, "original"))
-                seen[key] = original
+                context = text(row.get("context", PurePosixPath(path).name))
+                seen[key] = (original, context)
                 unit_id = f"{path}#{key}"
+                source_changed = row.get("source_changed", False)
+                if type(source_changed) is not bool:
+                    raise ValueError("原文更新状態が不正です。")
                 workspace.records[unit_id] = TranslationRecord(
                     text(required(row, "translation")), UnitState(text(required(row, "state"))),
+                    source_changed,
                 )
                 if name == names[0]:
                     project.units.append(TranslationUnit(
-                        id=unit_id, label=key, source_text=original, context=PurePosixPath(path).name,
+                        id=unit_id, label=key, source_text=original, context=context,
                     ))
                     refs[unit_id] = SourceRef(path, key)
             if name == names[0]:

@@ -24,7 +24,7 @@ from .api import (
     UIContribution,
     ExportSettingsPanel,
 )
-from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter
+from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter, VoiceInputProvider
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,7 @@ class PluginManager:
         self._exporters: dict[str, TranslationExporter] = {}
         self._export_settings: dict[str, ExportSettingsPanel] = {}
         self._providers: dict[str, AiProviderPlugin] = {}
+        self._voice_inputs: dict[str, VoiceInputProvider] = {}
         self._ui: dict[str, CreationAdapter] = {}
         self._ui_contributions: dict[str, UIContribution] = {}
         self._errors: list[str] = []
@@ -97,6 +98,10 @@ class PluginManager:
     @property
     def parsers(self) -> Mapping[str, FileAdapter]:
         return MappingProxyType(self._parsers)
+
+    @property
+    def voice_inputs(self) -> Mapping[str, VoiceInputProvider]:
+        return MappingProxyType(self._voice_inputs)
 
     @property
     def exporters(self) -> Mapping[str, TranslationExporter]:
@@ -167,7 +172,9 @@ class PluginManager:
             if contribution is None:
                 raise ValueError("Entry returned without registering a contribution")
             parser, provider, ui = contribution.parser, contribution.provider, contribution.ui
-            if parser is None and provider is None and ui is None and not contribution.exporters:
+            voice_input = contribution.voice_input
+            if (parser is None and provider is None and ui is None
+                    and voice_input is None and not contribution.exporters):
                 raise ValueError("Plugin has no capabilities")
             exporter_ids: set[str] = set()
             for exporter in contribution.exporters:
@@ -189,6 +196,15 @@ class PluginManager:
                     raise ValueError("Invalid AI provider metadata")
 
             creation_adapter: CreationAdapter | None = None
+            if voice_input is not None:
+                if not isinstance(voice_input, VoiceInputProvider) or voice_input.id != plugin_id:
+                    raise ValueError("Invalid voice input contract or ID")
+                if not isinstance(voice_input.display_name, str) or not voice_input.display_name.strip():
+                    raise ValueError("Invalid voice input display name")
+                if (voice_input.mode not in {"external", "transcription"}
+                        or not callable(voice_input.is_available) or not callable(voice_input.start)):
+                    raise ValueError("Invalid voice input mode or methods")
+
             ui_contribution: UIContribution | None = None
 
             if ui is not None:
@@ -208,6 +224,7 @@ class PluginManager:
                         raise ValueError("Invalid or duplicate settings page ID")
                     page_ids.add(page.id)
                 if (parser is None and provider is None and creation_adapter is None
+                        and voice_input is None
                         and not ui.settings_pages and ui.text_presentation is None
                         and ui.highlighter_factory is None and not contribution.exporters):
                     raise ValueError("Plugin has no capabilities")
@@ -235,6 +252,8 @@ class PluginManager:
                 self._parsers[plugin_id] = parser
             if provider is not None:
                 self._providers[plugin_id] = provider
+            if voice_input is not None:
+                self._voice_inputs[plugin_id] = voice_input
             if creation_adapter is not None:
                 self._ui[plugin_id] = creation_adapter
             if ui_contribution is not None:
@@ -274,6 +293,7 @@ class PluginManager:
         self._exporters.clear()
         self._export_settings.clear()
         self._providers.clear()
+        self._voice_inputs.clear()
         self._ui.clear()
         self._ui_contributions.clear()
         self._display_callbacks.clear()

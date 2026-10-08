@@ -26,6 +26,7 @@ target/
 logs/
 *.log
 settings.json
+settings.watch/
 test file/
 .runtime/
 

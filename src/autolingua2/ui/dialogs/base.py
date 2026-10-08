@@ -6,6 +6,7 @@ from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import QDialog, QMessageBox, QPushButton, QWidget
 
 from autolingua2.infrastructure.filesystem import UI_DIR
+from autolingua2.ui.components.combo_menu_button import ComboMenuButton
 from autolingua2.ui.i18n import tr
 
 
@@ -31,6 +32,7 @@ def load_ui(name: str, parent: QWidget | None = None) -> QWidget:
         raise RuntimeError(f"UIファイルを開けません: {path}")
     try:
         loader = QUiLoader()
+        loader.registerCustomWidget(ComboMenuButton)
         loader.setLanguageChangeEnabled(True)
         widget = loader.load(file, parent)
     finally:

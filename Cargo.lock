@@ -447,6 +447,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "autolingua-source-watcher"
+version = "0.1.0"
+dependencies = [
+ "autolingua2-native",
+]
+
+[[package]]
 name = "autolingua2-native"
 version = "0.1.0"
 dependencies = [
@@ -454,6 +461,9 @@ dependencies = [
  "encoding_rs",
  "libc",
  "pyo3",
+ "serde_json",
+ "url",
+ "windows",
  "windows-sys 0.59.0",
 ]
 

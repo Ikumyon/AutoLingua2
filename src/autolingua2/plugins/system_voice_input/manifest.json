@@ -1,0 +1,7 @@
+{
+  "id": "system_voice_input",
+  "name": "System voice input",
+  "kind": "python",
+  "entry": "entry.py",
+  "description": "Open the platform's standard voice input facility"
+}

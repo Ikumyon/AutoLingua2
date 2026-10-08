@@ -5,16 +5,33 @@ use std::io;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
-pub(super) struct Target { executable: PathBuf, args: Vec<OsString>, root: PathBuf, pub(super) development: Option<PathBuf> }
+pub(super) struct Target {
+    executable: PathBuf, args: Vec<OsString>, root: PathBuf,
+    pub(super) development: Option<PathBuf>, source_update: Option<String>,
+}
 impl Target {
     pub(super) fn resolve() -> io::Result<Self> {
         let mut args = std::env::args_os().skip(1);
         let mut forwarded = Vec::new();
         let mut development = None;
+        let mut source_update = None;
         while let Some(arg) = args.next() {
             if arg == "--development-root" {
                 if development.is_some() { return Err(error("Duplicate development root")); }
                 development = Some(PathBuf::from(args.next().ok_or_else(|| error("Missing development root"))?).canonicalize()?);
+            } else if arg.to_str().is_some_and(|value| value.starts_with("autolingua2:")) {
+                let uri = arg.to_str().ok_or_else(|| error("Invalid notification URI"))?;
+                if source_update.is_some() { return Err(error("Duplicate source update request")); }
+                let project = autolingua2_native::source_watch::notification::project_from_uri(uri)?;
+                forwarded.push(OsString::from("--source-update"));
+                forwarded.push(OsString::from(&project));
+                source_update = Some(project);
+            } else if arg == "--source-update" {
+                if source_update.is_some() { return Err(error("Duplicate source update request")); }
+                let project = args.next().ok_or_else(|| error("Missing source update project"))?;
+                source_update = Some(project.to_str().ok_or_else(|| error("Invalid project path"))?.to_string());
+                forwarded.push(arg);
+                forwarded.push(project);
             } else { forwarded.push(arg); }
         }
         let (root, executable, mut arguments) = if let Some(root) = &development {
@@ -29,7 +46,15 @@ impl Target {
         };
         if !executable.is_file() { return Err(error(format!("実行対象がありません: {}", executable.display()))); }
         arguments.extend(forwarded);
-        Ok(Self { executable, args: arguments, root, development })
+        Ok(Self { executable, args: arguments, root, development, source_update })
+    }
+
+    pub(super) fn activate(&self, context: &autolingua2_native::bootstrap::Context) -> io::Result<()> {
+        use autolingua2_native::bootstrap::{activate, Connection, Message};
+        if let Some(project) = &self.source_update {
+            Connection::connect(&context.endpoint("core"), std::time::Duration::from_secs(2))?
+                .request(&Message::SourceUpdate(project.clone()))
+        } else { activate(context) }
     }
 
     pub(super) fn spawn(&self, credential: &str) -> io::Result<Child> {

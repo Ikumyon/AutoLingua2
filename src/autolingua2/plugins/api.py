@@ -8,8 +8,9 @@ from typing import Callable, Protocol, runtime_checkable
 from PySide6.QtGui import QSyntaxHighlighter, QTextDocument
 from PySide6.QtWidgets import QWidget
 
-from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter, ImportedTranslation
+from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter, ImportedTranslation, VoiceInputProvider
 from autolingua2.infrastructure.encoding import read_text_auto
+from autolingua2.infrastructure.platform import current_platform
 from autolingua2.services.settings_store import load_plugin_settings, save_plugin_settings
 from autolingua2.ui.creation_contract import CreationAdapter, CreationContext
 
@@ -17,6 +18,7 @@ __all__ = [
     "PluginContext",
     "PluginContribution",
     "FileAccess",
+    "SystemVoiceInputAccess",
     "CreationAdapter",
     "CreationContext",
     "HighlighterFactory",
@@ -108,12 +110,21 @@ class FileAccess:
 
 
 @dataclass(frozen=True)
+class SystemVoiceInputAccess:
+    """OS-independent host entry to the platform's standard voice input."""
+
+    is_available: Callable[[], bool]
+    start: Callable[[], None]
+
+
+@dataclass(frozen=True)
 class PluginContribution:
     id: str
     parser: FileAdapter | None = None
     provider: AiProviderPlugin | None = None
     ui: UIContribution | None = None
     exporters: list[TranslationExporter] = field(default_factory=list)
+    voice_input: VoiceInputProvider | None = None
 
 
 class PluginContext:
@@ -124,6 +135,9 @@ class PluginContext:
         self._language = language
         self.files = FileAccess(read_text_auto)
         self.settings = PluginSettings(self._load_settings, self._save_settings)
+        self.system_voice_input = SystemVoiceInputAccess(
+            self._system_voice_input_available, self._start_system_voice_input,
+        )
         self._display_changed = display_changed
         self._contribution: PluginContribution | None = None
         self._accepting = True
@@ -131,6 +145,16 @@ class PluginContext:
         self._creation: CreationContext | None = None
         self._language_callbacks: list[Callable[[str], None]] = []
         self._close_callbacks: list[Callable[[], None]] = []
+
+    def _system_voice_input_available(self) -> bool:
+        if self._closed:
+            raise RuntimeError("Plugin context is closed")
+        return current_platform.system_voice_input_available()
+
+    def _start_system_voice_input(self) -> None:
+        if self._closed:
+            raise RuntimeError("Plugin context is closed")
+        current_platform.start_system_voice_input()
 
     def _load_settings(self) -> dict[str, object]:
         if self._closed:

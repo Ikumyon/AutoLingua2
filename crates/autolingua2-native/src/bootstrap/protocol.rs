@@ -16,7 +16,7 @@ pub fn valid_token(value: &str) -> bool {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
     Hello(String), Phase(Phase, String), Ready, Failed(String), Ping, Ack,
-    Activate, Restart(String), Cancel,
+    Activate, Restart(String), Cancel, SourceUpdate(String),
 }
 
 impl Message {
@@ -31,6 +31,7 @@ impl Message {
             Self::Ready => (3, ""), Self::Failed(s) => (4, s.as_str()),
             Self::Ping => (5, ""), Self::Ack => (6, ""), Self::Activate => (7, ""),
             Self::Restart(s) => (8, s.as_str()), Self::Cancel => (9, ""),
+            Self::SourceUpdate(s) => (10, s.as_str()),
         };
         let length = 2 + text.len();
         if length > MAX_FRAME { return Err(error("IPC message too large")); }
@@ -58,6 +59,7 @@ impl Message {
             6 if text.is_empty() => Ok(Self::Ack),
             7 if text.is_empty() => Ok(Self::Activate),
             9 if text.is_empty() => Ok(Self::Cancel),
+            10 if !text.is_empty() && !text.contains('\0') => Ok(Self::SourceUpdate(text.into())),
             _ => Err(error("Invalid IPC message")),
         }
     }

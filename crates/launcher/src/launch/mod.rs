@@ -19,7 +19,7 @@ pub fn run(ui: &Ui, cancel: &AtomicBool) -> io::Result<()> {
         if cancel.load(Ordering::Acquire) { return Ok(()); }
         if let Some(lock) = context.lock("startup")? { break lock; }
         if restart.is_none() && context.core_running()? {
-            return bootstrap::activate(&context).map_err(|err| error(format!("既存の本体が応答しません: {err}")));
+            return target.activate(&context).map_err(|err| error(format!("既存の本体が応答しません: {err}")));
         }
         if restart.is_some() && start.elapsed() > Duration::from_secs(4) {
             return Err(error("別の起動処理が進行中のため再起動を引き継げません。"));
@@ -40,7 +40,7 @@ pub fn run(ui: &Ui, cancel: &AtomicBool) -> io::Result<()> {
             thread::sleep(Duration::from_millis(25));
         }
     } else if context.core_running()? {
-        return bootstrap::activate(&context).map_err(|err| error(format!("既存の本体が応答しません: {err}")));
+        return target.activate(&context).map_err(|err| error(format!("既存の本体が応答しません: {err}")));
     }
     let _ = bootstrap::update_status();
     let credential = bootstrap::token()?;

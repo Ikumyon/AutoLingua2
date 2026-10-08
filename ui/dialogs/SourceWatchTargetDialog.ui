@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SourceWatchTargetDialog</class>
+ <widget class="QDialog" name="SourceWatchTargetDialog">
+  <property name="geometry"><rect><x>0</x><y>0</y><width>560</width><height>360</height></rect></property>
+  <property name="minimumSize"><size><width>440</width><height>0</height></size></property>
+  <property name="windowTitle"><string>監視対象を追加</string></property>
+  <layout class="QVBoxLayout" name="layoutSourceWatchTarget">
+   <property name="spacing"><number>12</number></property>
+   <item>
+    <layout class="QVBoxLayout" name="layoutTargetName">
+     <item>
+      <widget class="QLabel" name="labelTargetName">
+       <property name="text"><string>名前</string></property>
+       <property name="buddy"><cstring>editTargetName</cstring></property>
+      </widget>
+     </item>
+     <item><widget class="QLineEdit" name="editTargetName"/></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QVBoxLayout" name="layoutSourceRoot">
+     <item>
+      <widget class="QLabel" name="labelSourceRoot">
+       <property name="text"><string>翻訳元フォルダ</string></property>
+       <property name="buddy"><cstring>editSourceRoot</cstring></property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="layoutSourceRootInput">
+       <item><widget class="QLineEdit" name="editSourceRoot"/></item>
+       <item><widget class="QPushButton" name="buttonBrowseSourceRoot"><property name="text"><string>参照…</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item><widget class="QGroupBox" name="groupNotification"><property name="title"><string>更新通知</string></property>
+    <layout class="QVBoxLayout" name="layoutNotification">
+     <item><layout class="QHBoxLayout" name="layoutNotificationIcon">
+      <item><widget class="QLabel" name="labelNotificationIcon"><property name="minimumSize"><size><width>48</width><height>48</height></size></property><property name="maximumSize"><size><width>48</width><height>48</height></size></property><property name="text"><string/></property></widget></item>
+      <item><widget class="QPushButton" name="buttonNotificationIconChoose"><property name="text"><string>画像を変更</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+      <item><widget class="QPushButton" name="buttonNotificationIconReset"><property name="text"><string>標準に戻す</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+     </layout></item>
+     <item><widget class="QLabel" name="labelNotificationSound"><property name="text"><string>通知音：標準</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+     <item><layout class="QHBoxLayout" name="layoutNotificationSound">
+      <item><widget class="QPushButton" name="buttonNotificationSoundChoose"><property name="text"><string>音を変更</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+      <item><widget class="QPushButton" name="buttonNotificationSoundPlay"><property name="text"><string>試聴</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+      <item><widget class="QPushButton" name="buttonNotificationSoundReset"><property name="text"><string>標準に戻す</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+     </layout></item>
+    </layout>
+   </widget></item>
+   <item><spacer name="spacerTargetButtons"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint"><size><width>20</width><height>12</height></size></property></spacer></item>
+   <item>
+    <layout class="QHBoxLayout" name="layoutTargetButtons">
+     <item><spacer name="spacerTargetButtonsLeft"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QPushButton" name="buttonCancel"><property name="text"><string>キャンセル</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+     <item><widget class="QPushButton" name="buttonSubmit"><property name="text"><string>追加</string></property><property name="default"><bool>true</bool></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <tabstops>
+  <tabstop>editTargetName</tabstop>
+  <tabstop>editSourceRoot</tabstop>
+  <tabstop>buttonBrowseSourceRoot</tabstop>
+  <tabstop>buttonCancel</tabstop>
+  <tabstop>buttonSubmit</tabstop>
+ </tabstops>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>buttonCancel</sender>
+   <signal>clicked()</signal>
+   <receiver>SourceWatchTargetDialog</receiver>
+   <slot>reject()</slot>
+   <hints><hint type="sourcelabel"><x>340</x><y>190</y></hint><hint type="destinationlabel"><x>260</x><y>110</y></hint></hints>
+  </connection>
+ </connections>
+</ui>

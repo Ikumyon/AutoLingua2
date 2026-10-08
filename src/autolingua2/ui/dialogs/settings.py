@@ -257,11 +257,14 @@ from autolingua2.services.settings_store import (
     load_adapter_filter_rules,
     load_theme_settings,
     load_ui_language,
+    load_voice_input_provider,
     save_ai_settings,
     save_adapter_filter_rules,
     save_theme_settings,
     save_ui_language,
+    save_voice_input_provider,
 )
+from autolingua2.services.voice_input import voice_input_available
 from autolingua2.ui.i18n import (
     normalize_language,
     system_language,
@@ -270,6 +273,7 @@ from autolingua2.ui.i18n import (
 from autolingua2.ui.resource_api import IconAPI
 from .base import SimpleDialogController, load_ui, require_child
 from .glossary import GlossaryPageController
+from .source_watch import WatchPageController
 
 
 class SettingsDialogController(SimpleDialogController):
@@ -300,6 +304,7 @@ class SettingsDialogController(SimpleDialogController):
         self._unvalidated_models_for_save: list[ModelRowWidget] = []
 
         self._mount_pages()
+        self.watch_page = WatchPageController(self.dialog, self.plugins.parsers, self.icon_manager)
         self.glossary_page = GlossaryPageController(
             require_child(self.dialog, QWidget, "SettingsGlossaryPage"), entrance,
             glossary_languages or {}, glossary_adapter_id, glossary_game_id,
@@ -317,6 +322,7 @@ class SettingsDialogController(SimpleDialogController):
         self.button_box.accepted.connect(self._on_save_attempt)
         self.button_box.rejected.connect(self.ai_client.cancel_all)
         self._setup_ui_language()
+        self._setup_voice_input()
         self._setup_themes_and_icons()
         self._setup_ai(self.plugins.providers, provider_id, models or {}, selected_models or {}, api_keys or {}, concurrency)
         self._setup_filter_rules()
@@ -356,6 +362,9 @@ class SettingsDialogController(SimpleDialogController):
         categories = require_child(self.dialog, QListWidget, "listCategories")
         if target == "glossary":
             categories.setCurrentRow(5)
+            return True
+        if target == "file":
+            categories.setCurrentRow(2)
             return True
         for row in range(categories.count()):
             item = categories.item(row)
@@ -564,7 +573,7 @@ class SettingsDialogController(SimpleDialogController):
 
         # APIキーがない、またはプロバイダがない、または未検証モデルがない場合はそのまま閉じる
         if not untested_rows or not api_key or provider is None:
-            self.dialog.accept()
+            self.watch_page.save(self.dialog.accept)
             return
 
         # 未検証モデルがある場合：保存前に非同期自動テストを実行
@@ -611,11 +620,11 @@ class SettingsDialogController(SimpleDialogController):
                 for r in invalid_rows:
                     r.check_enabled.setChecked(False)
                 self._save_current_ai_fields()
-                self.dialog.accept()
+                self.watch_page.save(self.dialog.accept)
             return
 
         # すべて有効だった場合はそのまま保存・終了
-        self.dialog.accept()
+        self.watch_page.save(self.dialog.accept)
 
     def _populate_models(self) -> None:
         if self.layout_model_list is not None:
@@ -736,6 +745,21 @@ class SettingsDialogController(SimpleDialogController):
 
         current_index = self.combo_ui_language.findData(current_language)
         self.combo_ui_language.setCurrentIndex(max(current_index, 0))
+
+    def _setup_voice_input(self) -> None:
+        self.combo_voice_input = require_child(self.dialog, QComboBox, "comboVoiceInput")
+        selected = load_voice_input_provider()
+        self.combo_voice_input.addItem(tr("SettingsDialog", "使用しない"), "")
+        for provider in self.plugins.voice_inputs.values():
+            label = provider.display_name
+            if not voice_input_available(provider):
+                label = tr("SettingsDialog", "{name}（利用不可）").format(name=label)
+            self.combo_voice_input.addItem(label, provider.id)
+        if selected and self.combo_voice_input.findData(selected) < 0:
+            self.combo_voice_input.addItem(
+                tr("SettingsDialog", "{name}（未登録・利用不可）").format(name=selected), selected,
+            )
+        self.combo_voice_input.setCurrentIndex(max(0, self.combo_voice_input.findData(selected)))
 
     def _setup_themes_and_icons(self) -> None:
         self.list_themes = require_child(self.dialog, QListWidget, "listThemes")
@@ -979,6 +1003,10 @@ class SettingsDialogController(SimpleDialogController):
         # UI言語の保存
         new_language = str(self.combo_ui_language.currentData() or "")
         save_ui_language(new_language)
+        voice_provider = self.combo_voice_input.currentData()
+        if not isinstance(voice_provider, str):
+            raise TypeError("Voice input provider ID must be a string")
+        save_voice_input_provider(voice_provider)
 
         # テーマ・アイコンの保存と即時適用
         current_theme_item = self.list_themes.currentItem()

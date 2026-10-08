@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 
 from autolingua2.plugins.contracts import ExportFile, ImportedTranslation
+from .eu4_encoding import encode_eu4_escape
 from .reader import PARADOX_GAMES, SLOT_LANGUAGE
 from .writer import render_translation_file
 
@@ -18,12 +19,16 @@ class ParadoxYamlExporter:
         layout = settings.get("layout")
         if layout not in {"language", "mixed"}:
             raise ValueError("出力フォルダ構成を選択してください。")
+        encoding = settings.get("eu4_encoding", "utf8")
+        if encoding not in {"utf8", "escaped"}:
+            raise ValueError("エンコード方式が不正です。")
         outputs: list[ExportFile] = []
         for workspace in workspaces:
-            outputs.extend(self._workspace_files(workspace, layout))
+            outputs.extend(self._workspace_files(workspace, layout, encoding == "escaped"))
         return outputs
 
-    def _workspace_files(self, imported: ImportedTranslation, layout: object) -> list[ExportFile]:
+    def _workspace_files(self, imported: ImportedTranslation, layout: object,
+                         eu4_escape: bool) -> list[ExportFile]:
         slot = imported.project.target_file_language
         if slot not in SLOT_LANGUAGE:
             raise ValueError(f"ワークスペースの出力言語スロットが不正です: {imported.project.target_language}")
@@ -65,5 +70,12 @@ class ParadoxYamlExporter:
                               units=[unit for unit in imported.project.units if unit.id in refs])
             document = ImportedTranslation(project, refs)
             rendered = render_translation_file(document, project)
-            outputs.append(ExportFile(destination, b"\xef\xbb\xbf" + rendered.encode("utf-8")))
+            if eu4_escape and project.game_id == "eu4":
+                try:
+                    content = encode_eu4_escape(rendered)
+                except ValueError as exc:
+                    raise ValueError(f"{destination}: {exc}") from exc
+            else:
+                content = rendered.encode("utf-8")
+            outputs.append(ExportFile(destination, b"\xef\xbb\xbf" + content))
         return outputs

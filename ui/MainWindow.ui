@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>AutoLingua Desktop</string>
+   <string>Autolingua Desktop</string>
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QVBoxLayout" name="layoutRoot">
@@ -228,8 +228,8 @@
                    <rect>
                     <x>0</x>
                     <y>0</y>
-                    <width>416</width>
-                    <height>728</height>
+                    <width>396</width>
+                    <height>404</height>
                    </rect>
                   </property>
                   <property name="autoFillBackground">
@@ -600,11 +600,12 @@
              <bool>false</bool>
             </property>
            </widget>
-
           </item>
           <item>
            <widget class="QPushButton" name="buttonAddLanguage">
-            <property name="text"><string>＋ 言語を追加</string></property>
+            <property name="text">
+             <string>＋ 言語を追加</string>
+            </property>
            </widget>
           </item>
           <item>
@@ -666,6 +667,47 @@
              <string>■ 停止</string>
             </property>
            </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="layoutProjectNotification">
+          <item>
+           <widget class="QCheckBox" name="checkProjectNotification">
+            <property name="text">
+             <string>更新通知</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="buttonProjectNotificationSettings">
+            <property name="toolTip">
+             <string>このプロジェクトの通知設定</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="buttonProjectSourceUpdate">
+            <property name="visible">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>更新内容を確認</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="spacerProjectNotification">
+            <property name="orientation">
+             <enum>Qt::Orientation::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
           </item>
          </layout>
         </item>
@@ -885,40 +927,20 @@ QFrame#frameSegmentMode QToolButton:checked {
                </widget>
               </item>
               <item>
-               <widget class="QWidget" name="containerFocusPageScrubber">
-                <property name="sizePolicy">
-                 <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                  <horstretch>1</horstretch>
-                  <verstretch>0</verstretch>
-                 </sizepolicy>
+               <layout class="QHBoxLayout" name="layoutScrubberInner">
+                <property name="leftMargin">
+                 <number>0</number>
                 </property>
-                <property name="minimumSize">
-                 <size>
-                  <width>0</width>
-                  <height>26</height>
-                 </size>
+                <property name="topMargin">
+                 <number>0</number>
                 </property>
-                <property name="maximumSize">
-                 <size>
-                  <width>16777215</width>
-                  <height>26</height>
-                 </size>
+                <property name="rightMargin">
+                 <number>0</number>
                 </property>
-                <layout class="QHBoxLayout" name="layoutScrubberInner">
-                 <property name="leftMargin">
-                  <number>0</number>
-                 </property>
-                 <property name="topMargin">
-                  <number>0</number>
-                 </property>
-                 <property name="rightMargin">
-                  <number>0</number>
-                 </property>
-                 <property name="bottomMargin">
-                  <number>0</number>
-                 </property>
-                </layout>
-               </widget>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+               </layout>
               </item>
               <item>
                <widget class="QToolButton" name="buttonFocusNextPage">
@@ -960,6 +982,9 @@ QFrame#frameSegmentMode QToolButton:checked {
                   <height>26</height>
                  </size>
                 </property>
+                <property name="toolTip">
+                 <string>1ページの表示件数</string>
+                </property>
                 <property name="minimum">
                  <number>10</number>
                 </property>
@@ -971,9 +996,6 @@ QFrame#frameSegmentMode QToolButton:checked {
                 </property>
                 <property name="value">
                  <number>50</number>
-                </property>
-                <property name="toolTip">
-                 <string>1ページの表示件数</string>
                 </property>
                </widget>
               </item>
@@ -1050,6 +1072,9 @@ QTableCornerButton::section {
                <property name="wordWrap">
                 <bool>true</bool>
                </property>
+               <attribute name="verticalHeaderVisible">
+                <bool>false</bool>
+               </attribute>
                <column>
                 <property name="text">
                  <string>キー</string>
@@ -1075,9 +1100,6 @@ QTableCornerButton::section {
                  <string>ファイル</string>
                 </property>
                </column>
-               <attribute name="verticalHeaderVisible">
-                <bool>false</bool>
-               </attribute>
               </widget>
              </item>
             </layout>
@@ -1218,75 +1240,52 @@ QTableCornerButton::section {
                 </widget>
                </item>
                <item>
-                <widget class="QWidget" name="widgetAiTranslateSplit">
-                 <property name="styleSheet">
-                  <string notr="true">QPushButton#buttonAiTranslate, QPushButton#buttonAiTranslateAllModels {
-    background-color: palette(button);
-    color: palette(button-text);
-    border: 1px solid palette(mid);
-    border-radius: 4px;
-}
-QPushButton#buttonAiTranslate:hover, QPushButton#buttonAiTranslateAllModels:hover {
-    background-color: palette(button);
-}
-QPushButton#buttonAiTranslate {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-}
-QPushButton#buttonAiTranslateAllModels {
-    border-left: 0;
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-}
-</string>
+                <layout class="QHBoxLayout" name="layoutAiTranslateSplit">
+                 <property name="spacing">
+                  <number>0</number>
                  </property>
-                 <layout class="QHBoxLayout" name="layoutAiTranslateSplit">
-                  <property name="spacing">
-                   <number>0</number>
-                  </property>
-                  <property name="leftMargin">
-                   <number>0</number>
-                  </property>
-                  <property name="topMargin">
-                   <number>0</number>
-                  </property>
-                  <property name="rightMargin">
-                   <number>0</number>
-                  </property>
-                  <property name="bottomMargin">
-                   <number>0</number>
-                  </property>
-                  <item>
-                   <widget class="QPushButton" name="buttonAiTranslate">
-                    <property name="text">
-                     <string>AI翻訳</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item>
-                   <widget class="QPushButton" name="buttonAiTranslateAllModels">
-                    <property name="minimumSize">
-                     <size>
-                      <width>24</width>
-                      <height>0</height>
-                     </size>
-                    </property>
-                    <property name="maximumSize">
-                     <size>
-                      <width>24</width>
-                      <height>16777215</height>
-                     </size>
-                    </property>
-                    <property name="toolTip">
-                     <string>全モデル翻訳</string>
-                    </property>
-                    <property name="text">
-                     <string notr="true">▾</string>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
-                </widget>
+                 <property name="leftMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="topMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="rightMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="bottomMargin">
+                  <number>0</number>
+                 </property>
+                 <item>
+                  <widget class="QPushButton" name="buttonAiTranslate">
+                   <property name="text">
+                    <string>AI翻訳</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="buttonAiTranslateAllModels">
+                   <property name="minimumSize">
+                    <size>
+                     <width>24</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>24</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="toolTip">
+                    <string>全モデル翻訳</string>
+                   </property>
+                   <property name="text">
+                    <string notr="true">▾</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
                </item>
                <item>
                 <spacer name="spacerFocusActions">
@@ -1303,15 +1302,6 @@ QPushButton#buttonAiTranslateAllModels {
                </item>
                <item>
                 <widget class="QToolButton" name="buttonSaveSplit">
-                 <property name="text">
-                  <string>保存</string>
-                 </property>
-                 <property name="popupMode">
-                  <enum>QToolButton::ToolButtonPopupMode::MenuButtonPopup</enum>
-                 </property>
-                 <property name="toolButtonStyle">
-                  <enum>Qt::ToolButtonStyle::ToolButtonTextBesideIcon</enum>
-                 </property>
                  <property name="styleSheet">
                   <string notr="true">QToolButton#buttonSaveSplit {
     border-radius: 4px;
@@ -1328,6 +1318,15 @@ QToolButton#buttonSaveSplit::menu-arrow {
     height: 12px;
 }
 </string>
+                 </property>
+                 <property name="text">
+                  <string>保存</string>
+                 </property>
+                 <property name="popupMode">
+                  <enum>QToolButton::ToolButtonPopupMode::MenuButtonPopup</enum>
+                 </property>
+                 <property name="toolButtonStyle">
+                  <enum>Qt::ToolButtonStyle::ToolButtonTextBesideIcon</enum>
                  </property>
                 </widget>
                </item>
@@ -1417,7 +1416,7 @@ QToolButton#buttonSaveSplit::menu-arrow {
    <property name="minimumSize">
     <size>
      <width>240</width>
-     <height>200</height>
+     <height>296</height>
     </size>
    </property>
    <property name="windowTitle">
@@ -1471,19 +1470,29 @@ QToolButton#buttonSaveSplit::menu-arrow {
      </item>
      <item>
       <widget class="QLabel" name="labelGlossaryChoice">
-       <property name="text"><string>使用する用語集：</string></property>
+       <property name="text">
+        <string>使用する用語集：</string>
+       </property>
       </widget>
      </item>
-     <item><widget class="QComboBox" name="comboGlossary"/></item>
+     <item>
+      <widget class="QComboBox" name="comboGlossary"/>
+     </item>
      <item>
       <widget class="QLabel" name="labelGlossaryChain">
-       <property name="text"><string>なし</string></property>
-       <property name="wordWrap"><bool>true</bool></property>
+       <property name="text">
+        <string>なし</string>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
       <widget class="QPushButton" name="buttonManageGlossary">
-       <property name="text"><string>用語集を管理…</string></property>
+       <property name="text">
+        <string>用語集を管理…</string>
+       </property>
       </widget>
      </item>
      <item>
@@ -1503,42 +1512,277 @@ QToolButton#buttonSaveSplit::menu-arrow {
    </widget>
   </widget>
   <widget class="QDockWidget" name="dockAiChat">
-   <property name="minimumSize"><size><width>320</width><height>300</height></size></property>
-   <property name="windowTitle"><string>AIチャット</string></property>
-   <attribute name="dockWidgetArea"><number>2</number></attribute>
+   <property name="minimumSize">
+    <size>
+     <width>240</width>
+     <height>366</height>
+    </size>
+   </property>
+   <property name="windowTitle">
+    <string>AIチャット</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
    <widget class="QWidget" name="dockAiChatContents">
-    <layout class="QVBoxLayout" name="layoutAiChat">
-     <property name="leftMargin"><number>12</number></property>
-     <property name="topMargin"><number>12</number></property>
-     <property name="rightMargin"><number>12</number></property>
-     <property name="bottomMargin"><number>12</number></property>
+    <layout class="QVBoxLayout" name="layoutAiChat" stretch="0,1,0,0,0,0">
+     <property name="leftMargin">
+      <number>12</number>
+     </property>
+     <property name="topMargin">
+      <number>12</number>
+     </property>
+     <property name="rightMargin">
+      <number>12</number>
+     </property>
+     <property name="bottomMargin">
+      <number>12</number>
+     </property>
      <item>
       <layout class="QHBoxLayout" name="layoutChatHeader">
-       <item><spacer name="spacerChatHeader"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item>
-       <item><widget class="QPushButton" name="buttonChatNew"><property name="text"><string>新しい会話</string></property></widget></item>
+       <item>
+        <spacer name="spacerChatHeader">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonChatNew">
+         <property name="text">
+          <string>新しい会話</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </item>
-     <item><widget class="QTextBrowser" name="browserChatHistory"><property name="openLinks"><bool>false</bool></property><property name="placeholderText"><string>翻訳の相談や、現在のファイルの文章の検索・選択を依頼できます。</string></property></widget></item>
+     <item>
+      <widget class="QTextBrowser" name="browserChatHistory">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Ignored" vsizetype="Expanding">
+         <horstretch>0</horstretch>
+         <verstretch>1</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="placeholderText">
+        <string>翻訳の相談や、現在のファイルの文章の検索・選択を依頼できます。</string>
+       </property>
+       <property name="openLinks">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
      <item>
       <layout class="QHBoxLayout" name="layoutChatReferences">
-       <item><widget class="QLabel" name="labelChatReferences"><property name="text"><string>参照：なし</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-       <item><widget class="QPushButton" name="buttonChatClearReferences"><property name="text"><string>解除</string></property></widget></item>
+       <item>
+        <widget class="QLabel" name="labelChatReferences">
+         <property name="text">
+          <string>参照：なし</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonChatClearReferences">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>解除</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </item>
      <item>
       <layout class="QHBoxLayout" name="layoutChatReferenceActions">
-       <item><widget class="QPushButton" name="buttonChatAddReferences"><property name="text"><string>＋ 選択した文章を参照に追加</string></property></widget></item>
-       <item><widget class="QPushButton" name="buttonChatViewReferences"><property name="text"><string>参照を見る</string></property></widget></item>
+       <item>
+        <widget class="QPushButton" name="buttonChatAddReferences">
+         <property name="toolTip">
+          <string>選択した文章を参照に追加</string>
+         </property>
+         <property name="text">
+          <string>＋参照を追加</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonChatViewReferences">
+         <property name="text">
+          <string>参照を見る</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </item>
-     <item><widget class="QLabel" name="labelChatStatus"><property name="text"><string>操作対象：現在のファイル（検索・選択のみ）</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-     <item><widget class="QPlainTextEdit" name="editChatMessage"><property name="maximumSize"><size><width>16777215</width><height>140</height></size></property><property name="placeholderText"><string>AIへのメッセージを入力…（Enterで送信、Shift＋Enterで改行）</string></property></widget></item>
      <item>
-      <layout class="QHBoxLayout" name="layoutChatSend">
-       <item><widget class="QComboBox" name="comboChatProvider"><property name="toolTip"><string>チャットのプロバイダ。切り替え後の送信では過去の会話と参照も送信されます。</string></property><property name="sizeAdjustPolicy"><enum>QComboBox::SizeAdjustPolicy::AdjustToMinimumContentsLengthWithIcon</enum></property><property name="minimumContentsLength"><number>8</number></property></widget></item>
-       <item><widget class="QComboBox" name="comboChatModel"><property name="toolTip"><string>次の送信で使用するモデル</string></property><property name="sizeAdjustPolicy"><enum>QComboBox::SizeAdjustPolicy::AdjustToMinimumContentsLengthWithIcon</enum></property><property name="minimumContentsLength"><number>10</number></property></widget></item>
-       <item><widget class="QPushButton" name="buttonChatSend"><property name="text"><string>送信</string></property></widget></item>
-      </layout>
+      <widget class="QLabel" name="labelChatStatus">
+       <property name="text">
+        <string>操作対象：現在のファイル（検索・選択のみ）</string>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QFrame" name="frameChatInput">
+       <property name="styleSheet">
+        <string notr="true">QFrame#frameChatInput {
+    background-color: palette(base);
+    border: 1px solid palette(mid);
+    border-radius: 8px;
+    padding: 0px;
+}
+QPlainTextEdit#editChatMessage {
+    background-color: transparent;
+    border: none;
+}
+QPushButton#buttonChatModel,
+QPushButton#buttonChatVoice,
+QPushButton#buttonChatSend {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+}
+QPushButton#buttonChatModel:hover:enabled,
+QPushButton#buttonChatVoice:hover:enabled,
+QPushButton#buttonChatSend:hover:enabled {
+    background-color: rgba(128, 128, 128, 40);
+}</string>
+       </property>
+       <layout class="QVBoxLayout" name="layoutChatInput">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>6</number>
+        </property>
+        <property name="topMargin">
+         <number>6</number>
+        </property>
+        <property name="rightMargin">
+         <number>6</number>
+        </property>
+        <property name="bottomMargin">
+         <number>6</number>
+        </property>
+        <item>
+         <widget class="QPlainTextEdit" name="editChatMessage">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>60</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>100</height>
+           </size>
+          </property>
+          <property name="placeholderText">
+           <string>AIへのメッセージを入力…（Enterで送信、Shift＋Enterで改行）</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="layoutChatSend">
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="ComboMenuButton" name="buttonChatModel">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
+              <horstretch>1</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>90</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">QPushButton#buttonChatModel {
+    text-align: left;
+    padding: 0px;
+}
+QPushButton#buttonChatModel::menu-indicator {
+    subcontrol-origin: border;
+    subcontrol-position: right center;
+    right: 8px;
+}</string>
+            </property>
+            <property name="text">
+             <string>モデルを選択</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="buttonChatVoice">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="visible">
+             <bool>true</bool>
+            </property>
+            <property name="toolTip">
+             <string>音声入力を開く</string>
+            </property>
+            <property name="accessibleName">
+             <string>音声入力を開く</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="buttonChatSend">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="toolTip">
+             <string>送信</string>
+            </property>
+            <property name="accessibleName">
+             <string>送信</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
      </item>
     </layout>
    </widget>
@@ -1669,9 +1913,15 @@ QToolButton#buttonSaveSplit::menu-arrow {
    </property>
   </action>
   <action name="actionToggleAiChat">
-   <property name="checkable"><bool>true</bool></property>
-   <property name="checked"><bool>true</bool></property>
-   <property name="text"><string>AIチャット</string></property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>AIチャット</string>
+   </property>
   </action>
   <action name="actionToggleAiPanel">
    <property name="checkable">
@@ -1685,6 +1935,13 @@ QToolButton#buttonSaveSplit::menu-arrow {
    </property>
   </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>ComboMenuButton</class>
+   <extends>QPushButton</extends>
+   <header>autolingua2.ui.components.combo_menu_button</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

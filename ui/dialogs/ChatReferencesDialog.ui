@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ChatReferencesDialog</class>
+ <widget class="QDialog" name="ChatReferencesDialog">
+  <property name="windowTitle"><string>チャットの参照</string></property>
+  <property name="minimumSize"><size><width>560</width><height>400</height></size></property>
+  <layout class="QVBoxLayout" name="layoutReferences">
+   <item><widget class="QPlainTextEdit" name="editReferences"><property name="readOnly"><bool>true</bool></property></widget></item>
+   <item><widget class="QPushButton" name="buttonClose"><property name="text"><string>閉じる</string></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

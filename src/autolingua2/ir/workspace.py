@@ -11,6 +11,7 @@ from .issue import Issue
 class TranslationRecord:
     target_text: str = ""
     state: UnitState = UnitState.UNTRANSLATED
+    source_changed: bool = False
 
 
 @dataclass(slots=True)
@@ -26,6 +27,10 @@ class WorkspaceUnit:
 
     source: TranslationUnit
     record: TranslationRecord
+
+    @property
+    def source_changed(self) -> bool:
+        return self.record.source_changed
 
     @property
     def id(self) -> str:
@@ -62,6 +67,8 @@ class WorkspaceUnit:
     @state.setter
     def state(self, value: UnitState) -> None:
         self.record.state = value
+        if value in {UnitState.HUMAN_REVIEWED, UnitState.AI_REVIEWED}:
+            self.record.source_changed = False
 
     @property
     def hidden(self) -> bool:

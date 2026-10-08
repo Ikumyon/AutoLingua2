@@ -5,6 +5,7 @@ pub mod bootstrap;
 #[cfg(feature = "python")]
 pub mod encoding;
 pub mod platform;
+pub mod source_watch;
 
 #[cfg(feature = "python")]
 #[pymodule]
@@ -21,10 +22,13 @@ fn autolingua2_native(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // 2. プラットフォーム関連の登録 (トップレベル & サブモジュール)
     let platform_module = PyModule::new(py, "platform")?;
     platform_module.add_function(wrap_pyfunction!(platform::configure_desktop_integration, &platform_module)?)?;
+    platform_module.add_function(wrap_pyfunction!(platform::system_voice_input_available, &platform_module)?)?;
+    platform_module.add_function(wrap_pyfunction!(platform::start_system_voice_input, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::allocate_debug_console, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::start_plugin, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::plugin_platform_key, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::bindings::executable_filename, &platform_module)?)?;
+    platform_module.add_function(wrap_pyfunction!(platform::bindings::qt_file_path, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::bindings::show_folder, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::spawn_launcher, &platform_module)?)?;
     platform_module.add_class::<platform::PluginProcess>()?;
@@ -35,6 +39,10 @@ fn autolingua2_native(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     bootstrap_module.add_class::<bootstrap::bindings::CoreSession>()?;
     bootstrap_module.add_function(wrap_pyfunction!(bootstrap::bindings::update_status, &bootstrap_module)?)?;
     m.add_submodule(&bootstrap_module)?;
+
+    let watch_module = PyModule::new(py, "source_watch")?;
+    source_watch::bindings::register(&watch_module)?;
+    m.add_submodule(&watch_module)?;
 
     Ok(())
 }

@@ -26,7 +26,7 @@ class GeminiTranslator(BaseHttpTranslator):
             "contents": [{"role": "model" if m.role == "assistant" else "user",
                           "parts": [{"text": m.content}]} for m in messages] + continuation,
             "tools": [{"functionDeclarations": [{
-                "name": t["name"], "description": t["description"], "parameters": t["inputSchema"],
+                "name": t["name"], "description": t["description"], "parametersJsonSchema": t["inputSchema"],
             } for t in tools]}],
         }
 
@@ -67,7 +67,7 @@ class GeminiTranslator(BaseHttpTranslator):
         return {
             "Content-Type": "application/json",
             "x-goog-api-key": self.api_key,
-            "User-Agent": "AUTOlingua2/0.1.0",
+            "User-Agent": "Autolingua Desktop/0.1.0",
         }
 
     def build_payload(

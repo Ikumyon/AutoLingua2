@@ -1,47 +1,60 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>SettingsFilePage</class>
- <widget class="QWidget" name="SettingsFilePage">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>680</width>
-    <height>550</height>
-   </rect>
-  </property>
-  <layout class="QFormLayout" name="formFile">
-   <item row="0" column="1">
-    <widget class="QCheckBox" name="checkBackup">
-     <property name="text">
-      <string>保存時にバックアップを作成</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="1">
-    <widget class="QCheckBox" name="checkPreserveEncoding">
-     <property name="text">
-      <string>元の文字コードを保持</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="1">
-    <widget class="QCheckBox" name="checkPreserveLineEndings">
-     <property name="text">
-      <string>元の改行コードを保持</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-  </layout>
+ <widget class="QScrollArea" name="SettingsFilePage">
+  <property name="geometry"><rect><x>0</x><y>0</y><width>760</width><height>600</height></rect></property>
+  <property name="widgetResizable"><bool>true</bool></property>
+  <widget class="QWidget" name="fileSettingsContents">
+   <layout class="QVBoxLayout" name="layoutFileSettings">
+    <property name="spacing"><number>16</number></property>
+    <item>
+     <widget class="QGroupBox" name="groupFileSave">
+      <property name="title"><string>ファイル保存</string></property>
+      <layout class="QVBoxLayout" name="layoutFileSave">
+       <item><widget class="QCheckBox" name="checkBackup"><property name="text"><string>保存時にバックアップを作成</string></property><property name="checked"><bool>true</bool></property></widget></item>
+       <item><widget class="QCheckBox" name="checkPreserveEncoding"><property name="text"><string>元の文字コードを保持</string></property><property name="checked"><bool>true</bool></property></widget></item>
+       <item><widget class="QCheckBox" name="checkPreserveLineEndings"><property name="text"><string>元の改行コードを保持</string></property><property name="checked"><bool>true</bool></property></widget></item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupSourceWatchDashboard">
+      <property name="title"><string>翻訳元フォルダ監視</string></property>
+      <layout class="QVBoxLayout" name="layoutSourceWatchDashboard">
+       <property name="spacing"><number>12</number></property>
+       <item><layout class="QHBoxLayout" name="layoutSourceWatchStatus">
+        <property name="spacing"><number>6</number></property>
+        <item><widget class="QLabel" name="labelSourceWatchIndicator"><property name="minimumSize"><size><width>14</width><height>14</height></size></property><property name="maximumSize"><size><width>14</width><height>14</height></size></property><property name="text"><string/></property><property name="alignment"><set>Qt::AlignCenter</set></property><property name="watchState" stdset="0"><string>stopped</string></property></widget></item>
+        <item><widget class="QLabel" name="labelSourceWatchStatus"><property name="text"><string>監視状態：停止中</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+        <item><spacer name="spacerSourceWatchStatus"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>20</width><height>20</height></size></property></spacer></item>
+       </layout></item>
+       <item><layout class="QHBoxLayout" name="layoutSourceWatchSummary">
+        <item><widget class="QLabel" name="labelSourceWatchTargetCount"><property name="text"><string>登録対象：3件</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+        <item><widget class="QLabel" name="labelSourceWatchErrorCount"><property name="text"><string>エラー：1件</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+        <item><widget class="QLabel" name="labelSourceWatchPendingCount"><property name="text"><string>保留中の更新：2件</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+       </layout></item>
+       <item><layout class="QHBoxLayout" name="layoutSourceWatchActions">
+        <item><spacer name="spacerSourceWatchActions"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>20</width><height>20</height></size></property></spacer></item>
+        <item><widget class="QPushButton" name="buttonSourceWatchToggle"><property name="text"><string>監視を停止</string></property></widget></item>
+        <item><widget class="QPushButton" name="buttonSourceWatchAdd"><property name="text"><string>＋ 監視対象を追加</string></property></widget></item>
+       </layout></item>
+       <item>
+        <widget class="QWidget" name="widgetSourceWatchTargets">
+         <layout class="QVBoxLayout" name="layoutSourceWatchTargets">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>12</number></property>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item><spacer name="spacerFileSettingsBottom"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint"><size><width>20</width><height>20</height></size></property></spacer></item>
+   </layout>
+  </widget>
  </widget>
  <resources/>
  <connections/>

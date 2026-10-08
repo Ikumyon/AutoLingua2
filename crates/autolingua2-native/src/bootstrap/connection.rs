@@ -75,7 +75,7 @@ impl Connection {
             Message::Ack => {
                 // One-shot servers retain the pipe until this receipt is observed.
                 // Closing a Windows server pipe with an unread reply can lose that reply.
-                if matches!(message, Message::Activate | Message::Restart(_) | Message::Ready) {
+                if matches!(message, Message::Activate | Message::Restart(_) | Message::Ready | Message::SourceUpdate(_)) {
                     self.send(&Message::Ack)?;
                 }
                 Ok(())

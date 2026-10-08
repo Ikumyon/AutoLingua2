@@ -80,7 +80,8 @@ class WorkspaceService:
         outputs: list[ImportedTranslation] = []
         for workspace in self.workspaces.values():
             units = [replace(unit, target_text=workspace.records[unit.id].target_text,
-                             state=workspace.records[unit.id].state)
+                             state=workspace.records[unit.id].state,
+                             source_changed=workspace.records[unit.id].source_changed)
                      for unit in self.imported.project.units]
             outputs.append(ImportedTranslation(
                 replace(self.imported.project, units=units,

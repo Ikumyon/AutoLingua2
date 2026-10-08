@@ -58,7 +58,7 @@ class OpenAiTranslator(BaseHttpTranslator):
         return {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
-            "User-Agent": "AUTOlingua2/0.1.0",
+            "User-Agent": "Autolingua Desktop/0.1.0",
         }
 
     def build_payload(

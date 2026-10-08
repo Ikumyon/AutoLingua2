@@ -17,6 +17,7 @@ class TranslationUnit:
     issues: list[Issue] = field(default_factory=list)
     hidden: bool = False
     locked: bool = False
+    source_changed: bool = False
 
     def matches(self, query: str) -> bool:
         if not query:

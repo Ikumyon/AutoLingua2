@@ -34,3 +34,33 @@ RangeScrubberWidget {
     qproperty-borderColor: #3c3f41;
     qproperty-textColor: #ffffff;
 }
+
+/* Source watch indicators: state is supplied by the UI/controller. */
+QLabel#sourceWatchTitle {
+    font-size: 12pt;
+    font-weight: bold;
+}
+
+QLabel#labelSourceWatchIndicator,
+QLabel#sourceWatchIndicator {
+    border: none;
+    border-radius: 7px;
+    padding: 0;
+}
+
+QLabel#labelSourceWatchIndicator[watchState="running"],
+QLabel#sourceWatchIndicator[watchState="running"] {
+    background-color: #2eae61;
+}
+
+QLabel#labelSourceWatchIndicator[watchState="stopped"],
+QLabel#sourceWatchIndicator[watchState="stopped"] {
+    background-color: #db4b4b;
+}
+
+QLabel#labelSourceWatchIndicator[watchState="error"],
+QLabel#sourceWatchIndicator[watchState="error"] {
+    background-color: transparent;
+    color: #db4b4b;
+    font-weight: bold;
+}

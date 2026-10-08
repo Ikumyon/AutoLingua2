@@ -32,7 +32,7 @@ def configuration() -> LaunchConfiguration:
     from autolingua2_native import platform as native
     if getattr(sys, "frozen", False):
         exe = Path(sys.executable).resolve()
-        launcher = exe.parent.parent / native.executable_name("AutoLingua Desktop") if exe.parent.name.lower() == "core" else exe.with_name(native.executable_name("AutoLingua Desktop"))
+        launcher = exe.parent.parent / native.executable_name("AUTOlingua2") if exe.parent.name.lower() == "core" else exe.with_name(native.executable_name("AUTOlingua2"))
         return LaunchConfiguration(launcher, None)
     root = Path(__file__).resolve().parents[3]
     return LaunchConfiguration(root / "target" / "release" / native.executable_name("autolingua-launcher"), root)

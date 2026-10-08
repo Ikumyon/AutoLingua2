@@ -8,6 +8,9 @@ from autolingua2.ir import Issue, TranslationProject, TranslationSource, Transla
 from autolingua2.ir.filter_rules import FilterRule
 from autolingua2.ir.imported import GameProfile, GameSlot, ImportedTranslation, SourceRef
 from autolingua2.services.export_contract import ExportFile, TranslationExporter
+from autolingua2.services.voice_input_contract import (
+    VoiceInputCallbacks, VoiceInputMode, VoiceInputOperation, VoiceInputProvider,
+)
 from autolingua2.services.ai_providers.chat import (
     ChatMessage, ChatReply, ChatToolCall, object_value, string_value,
 )
@@ -20,6 +23,7 @@ from autolingua2.services.ai_providers.base import (
 )
 
 __all__ = [
+    "VoiceInputCallbacks", "VoiceInputMode", "VoiceInputOperation", "VoiceInputProvider",
     "ChatMessage", "ChatReply", "ChatToolCall", "object_value", "string_value",
     "ExportFile", "TranslationExporter",
     "FileAdapter", "AiProviderPlugin", "TextTranslator", "TranslationProviderError",

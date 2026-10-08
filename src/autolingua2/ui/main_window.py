@@ -6,8 +6,8 @@ from pathlib import Path
 import sys
 from typing import Callable
 
-from PySide6.QtCore import QByteArray, QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QSize, Qt, QSignalBlocker, QTimer, QLocale
-from PySide6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QPalette, QPixmap, QSyntaxHighlighter
+from PySide6.QtCore import QByteArray, QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QSize, Qt, QSignalBlocker, QTimer, QLocale, QItemSelection, QItemSelectionModel
+from PySide6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QPixmap, QSyntaxHighlighter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -63,6 +63,8 @@ from autolingua2.ui.dialogs.glossary import STORAGE_ERRORS
 from autolingua2.ui.dialogs.workspace_language import WorkspaceLanguageDialog
 from autolingua2.ir.filter_rules import AdapterFilterConfig, should_hide_unit
 from autolingua2.services.ai_network import AiNetworkClient
+from autolingua2.services.ai_chat import ChatFile, ChatReference
+from autolingua2.ui.ai_chat_dock import AiChatDockController
 from autolingua2.services.filter_rules import get_default_filter_config
 from autolingua2.ui.components.translation_table_delegate import (
     ActionButtonDelegate,
@@ -72,6 +74,12 @@ from autolingua2.ui.components.translation_table_delegate import (
 from autolingua2.services.export import export_translation
 from autolingua2.ui.export_dialog import ExportDialog
 from autolingua2.services.project_archive import load_project, project_snapshot, save_project
+from autolingua2.services.source_updates import (
+    AppliedUpdate, SourceUpdate, apply_update, ensure_watcher, pending_target, prepare_update,
+    notification_target, notifications_available, set_project_notification, import_notification_target,
+)
+from autolingua2.services.settings_store import load_watch_settings
+from autolingua2.ui.dialogs.source_watch import SourceUpdateDialog
 from autolingua2.services.settings_store import (
     AiSettings,
     ColumnLayout,
@@ -266,6 +274,14 @@ class MainWindowController(QObject):
         self.ai_client = AiNetworkClient(self.window)
 
         self._setup_widgets()
+        self.chat_dock = AiChatDockController(
+            self.window, self.provider_registry, self._chat_settings,
+            self._chat_current_file, self._chat_selected_references, self._chat_select_units,
+            voice_input_providers=self.plugins.voice_inputs,
+        )
+        self.chat_dock.send_button.setIcon(self.icon_manager.get_icon("send-24"))
+        self.chat_dock.voice_button.setIcon(self.icon_manager.get_icon("microphone"))
+        self.window.tabifyDockWidget(self.dock_ai_settings, self.chat_dock.dock)
         self.plugins.on_display_changed(self._on_plugin_display_changed)
         self._configure_text_presentation()
         self._connect_actions()
@@ -275,15 +291,19 @@ class MainWindowController(QObject):
         if entrance.errors:
             QTimer.singleShot(0, lambda: QMessageBox.warning(
                 self.window, "拡張読み込みエラー", "\n".join(entrance.errors)))
+        self._requested_source_updates: list[str] = []
+        self._refresh_project_notification()
+        self.source_watch_timer = QTimer(self)
+        self.source_watch_timer.setInterval(30000)
+        self.source_watch_timer.timeout.connect(self._poll_source_updates)
+        self.source_watch_timer.start()
+        if load_watch_settings().enabled:
+            QTimer.singleShot(0, lambda: self._run_operation(ensure_watcher, lambda _result: None))
 
     def show(self) -> None:
         self.window.show()
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if watched is self.window and event.type() in {
-            QEvent.Type.PaletteChange, QEvent.Type.ApplicationPaletteChange,
-        }:
-            QTimer.singleShot(0, self._update_ai_button_colors)
         if watched is self.window and isinstance(event, QCloseEvent):
             if self.io_worker is not None:
                 event.ignore()
@@ -313,6 +333,7 @@ class MainWindowController(QObject):
             else:
                 self._save_window_layout()
             self.plugins.remove_display_listener(self._on_plugin_display_changed)
+            self.chat_dock.close()
             self._dispose_highlighters()
             if self.creation_context:
                 self.creation_context.active = False
@@ -478,9 +499,6 @@ class MainWindowController(QObject):
         self.button_ai_translate = require_child(self.window, QPushButton, "buttonAiTranslate")
         self.button_ai_translate.setIcon(self.icon_manager.get_icon("robot-edit"))
         self.button_ai_translate_all_models = require_child(self.window, QPushButton, "buttonAiTranslateAllModels")
-        self.ai_translate_split = require_child(self.window, QWidget, "widgetAiTranslateSplit")
-        self._ai_button_style_template = self.ai_translate_split.styleSheet()
-        self._update_ai_button_colors()
         ai_button_height = self.button_copy_source.sizeHint().height()
         self.button_ai_translate.setFixedHeight(ai_button_height)
         self.button_ai_translate_all_models.setFixedHeight(ai_button_height)
@@ -499,9 +517,11 @@ class MainWindowController(QObject):
         self.spin_focus_page_size = require_child(self.window, QSpinBox, "spinFocusPageSize")
         self.spin_focus_page_size.setValue(self.focus_page_size)
 
-        self.container_scrubber = require_child(self.window, QWidget, "containerFocusPageScrubber")
-        self.page_scrubber = RangeScrubberWidget(self.container_scrubber, text_alignment="center")
-        layout_scrubber = require_child(self.container_scrubber, QHBoxLayout, "layoutScrubberInner")
+        layout_scrubber = require_child(self.window, QHBoxLayout, "layoutScrubberInner")
+        scrubber_parent = layout_scrubber.parentWidget()
+        if scrubber_parent is None:
+            raise RuntimeError("スクラバーの配置先レイアウトに親ウィジェットがありません")
+        self.page_scrubber = RangeScrubberWidget(scrubber_parent, text_alignment="center")
         layout_scrubber.addWidget(self.page_scrubber)
 
         self.edit_key = require_child(self.window, QLineEdit, "editKey")
@@ -516,6 +536,12 @@ class MainWindowController(QObject):
         self.action_pause_translation = require_child(self.window, QAction, "actionPauseTranslation")
         self.action_stop_translation = require_child(self.window, QAction, "actionStopTranslation")
         self.action_settings = require_child(self.window, QAction, "actionSettings")
+        self.check_project_notification = require_child(self.window, QCheckBox, "checkProjectNotification")
+        self.button_project_notification_settings = require_child(self.window, QToolButton, "buttonProjectNotificationSettings")
+        self.button_project_notification_settings.setIcon(self.icon_manager.get_icon("settings"))
+        self.button_project_source_update = require_child(self.window, QPushButton, "buttonProjectSourceUpdate")
+        self.button_project_source_update.setVisible(False)
+        self.button_project_source_update.clicked.connect(self.check_source_updates)
         self.action_problems = require_child(self.window, QAction, "actionProblems")
         self.action_about = require_child(self.window, QAction, "actionAbout")
         self.action_list_mode = require_child(self.window, QAction, "actionListMode")
@@ -607,22 +633,13 @@ class MainWindowController(QObject):
         self.frame_target_drop.installEventFilter(self)
         self._init_project_creation_ui()
 
-    def _update_ai_button_colors(self) -> None:
-        button_color = self.ai_translate_split.palette().color(QPalette.ColorRole.Button)
-        normal = button_color.darker(135).name()
-        border = button_color.darker(110).name()
-        style = self._ai_button_style_template.replace(
-            "background-color: palette(button);", f"background-color: {normal};", 1)
-        style = style.replace("border: 1px solid palette(mid);", f"border: 1px solid {border};")
-        if self.ai_translate_split.styleSheet() != style:
-            self.ai_translate_split.setStyleSheet(style)
-
     def _connect_actions(self) -> None:
         file_menu = require_child(self.window, QMenu, "menuFile")
         for title, callback in (
             ("プロジェクトを開く…", self.open_project),
             ("プロジェクトを保存", self.save_project),
             ("プロジェクトを別名で保存…", self.save_project_as),
+            ("翻訳元の更新を確認…", self.check_source_updates),
         ):
             action = QAction(tr("MainWindow", title), self.window)
             action.triggered.connect(callback)
@@ -641,6 +658,8 @@ class MainWindowController(QObject):
         self.button_create_project.clicked.connect(self.create_project)
 
         self.action_settings.triggered.connect(self.open_settings)
+        self.check_project_notification.toggled.connect(self._toggle_project_notification)
+        self.button_project_notification_settings.clicked.connect(lambda: self.open_settings("file"))
         self.combo_ai_provider.currentIndexChanged.connect(self._on_ai_provider_changed)
         self.combo_ai_model.currentIndexChanged.connect(self._on_ai_model_changed)
         self.combo_glossary.currentIndexChanged.connect(self._on_glossary_changed)
@@ -763,7 +782,7 @@ class MainWindowController(QObject):
         return self.save_project(choose_path=True)
 
     def save_project(self, _checked: bool = False, *, choose_path: bool = False) -> bool:
-        if self.io_worker is not None or not self.project.sources:
+        if self.io_worker is not None or (not self.project.sources and self.project_path is None):
             return False
         path = self.project_path
         if choose_path or path is None:
@@ -784,6 +803,14 @@ class MainWindowController(QObject):
             return False
         self.project_path = path
         self.window.statusBar().showMessage(tr("MainWindow", "プロジェクトを保存しました。"), 5000)
+        if self.project.source_root:
+            root = str(Path(self.project.source_root).resolve())
+            if any(target.source_root == root for target in load_watch_settings().targets):
+                try:
+                    set_project_notification(self.project, path, True, self.plugins.parsers.get(self.project.adapter_id))
+                except (OSError, ValueError) as exc:
+                    QMessageBox.warning(self.window, tr("MainWindow", "通知設定エラー"), str(exc))
+        self._refresh_project_notification()
         return True
 
     def open_project(self) -> None:
@@ -795,20 +822,150 @@ class MainWindowController(QObject):
         )
         if not selected:
             return
+        self._open_project_path(Path(selected))
+
+    def _open_project_path(self, path: Path) -> bool:
         try:
-            archive = load_project(Path(selected))
+            archive = load_project(path)
             service = WorkspaceService(archive.imported)
             service.languages.update(archive.languages)
             service.workspaces = archive.workspaces
         except Exception as exc:
             QMessageBox.warning(self.window, tr("MainWindow", "読み込みエラー"), str(exc))
-            return
+            return False
         if not self._confirm_project_change():
-            return
+            return False
         self.load_import(archive.imported, service)
-        self.project_path = Path(selected)
+        self.project_path = path
+        self._refresh_project_notification()
         self._saved_project = project_snapshot(self.workspace_service)
         self.window.setWindowTitle(f"Autolingua Desktop - {self.project.name}")
+        QTimer.singleShot(0, self._poll_source_updates)
+        return True
+
+    def _refresh_project_notification(self) -> None:
+        self.button_project_source_update.setVisible(False)
+        settings = load_watch_settings()
+        path = str(Path(self.project.source_root).resolve()) if self.project.source_root else ""
+        registered = any(target.source_root == path for target in settings.targets)
+        supported = False
+        error = ""
+        try:
+            supported = notifications_available()
+        except (ImportError, AttributeError, OSError) as exc:
+            error = str(exc)
+        with QSignalBlocker(self.check_project_notification):
+            self.check_project_notification.setChecked(registered)
+        self.check_project_notification.setEnabled(bool(self.project.source_root) and supported)
+        self.check_project_notification.setToolTip(error or (
+            tr("MainWindow", "この環境では更新通知を利用できません。") if not supported else
+            tr("MainWindow", "監視停止中") if not settings.enabled else ""))
+        if registered and settings.enabled:
+            self._poll_source_updates()
+
+    def _toggle_project_notification(self, checked: bool) -> None:
+        path = self.project_path
+        if not self.project.source_root:
+            self._refresh_project_notification()
+            return
+        try:
+            set_project_notification(self.project, path, checked, self.plugins.parsers.get(self.project.adapter_id))
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self.window, tr("MainWindow", "通知設定エラー"), str(exc))
+        self._refresh_project_notification()
+
+    def request_source_update(self, project: str) -> None:
+        if project not in self._requested_source_updates:
+            self._requested_source_updates.append(project)
+
+    def process_source_update_request(self) -> None:
+        if not self._requested_source_updates or self.io_worker is not None or self.import_worker is not None:
+            return
+        if QApplication.activeModalWidget() is not None:
+            return
+        path = Path(self._requested_source_updates.pop(0))
+        try:
+            notification = notification_target(path)
+            current = Path(self.project.source_root).resolve() if self.project.source_root else None
+            if current != path.resolve():
+                if notification.project_path:
+                    if not self._open_project_path(Path(notification.project_path)):
+                        return
+                else:
+                    if not self._confirm_project_change():
+                        return
+                    adapter = self.plugins.parsers.get(notification.adapter_id)
+                    if adapter is None:
+                        raise ValueError("この監視対象の読み込み方式がありません。翻訳元フォルダを読み込んでください。")
+                    def loaded(value: object) -> None:
+                        if not isinstance(value, ImportedTranslation):
+                            raise TypeError("翻訳元の読み込み結果が不正です。")
+                        self.load_import(value)
+                    self._run_operation(lambda: import_notification_target(notification, adapter), loaded)
+                    return
+            self.check_source_updates()
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self.window, tr("MainWindow", "翻訳元データの更新"), str(exc))
+
+    def _poll_source_updates(self) -> None:
+        if not self.project.source_root or self.io_worker is not None or self.import_worker is not None:
+            return
+        if QApplication.activeModalWidget() is not None:
+            return
+        try:
+            target, _ = pending_target(Path(self.project.source_root))
+            self.button_project_source_update.setVisible(target is not None)
+        except (OSError, ValueError) as exc:
+            self.window.statusBar().showMessage(str(exc), 10000)
+
+    def check_source_updates(self) -> None:
+        path = self.project_path
+        if not self.project.source_root or self.io_worker is not None or self.import_worker is not None:
+            return
+        settings = load_watch_settings()
+        target = next((target for target in settings.targets if target.source_root == str(Path(self.project.source_root).resolve())), None)
+        if target is None or not settings.enabled:
+            QMessageBox.information(self.window, tr("MainWindow", "翻訳元データの更新"),
+                                    tr("MainWindow", "設定でこのプロジェクトの監視を有効にしてください。"))
+            return
+        adapter = self.plugins.parsers.get(self.project.adapter_id)
+        if adapter is None:
+            QMessageBox.warning(self.window, tr("MainWindow", "翻訳元データの更新"),
+                                tr("MainWindow", "読み込み方式がありません。"))
+            return
+        service = deepcopy(self.workspace_service)
+
+        def prepared(result: object) -> None:
+            if not isinstance(result, SourceUpdate):
+                raise TypeError("原文の更新結果が不正です。")
+            dialog = SourceUpdateDialog(result, self.window)
+            accepted = dialog.exec() == QDialog.DialogCode.Accepted
+            dialog.dialog.deleteLater()
+            if not accepted:
+                return
+            if self.active_workspace is not None and self.current_unit is not None:
+                self.current_unit.target_text = self.edit_translation.toPlainText()
+            self.ai_client.cancel_all()
+            active_code = self.active_workspace.language_code if self.active_workspace is not None else None
+            latest = deepcopy(self.workspace_service)
+
+            def applied(value: object) -> None:
+                if not isinstance(value, AppliedUpdate):
+                    raise TypeError("原文の反映結果が不正です。")
+                self.load_import(value.service.imported, value.service)
+                self.project_path = path
+                self._refresh_project_notification()
+                QTimer.singleShot(0, self._poll_source_updates)
+                self._saved_project = project_snapshot(self.workspace_service) if path is not None else None
+                if active_code is not None:
+                    self._select_workspace(active_code)
+                if value.acknowledgment_error:
+                    QMessageBox.warning(self.window, tr("MainWindow", "更新記録エラー"),
+                                        value.acknowledgment_error)
+
+            self._run_operation(lambda: apply_update(latest, result, path), applied)
+
+        self._run_operation(lambda: prepare_update(service, target, adapter), prepared)
 
     def save_translation(self) -> None:
         if self.io_worker is not None:
@@ -906,17 +1063,23 @@ class MainWindowController(QObject):
             glossary_source_language=self.project.source_language,
             glossary_target_language=self.project.target_language,
         )
+        controller.watch_page.update_requested.connect(self.request_source_update)
         if initial_category is not None:
             controller.select_category(initial_category)
+            if initial_category == "file" and self.project.source_root:
+                controller.watch_page.select_project(str(Path(self.project.source_root).resolve()))
         if controller.exec() == QDialog.DialogCode.Accepted:
             self.ai_models = controller.ai_models
             self.ai_selected_models = controller.ai_selected_models
             self.ai_api_keys = controller.ai_api_keys
             self.ai_concurrency = controller.spin_concurrency.value()
             self._refresh_ai_choices()
+            self.chat_dock.refresh_choices()
             self._save_ai_choice()
             _, icon_theme = load_theme_settings()
             self.icon_manager.set_current_iconset(icon_theme)
+            self.chat_dock.voice_button.setIcon(self.icon_manager.get_icon("microphone"))
+            self.chat_dock.refresh_voice_input()
             if self.active_creation_panel:
                 from PySide6.QtCore import QCoreApplication
                 QCoreApplication.sendEvent(self.active_creation_panel, QEvent(QEvent.Type.LanguageChange))
@@ -925,6 +1088,7 @@ class MainWindowController(QObject):
                 self.refresh_all()
 
         self._refresh_glossary_choices()
+        self._refresh_project_notification()
 
     def _refresh_glossary_choices(self) -> None:
         self.glossary_choices = []
@@ -1001,6 +1165,64 @@ class MainWindowController(QObject):
             return
         self.ai_selected_models[self.ai_provider_id] = str(self.combo_ai_model.itemData(index))
         self._save_ai_choice()
+
+    def _chat_settings(self) -> AiSettings:
+        return AiSettings(provider_id=self.ai_provider_id, models=self.ai_models,
+                          selected_models=self.ai_selected_models, api_keys=self.ai_api_keys,
+                          concurrency=self.ai_concurrency)
+
+    @staticmethod
+    def _chat_reference(unit: TranslationUnit) -> ChatReference:
+        return ChatReference(unit.id, unit.label, unit.source_text, unit.target_text,
+                             unit.state == UnitState.UNTRANSLATED)
+
+    def _chat_current_file(self) -> ChatFile | None:
+        unit = self.current_unit
+        if unit is None:
+            return None
+        ref = self.imported.source_refs.get(unit.id)
+        if ref is None:
+            return None
+        units = tuple(self._chat_reference(item) for item in self.units
+                      if (item_ref := self.imported.source_refs.get(item.id)) is not None
+                      and item_ref.source_id == ref.source_id)
+        language = self.active_workspace.language_code if self.active_workspace is not None else ""
+        return ChatFile((id(self.imported), language, ref.source_id), self.source_name_for_unit(unit), units)
+
+    def _chat_selected_references(self) -> tuple[ChatReference, ...]:
+        if self.stack.currentIndex() != 0:
+            return (self._chat_reference(self.current_unit),) if self.current_unit is not None else ()
+        rows = sorted({index.row() for index in self.table.selectedIndexes()})
+        return tuple(self._chat_reference(self.filtered_units[row]) for row in rows
+                     if 0 <= row < len(self.filtered_units))
+
+    def _chat_select_units(self, ids: list[str]) -> None:
+        selected_ids = set(ids)
+        if not selected_ids:
+            self.table.clearSelection()
+            return
+        # Make matches visible even if the existing status/text filter excludes them.
+        with QSignalBlocker(self.search), QSignalBlocker(self.status_filter):
+            self.search.clear()
+            self.status_filter.setCurrentText(tr("MainWindow", "すべて"))
+        self.apply_filters()
+        self.show_list_mode()
+        selection_model = self.table.selectionModel()
+        model = self.table.model()
+        if selection_model is None or model is None:
+            raise RuntimeError("翻訳表の選択モデルがありません。")
+        selection = QItemSelection()
+        first_row: int | None = None
+        for row, unit in enumerate(self.filtered_units):
+            if unit.id in selected_ids:
+                selection.select(model.index(row, 0), model.index(row, self.table.columnCount() - 1))
+                if first_row is None:
+                    first_row = row
+        selection_model.select(selection, QItemSelectionModel.SelectionFlag.ClearAndSelect)
+        if first_row is not None:
+            self.current_unit = self.filtered_units[first_row]
+            self.table.scrollTo(model.index(first_row, 0))
+            self.refresh_focus()
 
     def _on_ui_language_changed(self, language_code: str) -> None:
         self._configure_text_presentation()
@@ -1380,6 +1602,7 @@ class MainWindowController(QObject):
             self.window.restoreGeometry(QByteArray.fromHex(layout.geometry.encode("ascii")))
         if layout.state:
             self.window.restoreState(QByteArray.fromHex(layout.state.encode("ascii")))
+            self.chat_dock.restore_visibility()
         if layout.splitter_main:
             self.splitter_main.restoreState(QByteArray.fromHex(layout.splitter_main.encode("ascii")))
         if layout.splitter_focus:
@@ -1420,6 +1643,7 @@ class MainWindowController(QObject):
             self.action_toggle_ai_panel.setChecked(visible)
 
     def _on_main_page_changed(self, index: int) -> None:
+        self.chat_dock.set_workspace_page(index != 0)
         if index == 0:
             self.dock_ai_settings.setVisible(False)
             self.action_toggle_ai_panel.setEnabled(False)
@@ -1429,6 +1653,7 @@ class MainWindowController(QObject):
             self.dock_ai_settings.setVisible(self._ai_dock_workspace_visible)
 
     def load_import(self, imported: ImportedTranslation, service: WorkspaceService | None = None) -> None:
+        self.chat_dock.reset()
         self.output_path = None
         self.imported = imported
         self.project = imported.project
@@ -1439,6 +1664,7 @@ class MainWindowController(QObject):
         self.units = list(self.workspace_service.source_units())
         self.project_path = None
         self._saved_project = None
+        self._refresh_project_notification()
         if service is None:
             self.apply_filter_rules_to_units()
             for unit in self.project.units:
@@ -1529,6 +1755,7 @@ class MainWindowController(QObject):
         self._select_workspace(str(code) if code else None)
 
     def _select_workspace(self, code: str | None) -> None:
+        self.chat_dock.context_changed()
         workspace = self.workspace_service.workspaces.get(code) if code is not None else None
         self.active_workspace = workspace
         self.project.target_language = workspace.language_code if workspace is not None else ""
@@ -1667,6 +1894,8 @@ class MainWindowController(QObject):
             self.refresh_focus_unit_list()
 
     def _unit_status_icon(self, unit: TranslationUnit) -> QIcon | None:
+        if unit.source_changed:
+            return self.icon_manager.get_icon("triangle-alert")
         if unit.hidden or unit.state == UnitState.HIDDEN:
             return self.icon_manager.get_icon("eye-slash")
         if unit.locked or unit.state == UnitState.LOCKED:
@@ -2435,6 +2664,8 @@ class MainWindowController(QObject):
         dialog.exec()
 
     def status_text(self, unit: TranslationUnit) -> str:
+        if unit.source_changed:
+            return tr("MainWindow", "原文更新・要確認")
         if unit.hidden or unit.state == UnitState.HIDDEN:
             return tr("MainWindow", "非表示")
         if unit.locked or unit.state == UnitState.LOCKED:

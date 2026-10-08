@@ -2,10 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
+import logging
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
+from dataclasses import asdict
+from PySide6.QtCore import QIODevice, QSaveFile
+from autolingua2.ir.source_watch import WatchSettings, WatchTarget
+from autolingua2.ir.validation import array, record, required, text
 from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from autolingua2.infrastructure.platform import qt_file_path
+from autolingua2.infrastructure import source_watch
 
 if TYPE_CHECKING:
     from autolingua2.services.ai_providers.registry import ProviderRegistry
@@ -14,6 +21,8 @@ if TYPE_CHECKING:
 GROUP_TRANSLATION_TABLE = "translation_table"
 GROUP_UI = "ui"
 GROUP_AI = "ai"
+GROUP_VOICE_INPUT = "voice_input"
+DEFAULT_VOICE_INPUT_PROVIDER = "system_voice_input"
 GROUP_FILTER_RULES = "filter_rules"
 KEY_COLUMN_ORDER = "column_order"
 KEY_HIDDEN_COLUMNS = "hidden_columns"
@@ -176,6 +185,20 @@ def save_ai_settings(settings: AiSettings) -> None:
 
     data[GROUP_AI] = group
     _write_settings_file(data)
+
+
+def load_voice_input_provider() -> str:
+    voice_settings = _read_settings_file().get(GROUP_VOICE_INPUT, {})
+    if not isinstance(voice_settings, dict):
+        return ""
+    provider_id = voice_settings.get("provider", DEFAULT_VOICE_INPUT_PROVIDER)
+    return provider_id if isinstance(provider_id, str) else ""
+
+
+def save_voice_input_provider(provider_id: str) -> None:
+    settings = _read_settings_file()
+    settings[GROUP_VOICE_INPUT] = {"provider": provider_id}
+    _write_settings_file(settings)
 
 
 def load_ui_language(default: str = DEFAULT_UI_LANGUAGE) -> str:
@@ -366,10 +389,63 @@ def _read_settings_file() -> dict[str, object]:
     return data if isinstance(data, dict) else {}
 
 
+class SettingsSaveError(OSError):
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        super().__init__(f"設定ファイルを保存できませんでした。\n保存先：{path}")
+
+
 def _write_settings_file(settings: dict[str, object]) -> None:
     path = settings_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(settings, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(settings, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
+        output = QSaveFile(qt_file_path(path))
+        output.setDirectWriteFallback(False)
+        if not output.open(QIODevice.OpenModeFlag.WriteOnly):
+            raise OSError(output.errorString())
+        if output.write(payload) != len(payload):
+            error = output.errorString()
+            output.cancelWriting()
+            raise OSError(error)
+        if not output.commit():
+            raise OSError(output.errorString())
+    except (OSError, ImportError, AttributeError) as exc:
+        logging.getLogger(__name__).exception("Settings save failed: %s", path)
+        raise SettingsSaveError(path) from exc
+
+
+def load_watch_settings() -> WatchSettings:
+    data = record(json.loads(source_watch.target_settings(settings_path())))
+    enabled = required(data, "enabled")
+    if type(enabled) is not bool:
+        raise ValueError("監視設定が不正です。")
+    targets: list[WatchTarget] = []
+    seen: set[str] = set()
+    for item in array(required(data, "targets")):
+        target = record(item)
+        path = text(target.get("project_path", ""))
+        root = text(required(target, "source_root"), nonempty=True)
+        if root in seen:
+            raise ValueError("通知・監視対象に重複したプロジェクトがあります。")
+        seen.add(root)
+        targets.append(WatchTarget(
+            path,
+            text(required(target, "name")),
+            root,
+            [text(suffix, nonempty=True) for suffix in array(required(target, "suffixes"))],
+            text(target.get("icon_path", "")), text(target.get("sound_path", "")),
+            text(target.get("adapter_id", "")), text(target.get("source_language", "")),
+        ))
+    return WatchSettings(enabled, targets)
+
+
+def save_watch_settings(settings: WatchSettings) -> None:
+    try:
+        source_watch.save_target_settings(settings_path(), json.dumps(asdict(settings), ensure_ascii=False))
+    except (OSError, ImportError, AttributeError) as exc:
+        logging.getLogger(__name__).exception("Daemon target settings save failed")
+        raise OSError("デーモンの監視設定を保存できませんでした。ネイティブモジュールのビルドを確認してください。") from exc
 
 
 def settings_path() -> Path:
