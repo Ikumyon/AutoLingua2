@@ -330,21 +330,28 @@ def save_ui_display_flags(render_newlines: bool, highlight_tags: bool, apply_col
     _write_settings_file(settings)
 
 
-def load_adapter_filter_rules(adapter_id: str) -> dict[str, object]:
+def load_game_filter_rules(adapter_id: str, game_id: str) -> dict[str, object] | None:
     settings = _read_settings_file()
     rules_group = settings.get(GROUP_FILTER_RULES, {})
     if not isinstance(rules_group, dict):
-        return {}
+        return None
     adapter_rules = rules_group.get(adapter_id, {})
-    return adapter_rules if isinstance(adapter_rules, dict) else {}
+    if not isinstance(adapter_rules, dict):
+        return None
+    game_rules = adapter_rules.get(game_id)
+    return game_rules if isinstance(game_rules, dict) else None
 
 
-def save_adapter_filter_rules(adapter_id: str, rules_data: dict[str, object]) -> None:
+def save_game_filter_rules(adapter_id: str, game_id: str, rules_data: dict[str, object]) -> None:
     settings = _read_settings_file()
     rules_group = settings.get(GROUP_FILTER_RULES, {})
     if not isinstance(rules_group, dict):
         rules_group = {}
-    rules_group[adapter_id] = rules_data
+    adapter_rules = rules_group.get(adapter_id, {})
+    if not isinstance(adapter_rules, dict):
+        adapter_rules = {}
+    adapter_rules[game_id] = rules_data
+    rules_group[adapter_id] = adapter_rules
     settings[GROUP_FILTER_RULES] = rules_group
     _write_settings_file(settings)
 

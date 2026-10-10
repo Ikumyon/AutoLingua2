@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Mapping
 from io import BytesIO
 import json
 from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
@@ -16,6 +17,8 @@ from autolingua2.ir.unit import TranslationUnit
 from autolingua2.ir.validation import array, record, required, text
 from autolingua2.ir.workspace import TranslationRecord, Workspace
 from autolingua2.services.workspaces import Language, WorkspaceService, normalize_language_code
+from autolingua2.adapters.base import FileAdapter
+from autolingua2.services.source_classification import classify_sources
 
 
 @dataclass
@@ -204,7 +207,7 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
     return ProjectArchive(ImportedTranslation(project, refs), restored, languages)
 
 
-def load_project(path: Path) -> ProjectArchive:
+def load_project(path: Path, adapters: Mapping[str, FileAdapter]) -> ProjectArchive:
     documents: dict[str, object] = {}
     with ZipFile(path, "r") as archive:
         for info in archive.infolist():
@@ -212,7 +215,12 @@ def load_project(path: Path) -> ProjectArchive:
             if info.filename in documents or info.is_dir():
                 raise ValueError("プロジェクト内のファイルが重複または不正です。")
             documents[info.filename] = json.loads(archive.read(info).decode("utf-8"), object_pairs_hook=_unique_object)
-    return _restore(documents)
+    restored = _restore(documents)
+    adapter = adapters.get(restored.imported.project.adapter_id)
+    if adapter is None:
+        raise ValueError("プロジェクトの読み込み方式がありません。")
+    classify_sources(restored.imported, adapter)
+    return restored
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:

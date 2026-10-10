@@ -6,7 +6,8 @@ from collections.abc import Callable
 
 from autolingua2.plugins.contracts import (
     Issue, TranslationProject, TranslationSource, TranslationUnit,
-    GameProfile, GameSlot, ImportedTranslation, SourceRef, FilterRule,
+    GameProfile, GameSlot, ImportedTranslation, SourceRef, FilterRule, TagKind,
+    KeyEntry, KeyFile,
 )
 
 
@@ -64,16 +65,19 @@ PARADOX_GAMES: list[GameProfile] = [
     GameProfile(id="generic", name="その他のゲーム / 汎用", slots=PARADOX_STANDARD_SLOTS, default_slot_id="l_english"),
 ]
 
-PARADOX_YAML_BUILTIN_RULES: list[FilterRule] = [
-    FilterRule(id="paradox_1", enabled=True, rule_type="デフォルト", pattern=r"@\w+\s?", example="", is_builtin=True),
-    FilterRule(id="paradox_2", enabled=True, rule_type="デフォルト", pattern=r"@?\[[\^\[\]]+\]", example="", is_builtin=True),
-    FilterRule(id="paradox_3", enabled=True, rule_type="デフォルト", pattern=r"£[\w\|]+?[£\s]", example="", is_builtin=True),
-    FilterRule(id="paradox_4", enabled=True, rule_type="デフォルト", pattern=r"[@£]\$.+?\$", example="", is_builtin=True),
-    FilterRule(id="paradox_5", enabled=True, rule_type="デフォルト", pattern=r"\$[\w.@-]+\$|*[^$]*\$", example="", is_builtin=True),
-    FilterRule(id="paradox_6", enabled=True, rule_type="開始", pattern=r"§\w", example="", is_builtin=True),
-    FilterRule(id="paradox_7", enabled=True, rule_type="終了", pattern=r"§!", example="", is_builtin=True),
-    FilterRule(id="paradox_8", enabled=True, rule_type="デフォルト", pattern=r"¤", example="", is_builtin=True),
-    FilterRule(id="paradox_9", enabled=True, rule_type="デフォルト", pattern=r"@[A-Z]+(\s|$)", example="", is_builtin=True),
+PARADOX_YAML_DEFAULT_RULES: list[FilterRule] = [
+    FilterRule("paradox_color", TagKind.NON_TEXT, pattern=r"§[^\r\n]", example="§Y / §!"),
+    FilterRule("paradox_newline", TagKind.NON_TEXT, pattern=r"\\n", example=r"\n"),
+    FilterRule("paradox_scope", TagKind.TEXT,
+               pattern=r"@?\[[^\[\]\r\n]+\]", example="[Root.GetName]"),
+    FilterRule("paradox_reference", TagKind.TEXT,
+               pattern=r"[@£]?\$[^$\r\n]+\$", example="$NAME$ / @$ICON$"),
+    FilterRule("paradox_icon", TagKind.NON_TEXT,
+               pattern=r"£[^£\r\n]*£|¤", example="£gold£ / ¤"),
+    FilterRule("paradox_at_icon", TagKind.TEXT,
+               pattern=r"@[\w]+!", example="@gold!"),
+    FilterRule("paradox_variable", TagKind.TEXT,
+               pattern=r"(?<!\w)@\w+", example="@variable"),
 ]
 
 
@@ -85,10 +89,11 @@ class ParadoxYamlAdapter:
     supported_languages: list[tuple[str, str]] = list(dict.fromkeys(
         (slot.language_code, slot.name) for slot in PARADOX_STANDARD_SLOTS
     ))
-    default_filter_rules = PARADOX_YAML_BUILTIN_RULES
+    default_filter_rules = PARADOX_YAML_DEFAULT_RULES
 
-    def __init__(self, read_text: Callable[[Path], str]) -> None:
+    def __init__(self, read_text: Callable[[Path], str], detect_encoding: Callable[[bytes], str]) -> None:
         self._read_text = read_text
+        self._detect_encoding = detect_encoding
 
     def can_load(self, path: Path) -> bool:
         return path.is_file() and path.suffix.lower() in self.suffixes
@@ -138,6 +143,34 @@ class ParadoxYamlAdapter:
 
     def load(self, path: Path) -> ImportedTranslation:
         text = self._read_text(path)
+        return self._load_text(path, text)
+
+    def inspect_key_file(self, path: Path) -> KeyFile:
+        content = path.read_bytes()
+        encoding = self._detect_encoding(content)
+        bom = next((mark for mark in (b"\xef\xbb\xbf", b"\xff\xfe", b"\xfe\xff")
+                    if content.startswith(mark)), b"")
+        text = content[len(bom):].decode(encoding)
+        if bom + text.encode(encoding) != content:
+            raise ValueError(f"文字コードを保持して修正できません: {path}")
+        imported = self._load_text(path, text)
+        language = imported.project.source_language
+        if not language:
+            raise ValueError(f"言語を検出できません: {path}")
+        entries = tuple(KeyEntry(unit.label, language, unit.source_text,
+                                 int(imported.source_refs[unit.id].location))
+                        for unit in imported.project.units)
+        return KeyFile(path.resolve(), content, encoding, bom, entries)
+
+    def remove_key_lines(self, snapshot: KeyFile, lines: set[int]) -> bytes:
+        if not lines <= {entry.line_number for entry in snapshot.entries}:
+            raise ValueError("削除するキー行が見つかりません。")
+        text = snapshot.content[len(snapshot.bom):].decode(snapshot.encoding)
+        remaining = "".join(line for number, line in enumerate(text.splitlines(keepends=True), 1)
+                            if number not in lines)
+        return snapshot.bom + remaining.encode(snapshot.encoding)
+
+    def _load_text(self, path: Path, text: str) -> ImportedTranslation:
         source_id = str(path.resolve())
         source = TranslationSource(id=source_id, name=path.name)
         project = TranslationProject(sources=[source])
@@ -185,6 +218,7 @@ class ParadoxYamlAdapter:
         if not language_header:
             source.issues.append(Issue(message="言語ヘッダが見つかりません"))
         project.source_slot = language_header
+        project.source_language = SLOT_LANGUAGE.get(language_header) or detect_file_language_from_name(path) or ""
 
         return ImportedTranslation(project=project, source_refs=source_refs)
 

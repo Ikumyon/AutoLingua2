@@ -1,16 +1,17 @@
-"""EU4 display syntax and palette, owned exclusively by the Paradox plugin."""
+"""Game palettes and EU4 display syntax, owned exclusively by the Paradox plugin."""
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 
 from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat, QTextDocument
 
 from autolingua2.plugins.api import GameTextPresentation, NewlineCodec, PluginContext
+from autolingua2.plugins.contracts import GameProfile
 from .translations import tr
 
 GAME_ID = "eu4"
-PAGE_ID = "paradox_yaml_eu4_colors"
+PAGE_ID = "paradox_yaml_colors"
 DEFAULT_COLORS = {
     "W": "#ffffff", "B": "#0000ff", "G": "#00ff00", "R": "#ff3232",
     "b": "#000000", "g": "#b0b0b0", "Y": "#ffbd00", "M": "#23ceff",
@@ -43,24 +44,28 @@ def presentation(game_id: str) -> GameTextPresentation | None:
     )
 
 
-class Eu4Palette:
-    """Cached palette; migration occurs once, rendering performs no file I/O."""
+class ParadoxPalette:
+    """Game-specific cached palettes; rendering performs no file I/O."""
 
-    def __init__(self, context: PluginContext) -> None:
+    def __init__(self, context: PluginContext, games: Sequence[GameProfile]) -> None:
         self.context = context
+        self.games = tuple(games)
         settings = context.settings.load()
-        if "color_tags" in settings:
-            legacy = settings.pop("color_tags")
-            games = settings.get("games")
-            games = dict(games) if isinstance(games, dict) else {}
-            if GAME_ID not in games:
-                games[GAME_ID] = {"color_tags": legacy}
-            settings["games"] = games
-            context.settings.save(settings)
-        games = settings.get("games")
-        game = games.get(GAME_ID) if isinstance(games, dict) else None
-        saved = game.get("color_tags") if isinstance(game, dict) else None
-        self.colors = self._validate(saved) if isinstance(saved, dict) else dict(DEFAULT_COLORS)
+        saved_games = settings.get("games")
+        self._colors: dict[str, dict[str, str]] = {}
+        for profile in self.games:
+            game = saved_games.get(profile.id) if isinstance(saved_games, dict) else None
+            saved = game.get("color_tags") if isinstance(game, dict) else None
+            self._colors[profile.id] = (
+                self._validate(saved) if isinstance(saved, dict) else self.default_colors(profile.id)
+            )
+
+    @staticmethod
+    def default_colors(game_id: str) -> dict[str, str]:
+        return dict(DEFAULT_COLORS) if game_id == GAME_ID else {}
+
+    def colors_for_game(self, game_id: str) -> Mapping[str, str]:
+        return self._colors[game_id]
 
     @staticmethod
     def _validate(value: dict[object, object]) -> dict[str, str]:
@@ -68,17 +73,22 @@ class Eu4Palette:
                 if isinstance(key, str) and re.fullmatch(r"[a-zA-Z0-9]", key)
                 and isinstance(color, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", color)}
 
-    def save(self, colors: dict[str, str]) -> None:
+    def save(self, colors_by_game: dict[str, dict[str, str]]) -> None:
+        if not colors_by_game:
+            return
+        if not colors_by_game.keys() <= self._colors.keys():
+            raise ValueError("Unknown Paradox game palette")
         settings = self.context.settings.load()
         saved_games = settings.get("games")
         games = dict(saved_games) if isinstance(saved_games, dict) else {}
-        saved_game = games.get(GAME_ID)
-        game = dict(saved_game) if isinstance(saved_game, dict) else {}
-        game["color_tags"] = dict(colors)
-        games[GAME_ID] = game
+        for game_id, colors in colors_by_game.items():
+            saved_game = games.get(game_id)
+            game = dict(saved_game) if isinstance(saved_game, dict) else {}
+            game["color_tags"] = dict(colors)
+            games[game_id] = game
         settings["games"] = games
         self.context.settings.save(settings)
-        self.colors = dict(colors)
+        self._colors.update({game_id: dict(colors) for game_id, colors in colors_by_game.items()})
         self.context.notify_display_changed()
 
     def create_highlighter(
@@ -97,7 +107,7 @@ class Eu4Highlighter(QSyntaxHighlighter):
     Qt formatting offsets are UTF-16 units, unlike Python regex offsets.
     """
 
-    def __init__(self, document: QTextDocument, palette: Eu4Palette,
+    def __init__(self, document: QTextDocument, palette: ParadoxPalette,
                  highlight_tags: Callable[[], bool], apply_colors: Callable[[], bool]) -> None:
         super().__init__(document)
         self._palette = palette
@@ -107,6 +117,7 @@ class Eu4Highlighter(QSyntaxHighlighter):
         self._state_ids: dict[tuple[str, ...], int] = {(): 0}
 
     def highlightBlock(self, text: str) -> None:
+        colors = self._palette.colors_for_game(GAME_ID)
         offsets = [0]
         for char in text:
             offsets.append(offsets[-1] + (2 if ord(char) > 0xFFFF else 1))
@@ -128,16 +139,16 @@ class Eu4Highlighter(QSyntaxHighlighter):
         start = 0
         for match in re.finditer(r"§([a-zA-Z0-9!])", text):
             if stack and self._apply_colors():
-                paint(start, match.start(), self._palette.colors[stack[-1]])
+                paint(start, match.start(), colors[stack[-1]])
             code = match.group(1)
             if code == "!":
                 if stack:
                     stack.pop()
-            elif code in self._palette.colors:
+            elif code in colors:
                 stack.append(code)
             start = match.end()
         if stack and self._apply_colors():
-            paint(start, len(text), self._palette.colors[stack[-1]])
+            paint(start, len(text), colors[stack[-1]])
         state = tuple(stack)
         state_id = self._state_ids.get(state)
         if state_id is None:

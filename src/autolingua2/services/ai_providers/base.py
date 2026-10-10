@@ -44,6 +44,14 @@ class AiProviderPlugin(Protocol):
 
     def create(self, api_key: str, model: str) -> TextTranslator: ...
 
+    def create_settings_widget(
+        self,
+        parent: Any = None,
+        *,
+        current_api_key: str = "",
+        on_api_key_changed: Any = None,
+    ) -> Any | None: ...
+
 
 MASTER_SYSTEM_PROMPT = (
     "あなたはゲーム翻訳者です。与えられたテキストを{source_language}から{target_language}に翻訳してください。\n"
@@ -92,10 +100,15 @@ def build_system_prompt_template(
     他言語でキャッシュがない場合、安全ガード（allow_sync_translation）が有効な場合のみ
     翻訳を実行し、それ以外（接続テスト中など）は原本を返してUIフリーズを防ぎます。
     """
+    # 口調システムは、ユーザーが自然言語の母語で指示を書くことを想定している。
+    # 日本語の共通指示文と母語の口調指示が混在するのを防ぐため、
+    # 共通指示文をOS言語へ翻訳し、ユーザーが口調を書く言語に合わせる。
     lang = target_language or system_language()
     if is_default_language(lang):
         return MASTER_SYSTEM_PROMPT
 
+    # 同じ原本は翻訳済みテンプレートを再利用し、指示文の翻訳を繰り返さない。
+    # 原本の改訂後に古い翻訳を使わないよう、ハッシュで更新を検出する。
     current_hash = get_prompt_hash(MASTER_SYSTEM_PROMPT)
     cache = _load_prompt_cache()
     cached_entry = cache.get(lang)
@@ -206,6 +219,7 @@ class BaseHttpTranslator(TextTranslator, ABC):
             translator=self,
             allow_sync_translation=allow_sync_translation,
         )
+        # ユーザーが母語で記述した口調指示を、OS言語に合わせた共通指示文へ差し込む。
         tone_section = f"口調: {tone}\n" if tone and tone.strip() else ""
         return template.format(
             source_language=source_language,
@@ -300,3 +314,13 @@ class BaseAiProvider(AiProviderPlugin, ABC):
 
     def create(self, api_key: str, model: str) -> TextTranslator:
         return self.translator_class(api_key=api_key, model=model)
+
+    def create_settings_widget(
+        self,
+        parent: Any = None,
+        *,
+        current_api_key: str = "",
+        on_api_key_changed: Any = None,
+    ) -> Any | None:
+        """設定ダイアログのスタックに表示するプロバイダー固有ウィジェット（None の場合は標準APIキー画面）。"""
+        return None

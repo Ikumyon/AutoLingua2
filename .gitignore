@@ -42,5 +42,6 @@ desktop.ini
 docs/
 examples/
 scripts/
+fixtures/
 .gitignore
 AGENTS.md

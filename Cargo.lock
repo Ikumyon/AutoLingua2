@@ -461,6 +461,7 @@ dependencies = [
  "encoding_rs",
  "libc",
  "pyo3",
+ "rayon",
  "serde_json",
  "url",
  "windows",

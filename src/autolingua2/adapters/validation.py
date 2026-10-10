@@ -9,8 +9,7 @@ def validate_adapter(adapter: FileAdapter) -> None:
             raise ValueError(f"Missing adapter attribute: {name}")
     if not isinstance(adapter.id, str) or not adapter.id.strip():
         raise ValueError("Adapter ID must be a nonempty string")
-    for name in ("can_load", "load", "detect_source_language",
-                 "filter_source_files"):
+    for name in ("can_load", "load", "detect_source_language", "filter_source_files"):
         if not callable(getattr(adapter, name, None)):
             raise ValueError(f"Missing adapter method: {name}")
     language_codes: set[str] = set()

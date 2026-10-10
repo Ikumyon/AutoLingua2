@@ -132,7 +132,6 @@ class ExecutableAdapter:
             raise PluginRPCError("protocol", "ソースIDは読み込んだファイルの絶対パスにしてください。")
         return result
 
-
 class ExecutableExporter:
     def __init__(self, rpc: PluginRPC, description: dict[str, object]) -> None:
         self.rpc = rpc
@@ -141,7 +140,11 @@ class ExecutableExporter:
 
     def plan(self, workspaces: list[ImportedTranslation], settings: dict[str, object]) -> list[ExportFile]:
         result = array(self.rpc.call("export_plan", {
-            "exporter_id": self.id, "workspaces": [asdict(item) for item in workspaces], "settings": settings,
+            "exporter_id": self.id,
+            "workspaces": [{"project": asdict(item.project),
+                            "source_refs": {key: asdict(ref) for key, ref in item.source_refs.items()}}
+                           for item in workspaces],
+            "settings": settings,
         }))
         files: list[ExportFile] = []
         for value in result:

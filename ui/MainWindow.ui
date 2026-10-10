@@ -249,33 +249,6 @@
                     <number>0</number>
                    </property>
                    <item>
-                    <widget class="QFrame" name="frameDropZone">
-                     <property name="acceptDrops">
-                      <bool>true</bool>
-                     </property>
-                     <property name="styleSheet">
-                      <string notr="true">QFrame#frameDropZone { border-width: 1.5px; border-style: dashed; border-radius: 6px; padding: 10px; }</string>
-                     </property>
-                     <property name="frameShape">
-                      <enum>QFrame::Shape::StyledPanel</enum>
-                     </property>
-                     <layout class="QVBoxLayout" name="layoutTargetDropInner">
-                      <property name="leftMargin">
-                       <number>0</number>
-                      </property>
-                      <property name="topMargin">
-                       <number>0</number>
-                      </property>
-                      <property name="rightMargin">
-                       <number>0</number>
-                      </property>
-                      <property name="bottomMargin">
-                       <number>0</number>
-                      </property>
-                     </layout>
-                    </widget>
-                   </item>
-                   <item>
                     <layout class="QVBoxLayout" name="layoutNameAndGame">
                      <property name="spacing">
                       <number>6</number>
@@ -426,34 +399,222 @@
                     </layout>
                    </item>
                    <item>
-                    <layout class="QVBoxLayout" name="layoutTargetSection">
-                     <property name="spacing">
-                      <number>6</number>
+                    <widget class="QTabWidget" name="tabProjectInputs">
+                     <property name="currentIndex">
+                      <number>0</number>
                      </property>
-                     <item>
-                      <widget class="QLabel" name="labelTargetPrompt">
-                       <property name="styleSheet">
-                        <string notr="true">font-weight: 600;</string>
+                     <widget class="QWidget" name="tabSource">
+                      <attribute name="title">
+                       <string>原文</string>
+                      </attribute>
+                      <attribute name="toolTip">
+                       <string>翻訳対象のファイルまたはフォルダを追加します（必須）</string>
+                      </attribute>
+                      <layout class="QVBoxLayout" name="layoutTabSource">
+                       <property name="spacing">
+                        <number>6</number>
                        </property>
-                       <property name="text">
-                        <string>追加された翻訳対象:</string>
+                       <item>
+                        <widget class="QFrame" name="frameDropZone">
+                         <property name="acceptDrops">
+                          <bool>true</bool>
+                         </property>
+                         <property name="styleSheet">
+                          <string notr="true">QFrame#frameDropZone { border-width: 1.5px; border-style: dashed; border-radius: 6px; padding: 10px; }</string>
+                         </property>
+                         <property name="frameShape">
+                          <enum>QFrame::Shape::StyledPanel</enum>
+                         </property>
+                         <layout class="QVBoxLayout" name="layoutTargetDropInner">
+                          <property name="leftMargin">
+                           <number>0</number>
+                          </property>
+                          <property name="topMargin">
+                           <number>0</number>
+                          </property>
+                          <property name="rightMargin">
+                           <number>0</number>
+                          </property>
+                          <property name="bottomMargin">
+                           <number>0</number>
+                          </property>
+                         </layout>
+                        </widget>
+                       </item>
+                       <item>
+                        <layout class="QVBoxLayout" name="layoutTargetSection">
+                         <property name="spacing">
+                          <number>6</number>
+                         </property>
+                         <item>
+                          <widget class="QLabel" name="labelTargetPrompt">
+                           <property name="styleSheet">
+                            <string notr="true">font-weight: 600;</string>
+                           </property>
+                           <property name="text">
+                            <string>追加された原文:</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <widget class="QListWidget" name="listTargetItems">
+                           <property name="minimumSize">
+                            <size>
+                             <width>0</width>
+                             <height>110</height>
+                            </size>
+                           </property>
+                           <property name="styleSheet">
+                            <string notr="true">border: 1px solid palette(mid); border-radius: 4px; background-color: palette(base);</string>
+                           </property>
+                          </widget>
+                         </item>
+                        </layout>
+                       </item>
+                      </layout>
+                     </widget>
+                     <widget class="QWidget" name="tabInherit">
+                      <attribute name="title">
+                       <string>翻訳を継承</string>
+                      </attribute>
+                      <attribute name="toolTip">
+                       <string>既存の翻訳ファイルから訳文を引き継ぎます（原文追加後に有効化）</string>
+                      </attribute>
+                      <layout class="QVBoxLayout" name="layoutTabInherit">
+                       <property name="spacing">
+                        <number>6</number>
                        </property>
-                      </widget>
-                     </item>
-                     <item>
-                      <widget class="QListWidget" name="listTargetItems">
-                       <property name="minimumSize">
-                        <size>
-                         <width>0</width>
-                         <height>130</height>
-                        </size>
-                       </property>
-                       <property name="styleSheet">
-                        <string notr="true">border: 1px solid palette(mid); border-radius: 4px; background-color: palette(base);</string>
-                       </property>
-                      </widget>
-                     </item>
-                    </layout>
+                       <item>
+                        <widget class="QFrame" name="frameInheritDropZone">
+                         <property name="acceptDrops">
+                          <bool>true</bool>
+                         </property>
+                         <property name="styleSheet">
+                          <string notr="true">QFrame#frameInheritDropZone { border-width: 1.5px; border-style: dashed; border-radius: 6px; padding: 10px; }</string>
+                         </property>
+                         <property name="frameShape">
+                          <enum>QFrame::Shape::StyledPanel</enum>
+                         </property>
+                         <layout class="QVBoxLayout" name="layoutInheritDropInner">
+                          <property name="spacing">
+                           <number>8</number>
+                          </property>
+                          <item>
+                           <widget class="QLabel" name="labelInheritDropPrompt">
+                            <property name="styleSheet">
+                             <string notr="true">font-weight: bold; font-size: 12px;</string>
+                            </property>
+                            <property name="text">
+                             <string>既存の翻訳済みファイル・フォルダをここにドロップ</string>
+                            </property>
+                            <property name="alignment">
+                             <set>Qt::AlignmentFlag::AlignCenter</set>
+                            </property>
+                           </widget>
+                          </item>
+                          <item>
+                           <layout class="QHBoxLayout" name="layoutInheritButtons">
+                            <property name="spacing">
+                             <number>8</number>
+                            </property>
+                            <item>
+                             <spacer name="spacerInheritLeft">
+                              <property name="orientation">
+                               <enum>Qt::Orientation::Horizontal</enum>
+                              </property>
+                              <property name="sizeHint" stdset="0">
+                               <size>
+                                <width>40</width>
+                                <height>20</height>
+                               </size>
+                              </property>
+                             </spacer>
+                            </item>
+                            <item>
+                             <widget class="QPushButton" name="buttonInheritFolder">
+                              <property name="text">
+                               <string>フォルダ追加</string>
+                              </property>
+                             </widget>
+                            </item>
+                            <item>
+                             <widget class="QPushButton" name="buttonInheritFile">
+                              <property name="text">
+                               <string>ファイル追加</string>
+                              </property>
+                             </widget>
+                            </item>
+                            <item>
+                             <spacer name="spacerInheritRight">
+                              <property name="orientation">
+                               <enum>Qt::Orientation::Horizontal</enum>
+                              </property>
+                              <property name="sizeHint" stdset="0">
+                               <size>
+                                <width>40</width>
+                                <height>20</height>
+                               </size>
+                              </property>
+                             </spacer>
+                            </item>
+                           </layout>
+                          </item>
+                         </layout>
+                        </widget>
+                       </item>
+                       <item>
+                        <layout class="QVBoxLayout" name="layoutInheritSection">
+                         <property name="spacing">
+                          <number>6</number>
+                         </property>
+                         <item>
+                          <widget class="QLabel" name="labelInheritPrompt">
+                           <property name="styleSheet">
+                            <string notr="true">font-weight: 600;</string>
+                           </property>
+                           <property name="text">
+                            <string>追加された既存訳:</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <widget class="QListWidget" name="listInheritItems">
+                           <property name="minimumSize">
+                            <size>
+                             <width>0</width>
+                             <height>110</height>
+                            </size>
+                           </property>
+                           <property name="styleSheet">
+                            <string notr="true">border: 1px solid palette(mid); border-radius: 4px; background-color: palette(base);</string>
+                           </property>
+                          </widget>
+                         </item>
+                        </layout>
+                       </item>
+                       <item>
+                        <layout class="QHBoxLayout" name="layoutInheritState">
+                         <property name="spacing">
+                          <number>8</number>
+                         </property>
+                         <item>
+                          <widget class="QLabel" name="labelInheritState">
+                           <property name="styleSheet">
+                            <string notr="true">font-weight: 600;</string>
+                           </property>
+                           <property name="text">
+                            <string>取り込み時の状態:</string>
+                           </property>
+                          </widget>
+                         </item>
+                         <item>
+                          <widget class="QComboBox" name="comboInheritState"/>
+                         </item>
+                        </layout>
+                       </item>
+                      </layout>
+                     </widget>
+                    </widget>
                    </item>
                   </layout>
                  </widget>
@@ -652,19 +813,6 @@
             </property>
             <property name="text">
              <string>▶ 全翻訳</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="buttonStopTranslation">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="styleSheet">
-             <string notr="true">padding: 4px 14px;</string>
-            </property>
-            <property name="text">
-             <string>■ 停止</string>
             </property>
            </widget>
           </item>

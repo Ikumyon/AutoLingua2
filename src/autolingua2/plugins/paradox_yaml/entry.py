@@ -2,7 +2,7 @@ from autolingua2.plugins.api import PluginContext, PluginContribution, UIContrib
 from .parser import ParadoxYamlAdapter
 from .parser.exporter import ParadoxYamlExporter
 from .ui.export_settings import ParadoxExportSettings
-from .ui.eu4 import Eu4Palette, presentation
+from .ui.eu4 import ParadoxPalette, presentation
 from .ui.panel import ParadoxCreationAdapter
 from .ui.settings_page import ParadoxSettingsPageProvider
 from .ui.translations import PluginTranslations
@@ -16,7 +16,9 @@ def register(context: PluginContext) -> None:
     context.on_language_changed(creation_ui.change_language)
     context.on_close(creation_ui.close)
 
-    palette = Eu4Palette(context)
+    adapter = ParadoxYamlAdapter(lambda p: context.files.read_text_auto(p)[0],
+                                 context.files.detect_encoding)
+    palette = ParadoxPalette(context, adapter.supported_games)
     ui = UIContribution(
         creation_panel=creation_ui,
         settings_pages=[ParadoxSettingsPageProvider(palette)],
@@ -27,7 +29,7 @@ def register(context: PluginContext) -> None:
 
     context.register(PluginContribution(
         id="paradox_yaml",
-        parser=ParadoxYamlAdapter(lambda p: context.files.read_text_auto(p)[0]),
+        parser=adapter,
         ui=ui,
         exporters=[ParadoxYamlExporter()],
     ))

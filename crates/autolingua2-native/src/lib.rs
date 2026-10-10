@@ -4,6 +4,8 @@ use pyo3::prelude::*;
 pub mod bootstrap;
 #[cfg(feature = "python")]
 pub mod encoding;
+#[cfg(feature = "python")]
+pub mod classification;
 pub mod platform;
 pub mod source_watch;
 
@@ -43,6 +45,10 @@ fn autolingua2_native(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     let watch_module = PyModule::new(py, "source_watch")?;
     source_watch::bindings::register(&watch_module)?;
     m.add_submodule(&watch_module)?;
+
+    let classification_module = PyModule::new(py, "classification")?;
+    classification::register(&classification_module)?;
+    m.add_submodule(&classification_module)?;
 
     Ok(())
 }

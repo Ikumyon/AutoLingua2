@@ -5,6 +5,7 @@ from typing import Callable
 from PySide6.QtWidgets import QHeaderView, QLineEdit, QMessageBox, QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QWidget
 
 from autolingua2.services.workspaces import WorkspaceService
+from autolingua2.services.translation_memory import TranslationMemoryError
 from autolingua2.ui.dialogs.base import SimpleDialogController, require_child
 from autolingua2.ui.i18n import tr
 from autolingua2.ui.language_names import workspace_language_name
@@ -53,7 +54,11 @@ class WorkspaceLanguageDialog(SimpleDialogController):
                 QMessageBox.StandardButton.Cancel)
             if answer != QMessageBox.StandardButton.Yes:
                 return
-            self.service.remove(code)
+            try:
+                self.service.remove(code)
+            except TranslationMemoryError as exc:
+                QMessageBox.warning(self.dialog, tr("WorkspaceLanguageDialog", "翻訳メモリ保存エラー"), str(exc))
+                return
             self.changed(None)
         else:
             self.service.add(code)

@@ -27,6 +27,7 @@ class WorkspaceUnit:
 
     source: TranslationUnit
     record: TranslationRecord
+    excluded_unit_ids: set[str] = field(default_factory=set, repr=False)
 
     @property
     def source_changed(self) -> bool:
@@ -72,7 +73,7 @@ class WorkspaceUnit:
 
     @property
     def hidden(self) -> bool:
-        return self.state == UnitState.HIDDEN
+        return self.id in self.excluded_unit_ids or self.state == UnitState.HIDDEN
 
     @hidden.setter
     def hidden(self, value: bool) -> None:

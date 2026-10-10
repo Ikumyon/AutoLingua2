@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 import re
 
 from PySide6.QtCore import QLocale
 
+from autolingua2.ir import UnitState
+from autolingua2.ir.classification import SourceCategory
 from autolingua2.ir.imported import ImportedTranslation
-from autolingua2.ir.workspace import TranslationRecord, Workspace, WorkspaceUnit
+from autolingua2.ir.workspace import TranslationRecord, UnitView, Workspace, WorkspaceUnit
 from autolingua2.services.settings_store import load_custom_languages, save_custom_languages
+from autolingua2.services.translation_memory import TranslationMemoryError, TranslationMemoryStore
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +30,9 @@ def normalize_language_code(value: str) -> str:
 class WorkspaceService:
     def __init__(self, imported: ImportedTranslation) -> None:
         self.imported = imported
+        self.translation_memory = TranslationMemoryStore()
         self.workspaces: dict[str, Workspace] = {}
+        self._pending_targets: dict[tuple[str, str], str] = {}
         self.languages: dict[str, Language] = {}
         for locale in QLocale.matchingLocales(QLocale.Language.AnyLanguage,
                                              QLocale.Script.AnyScript,
@@ -44,6 +50,13 @@ class WorkspaceService:
             self.languages[code] = Language(code, name)
         if imported.project.sources:
             self.add(imported.project.source_language)
+        for code, workspace in imported.inherited_workspaces.items():
+            if code not in self.languages:
+                self.languages[code] = Language(code, code)
+            self.workspaces[code] = replace(workspace, records={
+                unit_id: replace(record) for unit_id, record in workspace.records.items()
+            })
+        imported.inherited_workspaces.clear()
 
     def register(self, name: str, code: str) -> str:
         name = name.strip()
@@ -67,14 +80,85 @@ class WorkspaceService:
         return workspace
 
     def source_units(self) -> list[WorkspaceUnit]:
-        return [WorkspaceUnit(unit, TranslationRecord(state=unit.state))
+        return [WorkspaceUnit(unit, TranslationRecord(state=unit.state), self.imported.excluded_unit_ids)
                 for unit in self.imported.project.units]
 
     def remove(self, code: str) -> None:
+        project = self.imported.project
+        self.translation_memory.record_snapshots(
+            project.adapter_id, project.game_id, project.source_root,
+            project.source_language, {code: []},
+        )
         del self.workspaces[code]
+        self._pending_targets = {identity: text for identity, text in self._pending_targets.items()
+                                 if identity[0] != code}
 
     def units(self, workspace: Workspace) -> list[WorkspaceUnit]:
-        return [WorkspaceUnit(unit, workspace.records[unit.id]) for unit in self.imported.project.units]
+        return [WorkspaceUnit(unit, workspace.records[unit.id], self.imported.excluded_unit_ids)
+                for unit in self.imported.project.units]
+
+    def exact_peers(self, workspace: Workspace, unit_id: str) -> list[WorkspaceUnit]:
+        """Return other members of the existing exact group in this language."""
+        classification = self.imported.classification
+        if classification is None:
+            return []
+        group = next((group for group in classification.groups
+                      if group.category == SourceCategory.EXACT
+                      and any(element.unit_id == unit_id for element in group.elements)), None)
+        if group is None:
+            return []
+        member_ids = {element.unit_id for element in group.elements if element.unit_id != unit_id}
+        return [WorkspaceUnit(unit, workspace.records[unit.id], self.imported.excluded_unit_ids)
+                for unit in self.imported.project.units if unit.id in member_ids]
+
+    def share_translation(
+        self, workspace: Workspace, unit_id: str, states: set[UnitState], *, manual: bool,
+    ) -> list[WorkspaceUnit]:
+        """Share text with selected states; review remains an individual action."""
+        source = workspace.records[unit_id]
+        shared_state = UnitState.HUMAN_TRANSLATED if manual else UnitState.AI_TRANSLATED
+        changed: list[WorkspaceUnit] = []
+        for unit in self.exact_peers(workspace, unit_id):
+            if unit.state in states:
+                unit.target_text = source.target_text
+                unit.state = shared_state
+                changed.append(unit)
+        return changed
+
+    def begin_translation_edit(self, workspace: Workspace, unit_id: str) -> None:
+        """Keep the last confirmed text while the focus editor updates the live model."""
+        self._pending_targets.setdefault((workspace.language_code, unit_id), workspace.records[unit_id].target_text)
+
+    def record_translations(self, workspace: Workspace, units: Sequence[UnitView]) -> None:
+        """Synchronize a complete workspace, including removed or cleared translations."""
+        if self.workspaces.get(workspace.language_code) is not workspace:
+            raise TranslationMemoryError("記録先の翻訳ワークスペースが見つかりません。")
+        for unit in units:
+            if unit.id not in workspace.records:
+                raise TranslationMemoryError("記録する翻訳項目が見つかりません。")
+            self._pending_targets.pop((workspace.language_code, unit.id), None)
+        self._record_workspaces({workspace.language_code: workspace})
+
+    def record_all_translations(self) -> None:
+        self._record_workspaces(self.workspaces)
+
+    def _record_workspaces(self, workspaces: dict[str, Workspace]) -> None:
+        snapshots = {code: self._translation_pairs(workspace) for code, workspace in workspaces.items()}
+        project = self.imported.project
+        self.translation_memory.record_snapshots(
+            project.adapter_id, project.game_id, project.source_root,
+            project.source_language, snapshots,
+        )
+
+    def _translation_pairs(self, workspace: Workspace) -> list[tuple[str, str]]:
+        pairs: list[tuple[str, str]] = []
+        for unit in self.imported.project.units:
+            record = workspace.records.get(unit.id)
+            if record is None:
+                raise TranslationMemoryError("記録する翻訳項目が見つかりません。")
+            target = self._pending_targets.get((workspace.language_code, unit.id), record.target_text)
+            pairs.append((unit.source_text, target))
+        return pairs
 
     def export_data(self) -> list[ImportedTranslation]:
         outputs: list[ImportedTranslation] = []

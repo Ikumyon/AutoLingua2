@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 from typing import Callable
 
-from PySide6.QtCore import QByteArray, QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QSize, Qt, QSignalBlocker, QTimer, QLocale, QItemSelection, QItemSelectionModel
+from PySide6.QtCore import QByteArray, QEasingCurve, QEvent, QModelIndex, QObject, QPoint, QPropertyAnimation, QSize, Qt, QSignalBlocker, QTimer, QLocale, QItemSelection, QItemSelectionModel
 from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QContextMenuEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QPixmap, QSyntaxHighlighter
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -63,11 +63,15 @@ from autolingua2.services.glossary_store import GlossaryStore
 from autolingua2.ir.glossary import Glossary, glossary_chain
 from autolingua2.ui.dialogs.glossary import STORAGE_ERRORS
 from autolingua2.ui.dialogs.workspace_language import WorkspaceLanguageDialog
-from autolingua2.ir.filter_rules import AdapterFilterConfig, should_hide_unit
 from autolingua2.services.ai_network import AiNetworkClient
 from autolingua2.services.ai_chat import ChatFile, ChatReference
 from autolingua2.ui.ai_chat_dock import AiChatDockController
-from autolingua2.services.filter_rules import get_default_filter_config
+from autolingua2.services.filter_rules import get_filter_config
+from autolingua2.services.source_classification import classify_sources
+from autolingua2.ir.classification import ClassificationResult
+from autolingua2.ir.key_conflict import KeyConflict
+from autolingua2.services.translation_memory import TranslationMemoryError
+from autolingua2.ui.dialogs.key_conflict import KeyConflictDialog
 from autolingua2.ui.components.translation_table_delegate import (
     ActionButtonDelegate,
     MultiLineTextDelegate,
@@ -76,7 +80,7 @@ from autolingua2.ui.components.translation_table_delegate import (
 from autolingua2.ui.components.dock_tab_style import DockTabStyle
 from autolingua2.services.export import export_translation
 from autolingua2.ui.export_dialog import ExportDialog
-from autolingua2.services.project_archive import load_project, project_snapshot, save_project
+from autolingua2.services.project_archive import ProjectArchive, load_project, project_snapshot, save_project
 from autolingua2.services.source_updates import (
     AppliedUpdate, SourceUpdate, apply_update, ensure_watcher, pending_target, prepare_update,
     notification_target, notifications_available, set_project_notification, import_notification_target,
@@ -85,17 +89,13 @@ from autolingua2.services.settings_store import load_watch_settings
 from autolingua2.ui.dialogs.source_watch import SourceUpdateDialog
 from autolingua2.services.settings_store import (
     AiSettings,
-    ColumnLayout,
     DockTabPosition,
     WindowLayout,
-    load_adapter_filter_rules,
     load_ai_settings,
     load_theme_settings,
-    load_translation_table_columns,
     load_ui_display_flags,
     load_window_layout,
     save_ai_settings,
-    save_translation_table_columns,
     save_ui_display_flags,
     save_window_layout,
 )
@@ -112,8 +112,9 @@ from autolingua2.ui.language_names import workspace_language_name
 from autolingua2.ui.import_worker import ImportWorker
 from autolingua2.ui.operation_worker import OperationWorker
 from autolingua2.plugins.api import GameTextPresentation
-from autolingua2.ui.models.translation_table_model import TranslationTableColumn, default_translation_table_columns
-
+from autolingua2.ui.main_window_focus import FocusEditorController
+from autolingua2.ui.main_window_table import TranslationTableController
+from autolingua2.ui.main_window_translation import MainWindowTranslationController
 
 STATUS_MATCHERS: dict[str, Callable[[TranslationUnit], bool]] = {
     "hidden": lambda unit: unit.hidden or unit.state == UnitState.HIDDEN,
@@ -126,7 +127,6 @@ STATUS_MATCHERS: dict[str, Callable[[TranslationUnit], bool]] = {
     "human_translated": lambda unit: unit.state == UnitState.HUMAN_TRANSLATED,
     "untranslated": lambda unit: unit.state == UnitState.UNTRANSLATED,
 }
-
 
 class MainWindowCreationContext:
     """プラグインに提供する本体プロジェクト作成画面の操作コンテキスト。"""
@@ -192,8 +192,6 @@ class MainWindowCreationContext:
             set_target_slot=self.set_target_slot,
         )
 
-
-
 class MainWindowController(QObject):
     def __init__(self, entrance: ExtensionEntrance, platform_driver: PlatformDriver = current_platform) -> None:
         super().__init__()
@@ -202,6 +200,7 @@ class MainWindowController(QObject):
         self.plugins = entrance.plugins
         self._known_plugin_errors = len(self.plugins.errors)
         self.io_worker: OperationWorker | None = None
+        self._pending_rules_refresh = False
         self._close_after_io = False
         self._restart_target: bool | None = None
         self._restart_started = False
@@ -232,20 +231,15 @@ class MainWindowController(QObject):
         self.glossary_choices: list[Glossary] = []
         self.units: list[TranslationUnit] = []
         self.filtered_units: list[TranslationUnit] = []
-        self.current_unit: TranslationUnit | None = None
-        self.columns = default_translation_table_columns(self.status_text)
-        self.columns_by_id: dict[str, TranslationTableColumn] = {column.id: column for column in self.columns}
-        self.column_layout = load_translation_table_columns(
-            [column.id for column in self.columns],
-            {column.id for column in self.columns if not column.default_visible},
-        )
-        self._syncing_header_order = False
-        self._dragged_header_logical_index: int | None = None
-        self._updating_focus = False
+        self.table_controller = TranslationTableController(self)
+        self.focus_controller = FocusEditorController(self)
+        self.status_count_label: QLabel | None = None
 
         self.selected_icon_path: Path | None = None
         self.target_paths: list[Path] = []
         self.target_item_widgets: dict[Path, tuple[QLabel, QListWidgetItem]] = {}
+        self.inherited_paths: list[Path] = []
+        self.inherited_item_widgets: dict[Path, tuple[QLabel, QListWidgetItem]] = {}
         self.target_files: list[Path] = []
         self.active_adapter: FileAdapter | None = None
         self.creation_adapters: dict[str, CreationAdapter] = {
@@ -262,9 +256,6 @@ class MainWindowController(QObject):
         self._close_after_import = False
         self._ai_dock_workspace_visible: bool = True
         self._focus_sidebar_visible: bool = True
-        self._syncing_focus_list: bool = False
-        self.focus_page_size: int = 50
-        self.focus_current_page: int = 1
         render_newlines, highlight_tags, apply_colors = load_ui_display_flags()
         self.render_literal_newlines: bool = render_newlines
         self.highlight_translation_tags: bool = highlight_tags
@@ -273,6 +264,7 @@ class MainWindowController(QObject):
         self.source_highlighter: QSyntaxHighlighter | None = None
         self.translation_highlighter: QSyntaxHighlighter | None = None
         self.ai_client = AiNetworkClient(self.window)
+        self.translation_controller = MainWindowTranslationController(self)
         self._dock_tab_position: DockTabPosition = "bottom"
         self._dock_tab_vertical_text = True
         self._dock_tab_styles: dict[QTabBar, DockTabStyle] = {}
@@ -365,7 +357,8 @@ class MainWindowController(QObject):
         # プロジェクト作成画面のドラッグ＆ドロップ処理
         frame_icon = getattr(self, "frame_icon_drop", None)
         frame_target = getattr(self, "frame_target_drop", None)
-        if watched in {frame_icon, frame_target}:
+        frame_inherit = getattr(self, "frame_inherit_drop", None)
+        if watched in {frame_icon, frame_target, frame_inherit}:
             if isinstance(event, QDragEnterEvent):
                 if event.mimeData().hasUrls():
                     self._set_drop_hover(watched, True)
@@ -395,6 +388,12 @@ class MainWindowController(QObject):
                             self.set_project_icon(paths[0])
                         return True
 
+                    # 既存訳ドロップ枠: 既存の翻訳ファイル・フォルダを追加
+                    if watched is frame_inherit:
+                        for p in paths:
+                            self.add_inherited_path(p)
+                        return True
+
                     # 中央スロット枠: アクティブなプラグインにドロップイベントを委譲
                     if watched is frame_target:
                         adapter = self.active_creation_adapter
@@ -412,28 +411,27 @@ class MainWindowController(QObject):
                             QMessageBox.warning(self.window, "プラグインエラー", str(exc))
                         return True
 
-        header = getattr(self, "table_header", None)
-        header_viewport = getattr(self, "table_header_viewport", None)
-        if header is not None and (watched is header or watched is header_viewport):
-            if isinstance(event, QMouseEvent):
-                if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
-                    self._is_header_dragging = True
-                    self._drag_start_global_pos = event.globalPosition().toPoint()
-                elif event.type() == QEvent.Type.MouseMove and bool(event.buttons() & Qt.MouseButton.LeftButton):
-                    if getattr(self, "_is_header_dragging", False):
-                        curr_global = event.globalPosition().toPoint()
-                        start_global = getattr(self, "_drag_start_global_pos", curr_global)
-                        if (curr_global - start_global).manhattanLength() >= 4:
-                            vp = header.viewport()
-                            ref = vp if vp is not None else header
-                            pos_in_vp = ref.mapFromGlobal(curr_global)
-                            self.show_header_drop_indicator(pos_in_vp)
-                elif event.type() == QEvent.Type.MouseButtonRelease:
-                    self.hide_header_drop_indicator()
-            elif event.type() == QEvent.Type.Leave:
-                if not getattr(self, "_is_header_dragging", False):
-                    self.hide_header_drop_indicator()
-        elif watched is getattr(self, "frame_segment_mode", None):
+        table = getattr(self, "table", None)
+        if table is not None and watched is table.viewport():
+            if isinstance(event, QMouseEvent) and event.type() == QEvent.Type.MouseButtonPress:
+                if event.button() == Qt.MouseButton.LeftButton and event.modifiers() == Qt.KeyboardModifier.NoModifier:
+                    index = table.indexAt(event.pos())
+                    if index.isValid():
+                        row = index.row()
+                        selection_model = table.selectionModel()
+                        if selection_model is not None and selection_model.isRowSelected(row, QModelIndex()):
+                            visible_cols = self.table_controller.visible_columns()
+                            col_id = visible_cols[index.column()].id if 0 <= index.column() < len(visible_cols) else ""
+                            if col_id not in {"status", "action"}:
+                                table.clearSelection()
+                                table.setCurrentItem(None)
+                                return True
+                    else:
+                        table.clearSelection()
+                        table.setCurrentItem(None)
+                        return True
+
+        if watched is getattr(self, "frame_segment_mode", None):
             if event.type() in {QEvent.Type.Resize, QEvent.Type.Show}:
                 self._sync_segment_indicator_pos(animate=False)
         return False
@@ -532,7 +530,7 @@ class MainWindowController(QObject):
         self.button_focus_last = require_child(self.window, QToolButton, "buttonFocusLastPage")
         self.button_focus_last.setIcon(self.icon_manager.get_icon("chevrons-right"))
         self.spin_focus_page_size = require_child(self.window, QSpinBox, "spinFocusPageSize")
-        self.spin_focus_page_size.setValue(self.focus_page_size)
+        self.spin_focus_page_size.setValue(self.focus_controller.focus_page_size)
 
         layout_scrubber = require_child(self.window, QHBoxLayout, "layoutScrubberInner")
         scrubber_parent = layout_scrubber.parentWidget()
@@ -568,7 +566,6 @@ class MainWindowController(QObject):
         self.action_toggle_ai_panel = require_child(self.window, QAction, "actionToggleAiPanel")
         self.label_source_language_work = require_child(self.window, QLabel, "labelSourceLanguageWork")
         self.button_translate_all = require_child(self.window, QPushButton, "buttonTranslateAll")
-        self.button_stop_translation = require_child(self.window, QPushButton, "buttonStopTranslation")
         self.combo_ai_provider = require_child(self.window, QComboBox, "comboAiProvider")
         self.combo_ai_model = require_child(self.window, QComboBox, "comboAiModel")
         self.combo_glossary = require_child(self.window, QComboBox, "comboGlossary")
@@ -583,11 +580,11 @@ class MainWindowController(QObject):
         header.setStretchLastSection(False)
         header.setSectionsMovable(True)
         header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        header.customContextMenuRequested.connect(self.open_table_header_menu)
-        header.sectionMoved.connect(self.handle_table_section_moved)
-        header.installEventFilter(self)
+        header.customContextMenuRequested.connect(self.table_controller.open_table_header_menu)
+        header.sectionMoved.connect(self.table_controller.handle_table_section_moved)
+        header.installEventFilter(self.table_controller)
         if header.viewport() is not None:
-            header.viewport().installEventFilter(self)
+            header.viewport().installEventFilter(self.table_controller)
         h_parent = header.viewport() if header.viewport() is not None else header
         self.header_drop_indicator = QFrame(h_parent)
         self.header_drop_indicator.setObjectName("headerDropIndicator")
@@ -612,16 +609,25 @@ class MainWindowController(QObject):
             | QAbstractItemView.EditTrigger.EditKeyPressed
         )
         self.table.setShowGrid(True)
+        self.table.viewport().installEventFilter(self)
 
         self.status_delegate = StatusComboBoxDelegate(self.icon_manager.get_icon, self.table)
-        self.status_delegate.status_changed.connect(self._on_table_status_delegate_changed)
+        self.status_delegate.status_changed.connect(self.table_controller._on_table_status_delegate_changed)
         self.action_delegate = ActionButtonDelegate(self.icon_manager.get_icon, self.table)
-        self.action_delegate.action_clicked.connect(self._on_table_action_delegate_clicked)
+        self.action_delegate.action_clicked.connect(self.table_controller._on_table_action_delegate_clicked)
         self.action_delegate.action_all_models_clicked.connect(self._on_table_action_all_models_clicked)
         self.target_text_delegate = MultiLineTextDelegate(self.table)
-        self.target_text_delegate.text_committed.connect(self._on_table_target_text_committed)
+        self.target_text_delegate.text_committed.connect(self.table_controller._on_table_target_text_committed)
 
-        self.window.statusBar().addPermanentWidget(self.progress)
+        self.progress.setVisible(False)
+        count_label = QLabel(self.window)
+        count_label.setObjectName("statusCountLabel")
+        count_label.setStyleSheet("padding-right: 12px; font-size: 11px;")
+        self.status_count_label = count_label
+        status_bar = self.window.statusBar()
+        if status_bar is not None:
+            status_bar.addPermanentWidget(count_label)
+            status_bar.addPermanentWidget(self.progress)
 
         # プロジェクト作成画面のウィジェット
         self.stack_main = require_child(self.window, QStackedWidget, "stackMain")
@@ -637,18 +643,29 @@ class MainWindowController(QObject):
         self.combo_target_language = require_child(self.window, QComboBox, "comboTargetLanguage")
         self.button_add_language = require_child(self.window, QPushButton, "buttonAddLanguage")
 
-
-
-
         self.frame_target_drop = require_child(self.window, QFrame, "frameDropZone")
         self.list_target_items = require_child(self.window, QListWidget, "listTargetItems")
+        self.tab_project_inputs = require_child(self.window, QTabWidget, "tabProjectInputs")
+        self.frame_inherit_drop = require_child(self.window, QFrame, "frameInheritDropZone")
+        self.list_inherit_items = require_child(self.window, QListWidget, "listInheritItems")
+        self.button_inherit_folder = require_child(self.window, QPushButton, "buttonInheritFolder")
+        self.button_inherit_file = require_child(self.window, QPushButton, "buttonInheritFile")
+        self.button_inherit_folder.setIcon(self.icon_manager.get_icon("folder"))
+        self.button_inherit_file.setIcon(self.icon_manager.get_icon("file"))
+        self.button_inherit_folder.clicked.connect(self._browse_inherit_folder)
+        self.button_inherit_file.clicked.connect(self._browse_inherit_file)
+        self.combo_inherit_state = require_child(self.window, QComboBox, "comboInheritState")
+        self._init_inherited_state_choices()
+
         self.button_create_project = require_child(self.window, QPushButton, "buttonCreateProject")
         self.list_recent_projects = require_child(self.window, QListWidget, "listRecentProjects")
         self.action_new_project = require_child(self.window, QAction, "actionNewProject")
 
         self.frame_icon_drop.installEventFilter(self)
         self.frame_target_drop.installEventFilter(self)
+        self.frame_inherit_drop.installEventFilter(self)
         self._init_project_creation_ui()
+        self._update_input_tabs_state()
 
     def _connect_actions(self) -> None:
         file_menu = require_child(self.window, QMenu, "menuFile")
@@ -692,45 +709,43 @@ class MainWindowController(QObject):
         self.action_list_mode.triggered.connect(self.show_list_mode)
         self.action_focus_mode.triggered.connect(self.show_focus_mode)
         self.action_toggle_file_sidebar.triggered.connect(self.toggle_file_sidebar)
-        self.list_focus_units.currentRowChanged.connect(self._on_focus_unit_selected)
+        self.list_focus_units.currentRowChanged.connect(self.focus_controller._on_focus_unit_selected)
         self.action_toggle_ai_panel.triggered.connect(self._on_action_toggle_ai_panel_triggered)
         self.dock_ai_settings.visibilityChanged.connect(self._on_dock_ai_visibility_changed)
         self.stack_main.currentChanged.connect(self._on_main_page_changed)
 
-        self.button_translate_all.clicked.connect(self.action_translate_all.trigger)
-        self.button_stop_translation.clicked.connect(self.action_stop_translation.trigger)
-        self.action_translate_all.changed.connect(lambda: self.button_translate_all.setEnabled(self.action_translate_all.isEnabled()))
-        self.action_stop_translation.changed.connect(lambda: self.button_stop_translation.setEnabled(self.action_stop_translation.isEnabled()))
+        self.button_translate_all.clicked.connect(self.translation_controller._on_translate_button_clicked)
+        self.action_translate_all.triggered.connect(self.translation_controller._start_batch_translation_all)
+        self.action_translate_selected.triggered.connect(self.translation_controller._start_batch_translation_selected)
+        self.action_translate_untranslated.triggered.connect(self.translation_controller._start_batch_translation_untranslated)
+        self.action_stop_translation.triggered.connect(self.translation_controller._stop_batch_translation)
         self.combo_target_slot.currentIndexChanged.connect(self._on_target_slot_changed)
         self.combo_target_language.currentIndexChanged.connect(self._on_workspace_selected)
         self.button_add_language.clicked.connect(self._open_workspace_languages)
 
-
-
-
         self.button_list_mode.clicked.connect(self.show_list_mode)
         self.button_focus_mode.clicked.connect(self.show_focus_mode)
-        self.button_previous.clicked.connect(self.previous_entry)
-        self.button_next.clicked.connect(self.next_entry)
-        self.button_revert.clicked.connect(self.refresh_focus)
-        self.button_copy_source.clicked.connect(self.copy_source_to_translation)
+        self.button_previous.clicked.connect(self.focus_controller.previous_entry)
+        self.button_next.clicked.connect(self.focus_controller.next_entry)
+        self.button_revert.clicked.connect(self.focus_controller.refresh_focus)
+        self.button_copy_source.clicked.connect(self.focus_controller.copy_source_to_translation)
         self.button_ai_translate.clicked.connect(self.ai_translate_current_unit)
         self.button_ai_translate_all_models.clicked.connect(self.ai_translate_all_models_current_unit)
-        self.button_focus_first.clicked.connect(self.first_focus_page)
-        self.button_focus_prev.clicked.connect(self.prev_focus_page)
-        self.button_focus_next.clicked.connect(self.next_focus_page)
-        self.button_focus_last.clicked.connect(self.last_focus_page)
-        self.page_scrubber.value_changed.connect(self.set_focus_page)
-        self.spin_focus_page_size.valueChanged.connect(self.on_focus_page_size_changed)
-        self._setup_save_button_menu()
-        self.button_save_split.clicked.connect(self.save_and_next)
+        self.button_focus_first.clicked.connect(self.focus_controller.first_focus_page)
+        self.button_focus_prev.clicked.connect(self.focus_controller.prev_focus_page)
+        self.button_focus_next.clicked.connect(self.focus_controller.next_focus_page)
+        self.button_focus_last.clicked.connect(self.focus_controller.last_focus_page)
+        self.page_scrubber.value_changed.connect(self.focus_controller.set_focus_page)
+        self.spin_focus_page_size.valueChanged.connect(self.focus_controller.on_focus_page_size_changed)
+        self.focus_controller._setup_save_button_menu()
+        self.button_save_split.clicked.connect(self.focus_controller.save_and_next)
 
         self.search.textChanged.connect(self.apply_filters)
         self.status_filter.currentTextChanged.connect(self.apply_filters)
-        self.table.itemSelectionChanged.connect(self.sync_focus_from_table)
-        self.table.cellClicked.connect(self._on_table_cell_clicked)
+        self.table.itemSelectionChanged.connect(self.table_controller._on_table_selection_changed)
+        self.table.cellClicked.connect(self.table_controller._on_table_cell_clicked)
 
-        self.edit_translation.textChanged.connect(self.mark_focus_edited)
+        self.edit_translation.textChanged.connect(self.focus_controller.mark_focus_edited)
 
         self._setup_debug_menu()
 
@@ -841,23 +856,28 @@ class MainWindowController(QObject):
             return
         self._open_project_path(Path(selected))
 
-    def _open_project_path(self, path: Path) -> bool:
-        try:
-            archive = load_project(path)
-            service = WorkspaceService(archive.imported)
-            service.languages.update(archive.languages)
-            service.workspaces = archive.workspaces
-        except Exception as exc:
-            QMessageBox.warning(self.window, tr("MainWindow", "読み込みエラー"), str(exc))
+    def _open_project_path(self, path: Path, on_loaded: Callable[[], None] | None = None) -> bool:
+        if self.import_worker is not None or self.io_worker is not None:
             return False
         if not self._confirm_project_change():
             return False
-        self.load_import(archive.imported, service)
-        self.project_path = path
-        self._refresh_project_notification()
-        self._saved_project = project_snapshot(self.workspace_service)
-        self.window.setWindowTitle(f"Autolingua Desktop - {self.project.name}")
-        QTimer.singleShot(0, self._poll_source_updates)
+
+        def loaded(result: object) -> None:
+            if not isinstance(result, ProjectArchive):
+                raise TypeError("プロジェクトの読み込み結果が不正です。")
+            service = WorkspaceService(result.imported)
+            service.languages.update(result.languages)
+            service.workspaces = result.workspaces
+            self.load_import(result.imported, service)
+            self.project_path = path
+            self._refresh_project_notification()
+            self._saved_project = project_snapshot(self.workspace_service)
+            self.window.setWindowTitle(f"Autolingua Desktop - {self.project.name}")
+            QTimer.singleShot(0, self._poll_source_updates)
+            if on_loaded is not None:
+                on_loaded()
+
+        self._run_operation(lambda: load_project(path, self.plugins.parsers), loaded)
         return True
 
     def _refresh_project_notification(self) -> None:
@@ -906,8 +926,8 @@ class MainWindowController(QObject):
             current = Path(self.project.source_root).resolve() if self.project.source_root else None
             if current != path.resolve():
                 if notification.project_path:
-                    if not self._open_project_path(Path(notification.project_path)):
-                        return
+                    self._open_project_path(Path(notification.project_path), self.check_source_updates)
+                    return
                 else:
                     if not self._confirm_project_change():
                         return
@@ -960,9 +980,9 @@ class MainWindowController(QObject):
             dialog.dialog.deleteLater()
             if not accepted:
                 return
-            if self.active_workspace is not None and self.current_unit is not None:
-                self.current_unit.target_text = self.edit_translation.toPlainText()
-            self.ai_client.cancel_all()
+            if self.active_workspace is not None and self.focus_controller.current_unit is not None:
+                self.focus_controller.current_unit.target_text = self.edit_translation.toPlainText()
+            self.translation_controller.service.stop()
             active_code = self.active_workspace.language_code if self.active_workspace is not None else None
             latest = deepcopy(self.workspace_service)
 
@@ -1038,15 +1058,33 @@ class MainWindowController(QObject):
         dialog.show()
         worker.start()
 
+    def _on_import_key_conflict(self, conflict: KeyConflict) -> None:
+        worker = self.import_worker
+        if worker is None:
+            return
+        if self._close_after_import or worker.isInterruptionRequested():
+            worker.answer_conflict(conflict, None)
+            return
+        dialog = KeyConflictDialog(conflict, self.window)
+        worker.finished.connect(dialog.reject)
+        accepted = dialog.exec() == QDialog.DialogCode.Accepted
+        worker.answer_conflict(conflict, dialog.selection() if accepted else None)
+        dialog.deleteLater()
+
     def _operation_finished(self) -> None:
         worker = self.io_worker
         if worker is None:
             return
         self.io_worker = None
+        if self._pending_rules_refresh:
+            QTimer.singleShot(0, self._refresh_source_rules)
         self._operation_dialog.close()
         self._operation_dialog.deleteLater()
         close_after_io = self._close_after_io
         self._close_after_io = False
+        if worker.cancel_event.is_set():
+            self._restart_target = None
+            return
         if worker.error is not None:
             self._restart_target = None
             if not isinstance(worker.error, OperationCancelled):
@@ -1086,10 +1124,11 @@ class MainWindowController(QObject):
             if initial_category == "source_watch" and self.project.source_root:
                 controller.watch_page.select_project(str(Path(self.project.source_root).resolve()))
         if controller.exec() == QDialog.DialogCode.Accepted:
-            self.ai_models = controller.ai_models
-            self.ai_selected_models = controller.ai_selected_models
-            self.ai_api_keys = controller.ai_api_keys
-            self.ai_concurrency = controller.spin_concurrency.value()
+            settings = controller.ai_page.settings()
+            self.ai_models = settings.models
+            self.ai_selected_models = settings.selected_models
+            self.ai_api_keys = settings.api_keys
+            self.ai_concurrency = settings.concurrency
             self._refresh_ai_choices()
             self.chat_dock.refresh_choices()
             self._save_ai_choice()
@@ -1100,8 +1139,9 @@ class MainWindowController(QObject):
             if self.active_creation_panel:
                 from PySide6.QtCore import QCoreApplication
                 QCoreApplication.sendEvent(self.active_creation_panel, QEvent(QEvent.Type.LanguageChange))
+            if (self.project.adapter_id, self.project.game_id) in controller.filter_rules_page.changed_keys:
+                self._refresh_source_rules()
             if self.units:
-                self.apply_filter_rules_to_units()
                 self.refresh_all()
 
         self._refresh_glossary_choices()
@@ -1149,7 +1189,6 @@ class MainWindowController(QObject):
         self.combo_ai_model.clear()
         for entry in self.ai_models.get(self.ai_provider_id, []):
 
-
             if entry.enabled:
                 self.combo_ai_model.addItem(entry.name, entry.model)
         selected = self.ai_selected_models.get(self.ai_provider_id, "")
@@ -1194,7 +1233,7 @@ class MainWindowController(QObject):
                              unit.state == UnitState.UNTRANSLATED)
 
     def _chat_current_file(self) -> ChatFile | None:
-        unit = self.current_unit
+        unit = self.focus_controller.current_unit
         if unit is None:
             return None
         ref = self.imported.source_refs.get(unit.id)
@@ -1208,7 +1247,7 @@ class MainWindowController(QObject):
 
     def _chat_selected_references(self) -> tuple[ChatReference, ...]:
         if self.stack.currentIndex() != 0:
-            return (self._chat_reference(self.current_unit),) if self.current_unit is not None else ()
+            return (self._chat_reference(self.focus_controller.current_unit),) if self.focus_controller.current_unit is not None else ()
         rows = sorted({index.row() for index in self.table.selectedIndexes()})
         return tuple(self._chat_reference(self.filtered_units[row]) for row in rows
                      if 0 <= row < len(self.filtered_units))
@@ -1237,9 +1276,9 @@ class MainWindowController(QObject):
                     first_row = row
         selection_model.select(selection, QItemSelectionModel.SelectionFlag.ClearAndSelect)
         if first_row is not None:
-            self.current_unit = self.filtered_units[first_row]
+            self.focus_controller.current_unit = self.filtered_units[first_row]
             self.table.scrollTo(model.index(first_row, 0))
-            self.refresh_focus()
+            self.focus_controller.refresh_focus()
 
     def _on_ui_language_changed(self, language_code: str) -> None:
         self._configure_text_presentation()
@@ -1269,24 +1308,39 @@ class MainWindowController(QObject):
                     if not game.slots:
                         self.combo_target_slot.setItemText(0, tr("MainWindow", "該当なし"))
         self._refresh_all_target_labels()
-        self.columns = default_translation_table_columns(self.status_text)
-        self.columns_by_id = {column.id: column for column in self.columns}
+        self.table_controller.refresh_columns()
         self.refresh_all()
 
-    def apply_filter_rules_to_units(self) -> None:
-        configs: dict[str, AdapterFilterConfig] = {}
+    def _refresh_source_rules(self) -> None:
+        if self.io_worker is not None or self.import_worker is not None:
+            self._pending_rules_refresh = True
+            return
+        self._pending_rules_refresh = False
+        imported = self.imported
+        adapter = self.plugins.parsers.get(imported.project.adapter_id)
+        if adapter is None:
+            return
+        config = get_filter_config(adapter, imported.project.game_id)
+        snapshot = deepcopy(imported)
+        threshold = imported.classification.threshold if imported.classification is not None else 0.8
 
-        for unit in self.project.units:
-            adapter_id = self.project.adapter_id
+        def completed(result: ClassificationResult) -> None:
+            if self.imported is not imported or imported.project.game_id != snapshot.project.game_id:
+                return
+            if get_filter_config(adapter, imported.project.game_id).rules != config.rules:
+                return
+            if [(unit.id, unit.source_text) for unit in imported.project.units] != [
+                (unit.id, unit.source_text) for unit in snapshot.project.units
+            ]:
+                return
+            imported.classification = result
+            imported.excluded_unit_ids.clear()
+            imported.excluded_unit_ids.update(snapshot.excluded_unit_ids)
+            self.refresh_all()
 
-            if adapter_id not in configs:
-                saved = load_adapter_filter_rules(adapter_id)
-                default_cfg = get_default_filter_config(adapter_id, self.plugins.parsers.values())
-                configs[adapter_id] = AdapterFilterConfig.from_dict(saved, default_cfg.rules)
-
-            cfg = configs[adapter_id]
-            if should_hide_unit(unit, cfg):
-                unit.hidden = True
+        self._run_operation(
+            lambda: classify_sources(snapshot, adapter, threshold=threshold, config=config), completed,
+        )
 
     def _init_project_creation_ui(self) -> None:
         self.combo_game.blockSignals(True)
@@ -1297,7 +1351,6 @@ class MainWindowController(QObject):
         self.combo_game.blockSignals(False)
 
         self._on_game_selection_changed()
-
 
     def _on_game_selection_changed(self) -> None:
         if self._changing_game:
@@ -1451,11 +1504,18 @@ class MainWindowController(QObject):
         lbl.setStyleSheet(style)
         lbl.setToolTip(tooltip)
 
+    def _update_input_tabs_state(self) -> None:
+        has_source = bool(self.target_paths)
+        self.tab_project_inputs.setTabEnabled(1, has_source)
+        if not has_source and self.tab_project_inputs.currentIndex() == 1:
+            self.tab_project_inputs.setCurrentIndex(0)
+        self.button_create_project.setEnabled(has_source and self._creation_valid and self.import_worker is None)
+
     def _refresh_all_target_labels(self) -> None:
         self._creation_valid = self._panel_valid
         for path, (lbl, _) in self.target_item_widgets.items():
             self._update_path_label(path, lbl)
-        self.button_create_project.setEnabled(self._creation_valid and self.import_worker is None)
+        self._update_input_tabs_state()
 
     def _on_source_language_changed(self) -> None:
         self._refresh_all_target_labels()
@@ -1506,6 +1566,7 @@ class MainWindowController(QObject):
 
         self.target_item_widgets[resolved] = (lbl, item)
         self._update_path_label(resolved, lbl)
+        self._update_input_tabs_state()
 
     def remove_target_path_by_path(self, path: Path) -> None:
         resolved = path.resolve()
@@ -1523,6 +1584,87 @@ class MainWindowController(QObject):
         if row >= 0:
             self.list_target_items.takeItem(row)
         self._refresh_all_target_labels()
+        self._update_input_tabs_state()
+
+    def _browse_inherit_folder(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self.window, tr("MainWindow", "既存の翻訳フォルダを選択"))
+        if folder:
+            self.add_inherited_path(Path(folder))
+
+    def _browse_inherit_file(self) -> None:
+        adapter = self.active_adapter
+        filter_str = tr("MainWindow", "すべてのファイル (*.*)")
+        if adapter is not None and getattr(adapter, "suffixes", None):
+            pattern = " ".join(f"*{s}" for s in adapter.suffixes)
+            filter_str = tr("MainWindow", f"対応ファイル ({pattern});;すべてのファイル (*.*)")
+        files, _ = QFileDialog.getOpenFileNames(self.window, tr("MainWindow", "既存の翻訳ファイルを選択"), "", filter_str)
+        for f in files:
+            self.add_inherited_path(Path(f))
+
+    def add_inherited_path(self, path: Path) -> None:
+        resolved = path.resolve()
+        if not resolved.exists():
+            return
+        adapter = self.active_adapter
+        if adapter is not None and resolved.is_file() and not adapter.can_load(resolved):
+            QMessageBox.warning(self.window, tr("MainWindow", "警告"), tr("MainWindow", "選択形式で読み込めない対象です: ") + path.name)
+            return
+        if resolved in self.inherited_paths:
+            return
+        self.inherited_paths.append(resolved)
+
+        item = QListWidgetItem(self.list_inherit_items)
+        row_widget = QWidget()
+        layout = QHBoxLayout(row_widget)
+        layout.setContentsMargins(6, 4, 6, 4)
+        layout.setSpacing(8)
+
+        icon_lbl = QLabel()
+        icon_name = "folder" if resolved.is_dir() else "file"
+        icon = self.icon_manager.get_icon(icon_name)
+        icon_lbl.setPixmap(icon.pixmap(16, 16))
+        icon_lbl.setFixedSize(18, 18)
+
+        lbl = QLabel(resolved.name)
+        lbl.setToolTip(str(resolved))
+
+        btn_del = QPushButton()
+        btn_del.setIcon(self.icon_manager.get_icon("trash"))
+        btn_del.setFixedSize(24, 24)
+        btn_del.setToolTip(tr("MainWindow", "この項目を削除"))
+        btn_del.clicked.connect(lambda: self.remove_inherited_path(resolved, item))
+
+        layout.addWidget(icon_lbl, 0)
+        layout.addWidget(lbl, 1)
+        layout.addWidget(btn_del, 0)
+
+        item.setSizeHint(row_widget.sizeHint())
+        self.list_inherit_items.addItem(item)
+        self.list_inherit_items.setItemWidget(item, row_widget)
+        self.inherited_item_widgets[resolved] = (lbl, item)
+
+    def remove_inherited_path(self, path: Path, item: QListWidgetItem) -> None:
+        if path in self.inherited_paths:
+            self.inherited_paths.remove(path)
+        self.inherited_item_widgets.pop(path, None)
+        row = self.list_inherit_items.row(item)
+        if row >= 0:
+            self.list_inherit_items.takeItem(row)
+
+    def _init_inherited_state_choices(self) -> None:
+        self.combo_inherit_state.clear()
+        options: list[tuple[str, UnitState, str]] = [
+            (tr("MainWindow", "人間による校閲"), UnitState.HUMAN_REVIEWED, "person-check"),
+            (tr("MainWindow", "人間による翻訳"), UnitState.HUMAN_TRANSLATED, "person-edit-32"),
+            (tr("MainWindow", "AIによる校閲"), UnitState.AI_REVIEWED, "robot-check"),
+            (tr("MainWindow", "AIによる翻訳"), UnitState.AI_TRANSLATED, "robot-edit"),
+            (tr("MainWindow", "疑問あり"), UnitState.DOUBTFUL, "question"),
+            (tr("MainWindow", "未翻訳"), UnitState.UNTRANSLATED, "circle"),
+        ]
+        for label, state, icon_name in options:
+            icon = self.icon_manager.get_icon(icon_name)
+            self.combo_inherit_state.addItem(icon, label, state)
+        self.combo_inherit_state.setCurrentIndex(0)
 
     def create_project(self) -> None:
         if self.import_worker is not None or self.io_worker is not None or not self._creation_valid:
@@ -1543,13 +1685,24 @@ class MainWindowController(QObject):
             target_language="",
         )
 
-        worker = ImportWorker(adapter, self.target_paths,
-                              str(self.combo_source_language.currentData() or "auto"), self)
+        state_data = self.combo_inherit_state.currentData()
+        inherited_state = state_data if isinstance(state_data, UnitState) else UnitState.HUMAN_REVIEWED
+
+        worker = ImportWorker(
+            adapter,
+            self.target_paths,
+            str(self.combo_source_language.currentData() or "auto"),
+            self,
+            game_id=game.id,
+            inherited_paths=self.inherited_paths,
+            inherited_state=inherited_state,
+        )
         self.import_worker = worker
         self._set_import_busy(True)
         worker.loaded.connect(self._on_project_imported)
         worker.failed.connect(self._on_import_failed)
         worker.progress.connect(self._operation_progress)
+        worker.conflict_requested.connect(self._on_import_key_conflict)
         worker.finished.connect(self._on_import_finished)
         worker.finished.connect(worker.deleteLater)
         worker.start()
@@ -1557,7 +1710,9 @@ class MainWindowController(QObject):
     def _set_import_busy(self, busy: bool) -> None:
         for widget in (self.combo_game, self.combo_source_language,
                        self.edit_project_name, self.list_target_items,
-                       self.frame_icon_drop):
+                       self.list_inherit_items, self.button_inherit_folder,
+                       self.button_inherit_file, self.combo_inherit_state,
+                       self.tab_project_inputs, self.frame_icon_drop):
             widget.setEnabled(not busy)
         if self.active_creation_panel is not None:
             set_busy = getattr(self.active_creation_panel, "set_busy", None)
@@ -1565,9 +1720,12 @@ class MainWindowController(QObject):
                 set_busy(busy)
             else:
                 self.active_creation_panel.setEnabled(not busy)
-        self.button_create_project.setEnabled(not busy and self._creation_valid)
         for action in (self.action_new_project, self.action_settings):
             action.setEnabled(not busy)
+        if not busy:
+            self._update_input_tabs_state()
+        else:
+            self.button_create_project.setEnabled(False)
         self.window.statusBar().showMessage(tr("MainWindow", "対象を解析しています…") if busy else "")
 
     def _on_project_imported(self, imported: ImportedTranslation) -> None:
@@ -1587,6 +1745,8 @@ class MainWindowController(QObject):
         if not self._confirm_project_change():
             return
         self.load_import(imported)
+        if adapter is not None and imported.project.game_id != self._import_metadata["game_id"]:
+            self._refresh_source_rules()
         self.window.setWindowTitle(f"Autolingua Desktop - {imported.project.name}")
 
     def _on_import_failed(self, message: str) -> None:
@@ -1596,6 +1756,8 @@ class MainWindowController(QObject):
 
     def _on_import_finished(self) -> None:
         self.import_worker = None
+        if self._pending_rules_refresh:
+            QTimer.singleShot(0, self._refresh_source_rules)
         self._set_import_busy(False)
         if self._close_after_import:
             self._close_after_import = False
@@ -1747,6 +1909,7 @@ class MainWindowController(QObject):
 
     def load_import(self, imported: ImportedTranslation, service: WorkspaceService | None = None) -> None:
         self.chat_dock.reset()
+        self.translation_controller.reset_confirmations()
         self.output_path = None
         self.imported = imported
         self.project = imported.project
@@ -1758,14 +1921,8 @@ class MainWindowController(QObject):
         self.project_path = None
         self._saved_project = None
         self._refresh_project_notification()
-        if service is None:
-            self.apply_filter_rules_to_units()
-            for unit in self.project.units:
-                if unit.hidden:
-                    for workspace in self.workspace_service.workspaces.values():
-                        workspace.records[unit.id].state = UnitState.HIDDEN
-        self.current_unit = self.units[0] if self.units else None
-        self.focus_current_page = 1
+        self.focus_controller.current_unit = self.units[0] if self.units else None
+        self.focus_controller.focus_current_page = 1
         self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
         self._sync_workspace_language_ui()
         self._refresh_workspace_selection()
@@ -1781,6 +1938,10 @@ class MainWindowController(QObject):
             ),
             5000,
         )
+        try:
+            self.workspace_service.record_all_translations()
+        except TranslationMemoryError as exc:
+            self.translation_controller._show_memory_error(str(exc))
 
     def _sync_workspace_language_ui(self) -> None:
         adapter = self.plugins.parsers.get(self.project.adapter_id)
@@ -1854,8 +2015,8 @@ class MainWindowController(QObject):
         self.project.target_language = workspace.language_code if workspace is not None else ""
         self.units = list(self.workspace_service.units(workspace)) if workspace is not None else list(self.workspace_service.source_units())
         self._sync_workspace_language_ui()
-        self.current_unit = None
-        self.focus_current_page = 1
+        self.focus_controller.current_unit = None
+        self.focus_controller.focus_current_page = 1
         with QSignalBlocker(self.search), QSignalBlocker(self.status_filter):
             self.search.clear()
             self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
@@ -1872,174 +2033,14 @@ class MainWindowController(QObject):
         for action in (self.action_translate_all, self.action_translate_selected,
                        self.action_translate_untranslated):
             action.setEnabled(enabled)
+        self.translation_controller._update_translation_button_state()
+        self._update_status_bar_counts()
 
     def _workspace_is_alive(self, workspace: Workspace) -> bool:
         return self.workspace_service.workspaces.get(workspace.language_code) is workspace
 
     def refresh_all(self) -> None:
         self.apply_filters()
-
-    def _ensure_focus_sidebar_minimum_width(self) -> None:
-        """ページネーションの桁数に応じてサイドバーの最小幅を更新し、不足していればスプリッターを強制拡張。"""
-        btn_w = (
-            self.button_focus_first.sizeHint().width()
-            + self.button_focus_prev.sizeHint().width()
-            + self.button_focus_next.sizeHint().width()
-            + self.button_focus_last.sizeHint().width()
-        )
-        spin_w = max(self.spin_focus_page_size.minimumWidth(), self.spin_focus_page_size.sizeHint().width())
-        scrubber_w = self.page_scrubber.minimumWidth()
-
-        layout = self.frame_files.layout()
-        if layout is not None:
-            margins = layout.contentsMargins()
-            margin_w = margins.left() + margins.right()
-        else:
-            margin_w = 18
-        spacing_w = 2 * 5  # layoutFocusPagination spacing=2, 5 gaps
-
-        needed_w = btn_w + spin_w + scrubber_w + spacing_w + margin_w
-        self.frame_files.setMinimumWidth(needed_w)
-
-        if self.frame_files.isVisible() and self.frame_files.width() > 0 and self.frame_files.width() < needed_w:
-            sizes = self.splitter_main.sizes()
-            if sizes:
-                diff = needed_w - self.frame_files.width()
-                sizes[0] = needed_w
-                if len(sizes) > 1:
-                    sizes[1] = max(0, sizes[1] - diff)
-                self.splitter_main.setSizes(sizes)
-
-    def refresh_focus_unit_list(self) -> None:
-        self._syncing_focus_list = True
-        try:
-            total_pages = self.total_focus_pages()
-            self.focus_current_page = max(1, min(total_pages, self.focus_current_page))
-            self.page_scrubber.set_pages(self.focus_current_page, total_pages)
-            self._ensure_focus_sidebar_minimum_width()
-
-            self.button_focus_first.setEnabled(self.focus_current_page > 1)
-            self.button_focus_prev.setEnabled(self.focus_current_page > 1)
-            self.button_focus_next.setEnabled(self.focus_current_page < total_pages)
-            self.button_focus_last.setEnabled(self.focus_current_page < total_pages)
-
-            self.list_focus_units.clear()
-            start = (self.focus_current_page - 1) * self.focus_page_size
-            end = min(len(self.filtered_units), start + self.focus_page_size)
-            page_units = self.filtered_units[start:end]
-
-            for unit in page_units:
-                preview = " ".join(unit.source_text.split())
-                if len(preview) > 50:
-                    preview = preview[:47] + "..."
-                if not preview:
-                    preview = f"<{unit.label}>"
-                item = QListWidgetItem(preview)
-                icon = self._unit_status_icon(unit)
-                if icon is not None and not icon.isNull():
-                    item.setIcon(icon)
-                source_name = self.source_name_for_unit(unit)
-                tooltip = f"キー: {unit.label}\nファイル: {source_name}\n状態: {self.status_text(unit)}\n\n原文:\n{unit.source_text}"
-                if unit.target_text:
-                    tooltip += f"\n\n訳文:\n{unit.target_text}"
-                item.setToolTip(tooltip)
-                self.list_focus_units.addItem(item)
-            self._sync_focus_list_selection()
-        finally:
-            self._syncing_focus_list = False
-
-    def total_focus_pages(self) -> int:
-        if not self.filtered_units:
-            return 1
-        return max(1, (len(self.filtered_units) + self.focus_page_size - 1) // self.focus_page_size)
-
-    def set_focus_page(self, page: int) -> None:
-        total = self.total_focus_pages()
-        new_page = max(1, min(total, page))
-        if self.focus_current_page != new_page:
-            self.focus_current_page = new_page
-            start = (new_page - 1) * self.focus_page_size
-            if 0 <= start < len(self.filtered_units):
-                self.current_unit = self.filtered_units[start]
-                self.refresh_focus(sync_list=False)
-            self.refresh_focus_unit_list()
-
-    def first_focus_page(self) -> None:
-        self.set_focus_page(1)
-
-    def prev_focus_page(self) -> None:
-        self.set_focus_page(self.focus_current_page - 1)
-
-    def next_focus_page(self) -> None:
-        self.set_focus_page(self.focus_current_page + 1)
-
-    def last_focus_page(self) -> None:
-        self.set_focus_page(self.total_focus_pages())
-
-    def on_focus_page_size_changed(self, size: int) -> None:
-        if size > 0 and self.focus_page_size != size:
-            self.focus_page_size = size
-            if self.current_unit in self.filtered_units:
-                idx = self.filtered_units.index(self.current_unit)
-                self.focus_current_page = (idx // self.focus_page_size) + 1
-            else:
-                self.focus_current_page = 1
-            self.refresh_focus_unit_list()
-
-    def _unit_status_icon(self, unit: TranslationUnit) -> QIcon | None:
-        if unit.source_changed:
-            return self.icon_manager.get_icon("triangle-alert")
-        if unit.hidden or unit.state == UnitState.HIDDEN:
-            return self.icon_manager.get_icon("eye-slash")
-        if unit.locked or unit.state == UnitState.LOCKED:
-            return self.icon_manager.get_icon("lock")
-        if unit.issues:
-            return self.icon_manager.get_icon("triangle-alert")
-        if unit.state == UnitState.DOUBTFUL:
-            return self.icon_manager.get_icon("question")
-        if unit.state == UnitState.AI_REVIEWED:
-            return self.icon_manager.get_icon("robot-check")
-        if unit.state == UnitState.HUMAN_REVIEWED:
-            return self.icon_manager.get_icon("person-check")
-        if unit.state == UnitState.AI_TRANSLATED:
-            return self.icon_manager.get_icon("robot-edit")
-        if unit.state == UnitState.HUMAN_TRANSLATED:
-            return self.icon_manager.get_icon("person-edit-32")
-        return self.icon_manager.get_icon("circle")
-
-    def _sync_focus_list_selection(self) -> None:
-        if self.current_unit is None or not self.filtered_units:
-            self.list_focus_units.clearSelection()
-            return
-        try:
-            global_idx = self.filtered_units.index(self.current_unit)
-        except ValueError:
-            global_idx = -1
-        if global_idx >= 0:
-            unit_page = (global_idx // self.focus_page_size) + 1
-            if unit_page != self.focus_current_page:
-                self.list_focus_units.clearSelection()
-                return
-            page_idx = global_idx - (self.focus_current_page - 1) * self.focus_page_size
-            if self.list_focus_units.currentRow() != page_idx:
-                self._syncing_focus_list = True
-                try:
-                    self.list_focus_units.setCurrentRow(page_idx)
-                    item = self.list_focus_units.item(page_idx)
-                    if item is not None:
-                        self.list_focus_units.scrollToItem(item)
-                finally:
-                    self._syncing_focus_list = False
-
-    def _on_focus_unit_selected(self, row: int) -> None:
-        if self._syncing_focus_list or row < 0:
-            return
-        global_idx = (self.focus_current_page - 1) * self.focus_page_size + row
-        if 0 <= global_idx < len(self.filtered_units):
-            unit = self.filtered_units[global_idx]
-            if unit is not self.current_unit:
-                self.current_unit = unit
-                self.refresh_focus(sync_list=False)
 
     def apply_filters(self) -> None:
         query = self.search.text()
@@ -2048,21 +2049,23 @@ class MainWindowController(QObject):
         self.filtered_units = [
             unit
             for unit in self.units
-            if unit.matches(query)
+            if unit.id not in self.imported.excluded_unit_ids and unit.matches(query)
             and (selected_status == tr("MainWindow", "すべて") or self.unit_matches_status(unit, selected_status))
         ]
-        if self.current_unit in self.filtered_units:
-            idx = self.filtered_units.index(self.current_unit)
-            self.focus_current_page = (idx // self.focus_page_size) + 1
+        if self.focus_controller.current_unit in self.filtered_units:
+            idx = self.filtered_units.index(self.focus_controller.current_unit)
+            self.focus_controller.focus_current_page = (idx // self.focus_controller.focus_page_size) + 1
         else:
-            self.focus_current_page = 1
-        if self.filtered_units and self.current_unit not in self.filtered_units:
-            self.current_unit = self.filtered_units[0]
+            self.focus_controller.focus_current_page = 1
+        if self.filtered_units and self.focus_controller.current_unit not in self.filtered_units:
+            self.focus_controller.current_unit = self.filtered_units[0]
         elif not self.filtered_units:
-            self.current_unit = None
-        self.refresh_table()
-        self.refresh_focus_unit_list()
-        self.refresh_focus()
+            self.focus_controller.current_unit = None
+        self.table_controller.refresh_table()
+        self.focus_controller.refresh_focus_unit_list()
+        self.focus_controller.refresh_focus()
+        self._update_status_bar_counts()
+        self.translation_controller._update_translation_button_state()
 
     def _dispose_highlighters(self) -> None:
         # Removing formats emits textChanged too; it must never edit the new unit.
@@ -2114,8 +2117,8 @@ class MainWindowController(QObject):
         self.chat_dock.refresh_icons(plugin_id)
         if plugin_id == self.project.adapter_id:
             self._configure_text_presentation()
-            self.refresh_focus()
-            self.refresh_table()
+            self.focus_controller.refresh_focus()
+            self.table_controller.refresh_table()
 
     def _chat_icon(self, provider_id: str) -> QIcon:
         contribution = self.plugins.ui_contributions.get(provider_id)
@@ -2136,298 +2139,33 @@ class MainWindowController(QObject):
             return presentation.newline_codec.expand(text)
         return text
 
-    def refresh_table(self) -> None:
-        visible_columns = self.visible_columns()
-        self.table.clear()
-        self.table.setColumnCount(len(visible_columns))
-        self.table.setHorizontalHeaderLabels([column.label for column in visible_columns])
-        self.table.setRowCount(len(self.filtered_units))
-        self.table.verticalHeader().setDefaultSectionSize(60)
-
-        # カラムIDに基づいてDelegateを動的バインド（列番号のハードコードなし）
-        default_delegate = self.table.itemDelegate()
-        for col_idx, col in enumerate(visible_columns):
-            if col.id == "status":
-                self.table.setItemDelegateForColumn(col_idx, self.status_delegate)
-            elif col.id == "actions":
-                self.table.setItemDelegateForColumn(col_idx, self.action_delegate)
-            elif col.id == "target_text":
-                self.table.setItemDelegateForColumn(col_idx, self.target_text_delegate)
-            else:
-                self.table.setItemDelegateForColumn(col_idx, default_delegate)
-
-        for row, unit in enumerate(self.filtered_units):
-            for column_index, column in enumerate(visible_columns):
-                item = QTableWidgetItem()
-                item.setData(Qt.ItemDataRole.UserRole, unit)
-
-                if column.id == "target_text":
-                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable |
-                                  (Qt.ItemFlag.ItemIsEditable if self.active_workspace is not None else Qt.ItemFlag.NoItemFlags))
-                    display_text = unit.target_text
-                    if self.render_literal_newlines:
-                        display_text = self._expand_display_text(display_text)
-                    item.setText(display_text)
-                elif column.id == "actions":
-                    item.setFlags(Qt.ItemFlag.ItemIsSelectable |
-                                  (Qt.ItemFlag.ItemIsEnabled if self.active_workspace is not None else Qt.ItemFlag.NoItemFlags))
-                    item.setText("")
-                elif column.id == "status":
-                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable |
-                                  (Qt.ItemFlag.ItemIsEditable if self.active_workspace is not None else Qt.ItemFlag.NoItemFlags))
-                    item.setText(self.status_text(unit))
-                    item.setIcon(self.status_icon(unit))
-                else:
-                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                    value = column.value_for(unit, self.source_name_for_unit)
-                    if self.render_literal_newlines and column.id == "source_text":
-                        value = self._expand_display_text(value)
-                    item.setText(value)
-
-                self.table.setItem(row, column_index, item)
-
-        self.apply_header_visual_order()
-        self.table.resizeColumnsToContents()
-        h_header = self.table.horizontalHeader()
-        for col_idx, col in enumerate(visible_columns):
-            h_header.setSectionResizeMode(col_idx, QHeaderView.ResizeMode.Interactive)
-            if col.id == "actions" and self.table.columnWidth(col_idx) < 70:
-                self.table.setColumnWidth(col_idx, 70)
-
-    def status_icon(self, unit: TranslationUnit) -> QIcon:
-        icon = self._unit_status_icon(unit)
-        return icon or self.icon_manager.get_icon("circle")
-
-    def _on_table_status_delegate_changed(self, row: int, data: object) -> None:
-        if self.active_workspace is None:
+    def _update_status_bar_counts(self) -> None:
+        if self.status_count_label is None:
             return
-        if not (0 <= row < len(self.filtered_units)):
-            return
-        unit = self.filtered_units[row]
-        if data == "locked":
-            unit.locked = True
-            unit.hidden = False
-        elif data == "hidden":
-            unit.hidden = True
-            unit.locked = False
-        elif isinstance(data, UnitState):
-            unit.locked = False
-            unit.hidden = False
-            unit.state = data
-
-        self._sync_unit_row_content(row, unit)
-        if self.current_unit is unit:
-            self.refresh_focus(sync_list=False)
-        self.refresh_focus_unit_list()
-
-    def _on_table_action_delegate_clicked(self, row: int) -> None:
-        if not (0 <= row < len(self.filtered_units)):
-            return
-        unit = self.filtered_units[row]
-        self._translate_single_unit(unit, row)
-
-    def _on_table_target_text_committed(self, row: int, new_text: str) -> None:
-        if self.active_workspace is None:
-            return
-        if not (0 <= row < len(self.filtered_units)):
-            return
-        unit = self.filtered_units[row]
-        if unit.target_text == new_text:
-            return
-        unit.target_text = new_text
-        if unit.state == UnitState.UNTRANSLATED and new_text.strip():
-            unit.state = UnitState.HUMAN_TRANSLATED
-
-        self._sync_unit_row_content(row, unit)
-        if self.current_unit is unit:
-            if not self._updating_focus and self.edit_translation.toPlainText() != new_text:
-                self.edit_translation.setPlainText(new_text)
-
-    def _translate_single_unit(self, unit: TranslationUnit, row: int) -> None:
-        workspace = self.active_workspace
-        if workspace is None:
-            return
-        if not self.ai_provider_id:
-            QMessageBox.warning(self.window, tr("MainWindow", "AI設定"), tr("MainWindow", "AIプロバイダーが選択されていません。"))
-            return
-        provider = self.plugins.providers.get(self.ai_provider_id)
-        if provider is None:
-            QMessageBox.warning(self.window, tr("MainWindow", "AI設定"), tr("MainWindow", "選択中のAIプロバイダーが見つかりません。"))
-            return
-        api_key = self.ai_api_keys.get(self.ai_provider_id, "")
-        if not api_key:
-            QMessageBox.warning(self.window, tr("MainWindow", "AI設定"), tr("MainWindow", "APIキーが設定されていません。設定画面で設定してください。"))
-            return
-        model = self.combo_ai_model.currentText().strip()
-        if not model:
-            QMessageBox.warning(self.window, tr("MainWindow", "AI設定"), tr("MainWindow", "AIモデルが選択されていません。"))
+        if not self.units:
+            self.status_count_label.setText("")
             return
 
-        source_text = unit.source_text.strip()
-        if not source_text:
-            return
+        total_count = len(self.units)
+        filtered_count = len(self.filtered_units)
+        selected_count = len(self.table_controller._get_selected_rows())
 
-        self.window.statusBar().showMessage(tr("MainWindow", f"[{unit.label}] を翻訳中..."), 3000)
-
-        source_lang = self.project.source_language or "en"
-        target_lang = self.project.target_language
-        req_id = f"row_{row}_{id(unit)}"
-
-        def on_completed(r_id: str, translated_text: str) -> None:
-            if r_id != req_id:
-                return
-            _cleanup()
-            if not self._workspace_is_alive(workspace):
-                return
-            unit.target_text = translated_text
-            unit.state = UnitState.AI_TRANSLATED
-            if self.active_workspace is not workspace:
-                return
-            row = self.filtered_units.index(unit) if unit in self.filtered_units else -1
-            if row >= 0:
-                self._sync_unit_row_content(row, unit)
-            else:
-                self.refresh_table()
-            if self.current_unit is not None and self.current_unit.id == unit.id:
-                self.refresh_focus(sync_list=False)
-            self.refresh_focus_unit_list()
-            self.window.statusBar().showMessage(tr("MainWindow", f"[{unit.label}] の翻訳が完了しました。"), 4000)
-
-        def on_failed(r_id: str, error_message: str) -> None:
-            if r_id != req_id:
-                return
-            _cleanup()
-            self.window.statusBar().showMessage(tr("MainWindow", f"翻訳エラー: {error_message}"), 6000)
-
-        def _cleanup() -> None:
-            try:
-                self.ai_client.translation_completed.disconnect(on_completed)
-            except Exception:
-                pass
-            try:
-                self.ai_client.translation_failed.disconnect(on_failed)
-            except Exception:
-                pass
-
-        self.ai_client.translation_completed.connect(on_completed)
-        self.ai_client.translation_failed.connect(on_failed)
-        self.ai_client.translate_text(
-            request_id=req_id,
-            provider=provider,
-            api_key=api_key,
-            model=model,
-            text=unit.source_text,
-            source_language=source_lang,
-            target_language=target_lang,
-            source_language_name=workspace_language_name(self.workspace_service, source_lang)
-                if source_lang in self.workspace_service.languages else "",
-            target_language_name=workspace_language_name(self.workspace_service, target_lang),
-        )
-
-    def _sync_unit_row_content(self, row: int, unit: TranslationUnit) -> None:
-        visible_columns = self.visible_columns()
-        for col_idx, col in enumerate(visible_columns):
-            item = self.table.item(row, col_idx)
-            if item is None:
-                continue
-            item.setData(Qt.ItemDataRole.UserRole, unit)
-            if col.id == "target_text":
-                display_text = unit.target_text
-                if self.render_literal_newlines:
-                    display_text = self._expand_display_text(display_text)
-                item.setText(display_text)
-            elif col.id == "status":
-                item.setText(self.status_text(unit))
-                item.setIcon(self.status_icon(unit))
-
-    def _on_table_cell_clicked(self, row: int, column: int) -> None:
-        if 0 <= row < len(self.filtered_units):
-            unit = self.filtered_units[row]
-            if self.current_unit is not unit:
-                self.current_unit = unit
-                self.refresh_focus()
-
-            visible_columns = self.visible_columns()
-            if 0 <= column < len(visible_columns):
-                col = visible_columns[column]
-                if col.id in {"status", "target_text"}:
-                    model_index = self.table.model().index(row, column)
-                    self.table.edit(model_index)
-
-    def sync_focus_from_table(self) -> None:
-        selected = self.table.selectedItems()
-        if not selected:
-            return
-        unit = selected[0].data(Qt.ItemDataRole.UserRole)
-        if isinstance(unit, TranslationUnit):
-            self.current_unit = unit
-            self.refresh_focus()
-
-    def refresh_focus(self, sync_list: bool = True) -> None:
-        self._updating_focus = True
-        try:
-            unit = self.current_unit
-            if unit is None:
-                self.edit_key.clear()
-                self.edit_file.clear()
-                self.edit_source.clear()
-                self.edit_translation.clear()
-                self.label_position.setText("0 / 0")
-                if sync_list:
-                    self._sync_focus_list_selection()
-                return
-
-            position = self.filtered_units.index(unit) + 1 if unit in self.filtered_units else 0
-            self.label_position.setText(f"{position} / {len(self.filtered_units)}")
-            self.edit_key.setText(unit.label)
-            self.edit_file.setText(self.source_name_for_unit(unit))
-            source_display = unit.source_text
-            target_display = unit.target_text
-            source_display = self._expand_display_text(source_display)
-            target_display = self._expand_display_text(target_display)
-            self.edit_source.setPlainText(source_display)
-            self.edit_translation.setPlainText(target_display)
-            if sync_list:
-                unit_page = ((position - 1) // self.focus_page_size) + 1 if position > 0 else 1
-                if unit_page != self.focus_current_page:
-                    self.focus_current_page = unit_page
-                    self.refresh_focus_unit_list()
-                else:
-                    self._sync_focus_list_selection()
-        finally:
-            self._updating_focus = False
-
-    def mark_focus_edited(self) -> None:
-        if self._updating_focus or self.current_unit is None or self.active_workspace is None:
-            return
-        new_target = self.edit_translation.toPlainText()
-        if new_target == self._expand_display_text(self.current_unit.target_text):
-            return  # Syntax formatting also emits textChanged without changing text.
-        presentation = self._text_presentation
-        if self.render_literal_newlines and presentation is not None and presentation.newline_codec is not None:
-            new_target = presentation.newline_codec.collapse(new_target)
-        self.current_unit.target_text = new_target
-        if self.current_unit in self.filtered_units:
-            row = self.filtered_units.index(self.current_unit)
-            self._sync_unit_row_content(row, self.current_unit)
+        if filtered_count != total_count:
+            count_str = f"{filtered_count:,} / {total_count:,} 件"
         else:
-            self.refresh_table()
+            count_str = f"{total_count:,} 件"
 
+        if selected_count > 0:
+            text = f"選択中: {selected_count:,} 件 | {count_str}"
+        else:
+            text = count_str
 
-    def copy_source_to_translation(self) -> None:
-        if self.active_workspace is None:
-            return
-        source_text = self.edit_source.toPlainText()
-        self.edit_translation.setPlainText(source_text)
+        self.status_count_label.setText(text)
 
     def ai_translate_current_unit(self) -> None:
-        if self.current_unit is None:
-            return
-        try:
-            row = self.filtered_units.index(self.current_unit)
-        except ValueError:
-            row = -1
-        self._translate_single_unit(self.current_unit, row)
+        unit = self.focus_controller.current_unit
+        if unit is not None:
+            self.translation_controller._translate_single_unit(unit)
 
     def _get_active_models_list(self) -> list[tuple[str, str, str, str]]:
         return self.provider_registry.get_active_models(self.ai_models)
@@ -2479,174 +2217,31 @@ class MainWindowController(QObject):
                 return
             row = self.filtered_units.index(unit) if unit in self.filtered_units else -1
             if row >= 0:
-                self._sync_unit_row_content(row, unit)
+                self.table_controller._sync_unit_row_content(row, unit)
             else:
-                self.refresh_table()
-            if self.current_unit is not None and self.current_unit.id == unit.id:
-                self.refresh_focus(sync_list=False)
-            self.refresh_focus_unit_list()
+                self.table_controller.refresh_table()
+            if self.focus_controller.current_unit is not None and self.focus_controller.current_unit.id == unit.id:
+                self.focus_controller.refresh_focus(sync_list=False)
+            self.focus_controller.refresh_focus_unit_list()
             self.window.statusBar().showMessage(tr("MainWindow", f"[{unit.label}] に翻訳を採用しました。"), 4000)
 
         dialog.translation_adopted.connect(on_adopted)
         dialog.exec()
 
     def ai_translate_all_models_current_unit(self) -> None:
-        if self.current_unit is None:
+        if self.focus_controller.current_unit is None:
             return
         try:
-            row = self.filtered_units.index(self.current_unit)
+            row = self.filtered_units.index(self.focus_controller.current_unit)
         except ValueError:
             row = -1
-        self._open_multi_model_dialog(self.current_unit, row)
+        self._open_multi_model_dialog(self.focus_controller.current_unit, row)
 
     def _on_table_action_all_models_clicked(self, row: int) -> None:
         if not (0 <= row < len(self.filtered_units)):
             return
         unit = self.filtered_units[row]
         self._open_multi_model_dialog(unit, row)
-
-    def _setup_save_button_menu(self) -> None:
-        menu = QMenu(self.window)
-
-        action_save_next = QAction(self.icon_manager.get_icon("save"), tr("MainWindow", "保存して次へ (人間による翻訳)"), self.window)
-        action_save_next.setShortcut("Ctrl+Return")
-        action_save_next.triggered.connect(self.save_and_next)
-        menu.addAction(action_save_next)
-
-        action_save_stay = QAction(self.icon_manager.get_icon("file"), tr("MainWindow", "保存 (留まる)"), self.window)
-        action_save_stay.setShortcut("Ctrl+S")
-        action_save_stay.triggered.connect(self.save_stay)
-        menu.addAction(action_save_stay)
-
-        menu.addSeparator()
-
-        action_human_trans = QAction(self.icon_manager.get_icon("person-edit-32"), tr("MainWindow", "人間による翻訳として保存"), self.window)
-        action_human_trans.triggered.connect(lambda: self.save_with_state(UnitState.HUMAN_TRANSLATED))
-        menu.addAction(action_human_trans)
-
-        action_human_rev = QAction(self.icon_manager.get_icon("person-check"), tr("MainWindow", "人間による校閲として保存"), self.window)
-        action_human_rev.triggered.connect(lambda: self.save_with_state(UnitState.HUMAN_REVIEWED))
-        menu.addAction(action_human_rev)
-
-        action_ai_trans = QAction(self.icon_manager.get_icon("robot-edit"), tr("MainWindow", "AIによる翻訳として保存"), self.window)
-        action_ai_trans.triggered.connect(lambda: self.save_with_state(UnitState.AI_TRANSLATED))
-        menu.addAction(action_ai_trans)
-
-        action_ai_rev = QAction(self.icon_manager.get_icon("robot-check"), tr("MainWindow", "AIによる校閲として保存"), self.window)
-        action_ai_rev.triggered.connect(lambda: self.save_with_state(UnitState.AI_REVIEWED))
-        menu.addAction(action_ai_rev)
-
-        action_doubtful = QAction(self.icon_manager.get_icon("question"), tr("MainWindow", "疑問ありとして保存"), self.window)
-        action_doubtful.triggered.connect(lambda: self.save_with_state(UnitState.DOUBTFUL))
-        menu.addAction(action_doubtful)
-
-        action_locked = QAction(self.icon_manager.get_icon("lock"), tr("MainWindow", "ロックとして保存"), self.window)
-        action_locked.triggered.connect(self.save_as_locked)
-        menu.addAction(action_locked)
-
-        action_hidden = QAction(self.icon_manager.get_icon("eye-slash"), tr("MainWindow", "非表示として保存"), self.window)
-        action_hidden.triggered.connect(self.save_as_hidden)
-        menu.addAction(action_hidden)
-
-        menu.addSeparator()
-
-        action_untranslated = QAction(self.icon_manager.get_icon("brush-cleaning"), tr("MainWindow", "未翻訳に戻す"), self.window)
-        action_untranslated.triggered.connect(self.save_as_untranslated)
-        menu.addAction(action_untranslated)
-
-        self.button_save_split.setMenu(menu)
-
-    def save_and_next(self) -> None:
-        self._save_current_unit_changes(next_entry=True)
-
-    def save_stay(self) -> None:
-        self._save_current_unit_changes(next_entry=False)
-
-    def save_with_state(self, state: UnitState) -> None:
-        if self.active_workspace is None:
-            return
-        if self.current_unit is not None:
-            self.current_unit.target_text = self.edit_translation.toPlainText()
-            self.current_unit.state = state
-            self._after_unit_saved(next_entry=True)
-
-    def save_as_locked(self) -> None:
-        if self.active_workspace is None:
-            return
-        if self.current_unit is not None:
-            self.current_unit.target_text = self.edit_translation.toPlainText()
-            self.current_unit.locked = True
-            self.current_unit.state = UnitState.LOCKED
-            self._after_unit_saved(next_entry=True)
-
-    def save_as_hidden(self) -> None:
-        if self.active_workspace is None:
-            return
-        if self.current_unit is not None:
-            self.current_unit.target_text = self.edit_translation.toPlainText()
-            self.current_unit.hidden = True
-            self.current_unit.state = UnitState.HIDDEN
-            self._after_unit_saved(next_entry=True)
-
-    def save_as_untranslated(self) -> None:
-        if self.active_workspace is None:
-            return
-        if self.current_unit is not None:
-            self.current_unit.state = UnitState.UNTRANSLATED
-            self._after_unit_saved(next_entry=True)
-
-    def _save_current_unit_changes(self, next_entry: bool) -> None:
-        if self.current_unit is None or self.active_workspace is None:
-            return
-        text = self.edit_translation.toPlainText()
-        self.current_unit.target_text = text
-        if text.strip():
-            self.current_unit.state = UnitState.HUMAN_TRANSLATED
-        else:
-            self.current_unit.state = UnitState.UNTRANSLATED
-        self._after_unit_saved(next_entry=next_entry)
-
-    def _after_unit_saved(self, next_entry: bool) -> None:
-        self.refresh_table()
-        if self.current_unit in self.filtered_units:
-            global_idx = self.filtered_units.index(self.current_unit)
-            start = (self.focus_current_page - 1) * self.focus_page_size
-            end = start + self.focus_page_size
-            if start <= global_idx < end:
-                page_idx = global_idx - start
-                item = self.list_focus_units.item(page_idx)
-                if item is not None:
-                    preview = " ".join(self.current_unit.source_text.split())
-                    if len(preview) > 50:
-                        preview = preview[:47] + "..."
-                    if not preview:
-                        preview = f"<{self.current_unit.label}>"
-                    item.setText(preview)
-                    icon = self._unit_status_icon(self.current_unit)
-                    if icon is not None and not icon.isNull():
-                        item.setIcon(icon)
-                    else:
-                        item.setIcon(QIcon())
-        if next_entry:
-            self.next_entry()
-        else:
-            self.refresh_focus(sync_list=False)
-
-    def previous_entry(self) -> None:
-        self.move_focus(-1)
-
-    def next_entry(self) -> None:
-        self.move_focus(1)
-
-    def move_focus(self, step: int) -> None:
-        if not self.filtered_units:
-            return
-        if self.current_unit in self.filtered_units:
-            index = self.filtered_units.index(self.current_unit)
-        else:
-            index = 0
-        self.current_unit = self.filtered_units[(index + step) % len(self.filtered_units)]
-        self.refresh_focus()
 
     def show_list_mode(self) -> None:
         self.stack.setCurrentIndex(0)
@@ -2696,8 +2291,8 @@ class MainWindowController(QObject):
     def _on_toggle_render_newlines(self, enabled: bool) -> None:
         self.render_literal_newlines = enabled
         self._save_display_flags()
-        self.refresh_focus(sync_list=False)
-        self.refresh_table()
+        self.focus_controller.refresh_focus(sync_list=False)
+        self.table_controller.refresh_table()
 
     def _on_toggle_highlight_tags(self, enabled: bool) -> None:
         self.highlight_translation_tags = enabled
@@ -2720,8 +2315,8 @@ class MainWindowController(QObject):
         self.display_settings_menu.exec(pos)
 
     def show_focus_mode(self) -> None:
-        if self.current_unit is None and self.filtered_units:
-            self.current_unit = self.filtered_units[0]
+        if self.focus_controller.current_unit is None and self.filtered_units:
+            self.focus_controller.current_unit = self.filtered_units[0]
         self.stack.setCurrentIndex(1)
         self.button_list_mode.setChecked(False)
         self.button_focus_mode.setChecked(True)
@@ -2733,8 +2328,8 @@ class MainWindowController(QObject):
         self.action_toggle_file_sidebar.setChecked(self._focus_sidebar_visible)
         self.frame_files.setVisible(self._focus_sidebar_visible)
         if self._focus_sidebar_visible:
-            self._ensure_focus_sidebar_minimum_width()
-        self.refresh_focus()
+            self.focus_controller._ensure_focus_sidebar_minimum_width()
+        self.focus_controller.refresh_focus()
 
     def toggle_file_sidebar(self) -> None:
         if self.stack.currentIndex() == 1:
@@ -2814,170 +2409,3 @@ class MainWindowController(QObject):
             if source.id == ref.source_id:
                 return source.name
         return ref.source_id
-
-    def visible_columns(self) -> list[TranslationTableColumn]:
-        return [
-            self.columns_by_id[column_id]
-            for column_id in self.column_layout.order
-            if column_id in self.columns_by_id and column_id not in self.column_layout.hidden
-        ]
-
-    def open_table_header_menu(self, position: QPoint) -> None:
-        header = self.table.horizontalHeader()
-        logical_index = header.logicalIndexAt(position)
-        visible_columns = self.visible_columns()
-        clicked_column = visible_columns[logical_index].id if 0 <= logical_index < len(visible_columns) else None
-
-        menu = QMenu(self.window)
-        visible_count = len(visible_columns)
-
-        for column_id in self.column_layout.order:
-            column = self.columns_by_id.get(column_id)
-            if column is None:
-                continue
-            action = QAction(column.label, menu)
-            action.setCheckable(True)
-            action.setChecked(column_id not in self.column_layout.hidden)
-            action.setEnabled(not action.isChecked() or visible_count > 1)
-            action.toggled.connect(lambda checked, selected_id=column_id: self.set_column_visible(selected_id, checked))
-            menu.addAction(action)
-
-        menu.addSeparator()
-        move_left = menu.addAction(tr("MainWindow", "左へ移動"))
-        move_left.setEnabled(clicked_column is not None and self.can_move_visible_column(clicked_column, -1))
-        move_left.triggered.connect(lambda: self.move_visible_column(clicked_column, -1))
-
-        move_right = menu.addAction(tr("MainWindow", "右へ移動"))
-        move_right.setEnabled(clicked_column is not None and self.can_move_visible_column(clicked_column, 1))
-        move_right.triggered.connect(lambda: self.move_visible_column(clicked_column, 1))
-
-        menu.addSeparator()
-        reset = menu.addAction(tr("MainWindow", "初期状態に戻す"))
-        reset.triggered.connect(self.reset_column_layout)
-
-        menu.exec(header.mapToGlobal(position))
-
-    def set_column_visible(self, column_id: str, visible: bool) -> None:
-        if visible:
-            self.column_layout.hidden.discard(column_id)
-        else:
-            if len(self.visible_columns()) <= 1:
-                return
-            self.column_layout.hidden.add(column_id)
-        self.save_and_refresh_column_layout()
-
-    def can_move_visible_column(self, column_id: str | None, direction: int) -> bool:
-        if column_id is None:
-            return False
-        visible_ids = [column.id for column in self.visible_columns()]
-        if column_id not in visible_ids:
-            return False
-        new_index = visible_ids.index(column_id) + direction
-        return 0 <= new_index < len(visible_ids)
-
-    def move_visible_column(self, column_id: str | None, direction: int) -> None:
-        if not self.can_move_visible_column(column_id, direction) or column_id is None:
-            return
-        visible_ids = [column.id for column in self.visible_columns()]
-        old_visible_index = visible_ids.index(column_id)
-        other_column_id = visible_ids[old_visible_index + direction]
-        old_index = self.column_layout.order.index(column_id)
-        other_index = self.column_layout.order.index(other_column_id)
-        self.column_layout.order[old_index], self.column_layout.order[other_index] = (
-            self.column_layout.order[other_index],
-            self.column_layout.order[old_index],
-        )
-        self.save_and_refresh_column_layout()
-
-    def reset_column_layout(self) -> None:
-        self.column_layout = ColumnLayout(
-            order=[column.id for column in self.columns],
-            hidden={column.id for column in self.columns if not column.default_visible},
-        )
-        self.save_and_refresh_column_layout()
-
-    def handle_table_section_moved(self, logical_index: int, old_visual_index: int, new_visual_index: int) -> None:
-        self.hide_header_drop_indicator()
-        if self._syncing_header_order or old_visual_index == new_visual_index:
-            return
-        visible_ids = [column.id for column in self.visible_columns()]
-        if logical_index < 0 or logical_index >= len(visible_ids):
-            return
-        moved_column_id = visible_ids[logical_index]
-        remaining_visible = [column_id for column_id in visible_ids if column_id != moved_column_id]
-        bounded_index = max(0, min(new_visual_index, len(remaining_visible)))
-        remaining_visible.insert(bounded_index, moved_column_id)
-        self.reorder_layout_by_visible_ids(remaining_visible)
-        save_translation_table_columns(self.column_layout)
-
-    def reorder_layout_by_visible_ids(self, visible_ids: list[str]) -> None:
-        visible_set = set(visible_ids)
-        reordered: list[str] = []
-        visible_iter = iter(visible_ids)
-        for column_id in self.column_layout.order:
-            if column_id in visible_set:
-                reordered.append(next(visible_iter))
-            else:
-                reordered.append(column_id)
-        self.column_layout.order = reordered
-
-    def apply_header_visual_order(self) -> None:
-        header = self.table.horizontalHeader()
-        self._syncing_header_order = True
-        try:
-            for target_visual_index, logical_index in enumerate(range(self.table.columnCount())):
-                current_visual_index = header.visualIndex(logical_index)
-                if current_visual_index != target_visual_index:
-                    header.moveSection(current_visual_index, target_visual_index)
-        finally:
-            self._syncing_header_order = False
-
-    def save_and_refresh_column_layout(self) -> None:
-        save_translation_table_columns(self.column_layout)
-        self.refresh_table()
-
-    def show_header_drop_indicator(self, position: QPoint) -> None:
-        header = self.table.horizontalHeader()
-        if self.table.columnCount() == 0 or header.count() == 0:
-            self.hide_header_drop_indicator()
-            return
-
-        x = self.header_drop_indicator_x(position)
-        h_vp = header.viewport()
-        h_height = h_vp.height() if h_vp is not None else header.height()
-        self.header_drop_indicator.setGeometry(x - 1, 0, 3, h_height)
-        self.header_drop_indicator.raise_()
-        self.header_drop_indicator.show()
-
-        t_vp = self.table.viewport()
-        if t_vp is not None:
-            self.table_drop_indicator.setGeometry(x - 1, 0, 3, t_vp.height())
-            self.table_drop_indicator.raise_()
-            self.table_drop_indicator.show()
-
-    def hide_header_drop_indicator(self) -> None:
-        self._is_header_dragging = False
-        self._drag_start_global_pos = None
-        if hasattr(self, "header_drop_indicator"):
-            self.header_drop_indicator.hide()
-        if hasattr(self, "table_drop_indicator"):
-            self.table_drop_indicator.hide()
-
-    def header_drop_indicator_x(self, position: QPoint) -> int:
-        header = self.table.horizontalHeader()
-        x = position.x()
-        logical_index = header.logicalIndexAt(x)
-
-        if logical_index < 0:
-            if x <= 0:
-                first_logical = header.logicalIndex(0)
-                return header.sectionViewportPosition(first_logical)
-            last_logical = header.logicalIndex(header.count() - 1)
-            return header.sectionViewportPosition(last_logical) + header.sectionSize(last_logical)
-
-        section_left = header.sectionViewportPosition(logical_index)
-        section_width = header.sectionSize(logical_index)
-        section_center = section_left + section_width // 2
-        if x < section_center:
-            return section_left
-        return section_left + section_width

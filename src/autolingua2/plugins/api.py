@@ -9,7 +9,7 @@ from PySide6.QtGui import QIcon, QSyntaxHighlighter, QTextDocument
 from PySide6.QtWidgets import QWidget
 
 from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter, ImportedTranslation, VoiceInputProvider
-from autolingua2.infrastructure.encoding import read_text_auto
+from autolingua2.infrastructure.encoding import detect_encoding, read_text_auto
 from autolingua2.infrastructure.platform import current_platform
 from autolingua2.services.settings_store import load_plugin_settings, save_plugin_settings
 from autolingua2.ui.creation_contract import CreationAdapter, CreationContext
@@ -108,6 +108,7 @@ class UIContribution:
 @dataclass(frozen=True)
 class FileAccess:
     read_text_auto: Callable[[Path], tuple[str, str]]
+    detect_encoding: Callable[[bytes], str]
 
 
 @dataclass(frozen=True)
@@ -136,7 +137,7 @@ class PluginContext:
         self.id = plugin_id
         self._get_icon = get_icon
         self._language = language
-        self.files = FileAccess(read_text_auto)
+        self.files = FileAccess(read_text_auto, detect_encoding)
         self.settings = PluginSettings(self._load_settings, self._save_settings)
         self.system_voice_input = SystemVoiceInputAccess(
             self._system_voice_input_available, self._start_system_voice_input,

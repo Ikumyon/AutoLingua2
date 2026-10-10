@@ -16,12 +16,12 @@
      <item>
       <widget class="QLabel" name="labelRuleAdapter">
        <property name="text">
-        <string>対象形式:</string>
+        <string>対象ゲーム:</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QComboBox" name="comboRuleAdapter"/>
+      <widget class="QComboBox" name="comboRuleGame"/>
      </item>
      <item>
       <spacer name="spacerRuleHeader">
@@ -37,13 +37,6 @@
       </spacer>
      </item>
     </layout>
-   </item>
-   <item>
-    <widget class="QCheckBox" name="checkDisableAllBuiltin">
-     <property name="text">
-      <string>事前定義されたルールをすべて無効化</string>
-     </property>
-    </widget>
    </item>
    <item>
     <widget class="QTableWidget" name="tableFilterRules">
@@ -86,6 +79,13 @@
         </size>
        </property>
       </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="buttonResetRules">
+       <property name="text">
+        <string>このゲームの初期値に戻す</string>
+       </property>
+      </widget>
      </item>
     </layout>
    </item>

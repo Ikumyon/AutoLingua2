@@ -144,6 +144,10 @@ class AiChatDockController(QObject):
         voice_busy = self.voice_input.active
         self.input.setReadOnly(ai_busy or voice_busy)
         self.send_button.setEnabled(not voice_busy)
+        self.send_button.setIcon(self._get_icon("stop" if ai_busy else "send-24"))
+        send_label = tr("AiChat", "停止") if ai_busy else tr("AiChat", "送信")
+        self.send_button.setToolTip(send_label)
+        self.send_button.setAccessibleName(send_label)
         self.model_button.setEnabled(not ai_busy and not voice_busy and bool(self._choices))
         self.voice_button.setVisible(self.voice_input.available)
         self.voice_button.setEnabled(not ai_busy and self.voice_input.state != "processing")
@@ -265,9 +269,6 @@ class AiChatDockController(QObject):
         self.new_button.setEnabled(not busy)
         self.add_button.setEnabled(not busy)
         self.clear_button.setEnabled(not busy and bool(self.session.references))
-        send_label = tr("AiChat", "停止") if busy else tr("AiChat", "送信")
-        self.send_button.setToolTip(send_label)
-        self.send_button.setAccessibleName(send_label)
         self._update_input_controls()
 
     def _append(self, role: str, text: str) -> None:
@@ -347,8 +348,8 @@ class AiChatDockController(QObject):
             if provider_id is None or provider_id == answer_provider:
                 label.setPixmap(self._chat_icon(answer_provider).pixmap(QSize(20, 20)))
             button.setIcon(self._get_icon("check" if button.property("answerCopied") is True else "copy"))
-        self.send_button.setIcon(self._get_icon("send-24"))
         self.voice_button.setIcon(self._get_icon("microphone"))
+        self._update_input_controls()
 
     def _add_references(self) -> None:
         references = self.selected_references()

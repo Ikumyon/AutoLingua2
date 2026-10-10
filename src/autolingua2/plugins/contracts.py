@@ -3,10 +3,14 @@
 Internal model locations may change; plugin authors should import these names here.
 These are the host's actual types, not copies or compatibility implementations.
 """
-from autolingua2.adapters.base import FileAdapter
+from autolingua2.adapters.base import FileAdapter, KeyConflictAdapter
+from autolingua2.ir.key_conflict import KeyEntry, KeyFile
 from autolingua2.ir import Issue, TranslationProject, TranslationSource, TranslationUnit, UnitState
-from autolingua2.ir.filter_rules import FilterRule
+from autolingua2.ir.filter_rules import FilterRule, TagKind
 from autolingua2.ir.imported import GameProfile, GameSlot, ImportedTranslation, SourceRef
+from autolingua2.ir.classification import (
+    ClassificationResult, ClassifiedElement, DifferenceKind, SourceCategory, SourceGroup, TextDifference,
+)
 from autolingua2.services.export_contract import ExportFile, TranslationExporter
 from autolingua2.services.voice_input_contract import (
     VoiceInputCallbacks, VoiceInputMode, VoiceInputOperation, VoiceInputProvider,
@@ -26,9 +30,11 @@ __all__ = [
     "VoiceInputCallbacks", "VoiceInputMode", "VoiceInputOperation", "VoiceInputProvider",
     "ChatMessage", "ChatReply", "ChatToolCall", "object_value", "string_value",
     "ExportFile", "TranslationExporter",
-    "FileAdapter", "AiProviderPlugin", "TextTranslator", "TranslationProviderError",
+    "FileAdapter", "KeyConflictAdapter", "KeyEntry", "KeyFile",
+    "AiProviderPlugin", "TextTranslator", "TranslationProviderError",
     "BaseHttpTranslator", "BaseAiProvider",
     "Issue", "TranslationProject", "TranslationSource", "TranslationUnit", "UnitState",
-    "FilterRule", "GameProfile", "GameSlot", "ImportedTranslation", "SourceRef",
+    "FilterRule", "TagKind", "GameProfile", "GameSlot", "ImportedTranslation", "SourceRef",
+    "ClassificationResult", "ClassifiedElement", "DifferenceKind", "SourceCategory", "SourceGroup", "TextDifference",
 ]
 

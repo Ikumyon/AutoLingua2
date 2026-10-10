@@ -164,7 +164,7 @@ def prepare_update(service: WorkspaceService, target: WatchTarget, adapter: File
     observed = source_watch.snapshot(settings_path(), path)
     root = Path(target.source_root)
     imported = import_project(adapter, [root], service.imported.project.source_language,
-                              source_root=root, allow_empty=True)
+                              source_root=root, allow_empty=True, game_id=service.imported.project.game_id)
     if source_watch.snapshot(settings_path(), path) != observed:
         raise ValueError("読み込み中に翻訳元が変更されました。もう一度確認してください。")
     old = {unit.id: unit for unit in service.imported.project.units}
@@ -193,6 +193,8 @@ def apply_update(service: WorkspaceService, update: SourceUpdate, path: Path | N
                 source_root=project.source_root, loaded_files=project.loaded_files,
                 loaded_folders=project.loaded_folders),
         update.imported.source_refs,
+        update.imported.classification,
+        set(update.imported.excluded_unit_ids),
     )
     changed = {change.unit_id for change in update.changes if change.kind == "変更"}
     for workspace in candidate.workspaces.values():

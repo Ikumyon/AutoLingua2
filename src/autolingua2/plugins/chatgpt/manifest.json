@@ -1,0 +1,7 @@
+{
+  "id": "chatgpt",
+  "name": "ChatGPT",
+  "kind": "python",
+  "entry": "entry.py",
+  "description": "ChatGPT (Sign in with ChatGPT) translation provider"
+}
