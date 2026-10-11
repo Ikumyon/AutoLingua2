@@ -120,6 +120,7 @@ class MultiModelTranslationDialog(QDialog):
         *, default_provider_id: str = "",
         source_language_name: str = "",
         target_language_name: str = "",
+        tone: str | None = None,
     ) -> None:
         super().__init__(parent)
         self.source_text = source_text
@@ -133,6 +134,7 @@ class MultiModelTranslationDialog(QDialog):
         self.target_lang = target_lang
         self.source_language_name = source_language_name
         self.target_language_name = target_language_name
+        self.tone = tone
 
         self._cards: dict[str, ModelResultCard] = {}  # req_id -> card
         self._adopted_text: str | None = None
@@ -209,6 +211,7 @@ class MultiModelTranslationDialog(QDialog):
                 target_language=self.target_lang,
                 source_language_name=self.source_language_name,
                 target_language_name=self.target_language_name,
+                tone=self.tone,
             )
 
     def _on_translation_completed(self, req_id: str, translated_text: str) -> None:

@@ -7,6 +7,7 @@ from io import BytesIO
 import json
 from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from zipfile import ZIP_DEFLATED, ZipFile
+from uuid import NAMESPACE_URL, uuid5
 
 from PySide6.QtCore import QIODevice, QSaveFile
 
@@ -14,6 +15,7 @@ from autolingua2.ir.imported import ImportedTranslation, SourceRef
 from autolingua2.ir.project import TranslationProject, TranslationSource
 from autolingua2.ir.state import UnitState
 from autolingua2.ir.unit import TranslationUnit
+from autolingua2.ir.tone import ToneItem
 from autolingua2.ir.validation import array, record, required, text
 from autolingua2.ir.workspace import TranslationRecord, Workspace
 from autolingua2.services.workspaces import Language, WorkspaceService, normalize_language_code
@@ -71,6 +73,7 @@ def project_documents(service: WorkspaceService) -> dict[str, object]:
         "project.json": {
             "format_version": 1, "name": project.name, "plugin_id": project.adapter_id,
             "game_id": project.game_id, "source_slot": project.source_slot,
+            "memory_id": project.memory_id,
             "source_language": project.source_language,
             "source_root": project.source_root, "files": project.loaded_files,
             "folders": project.loaded_folders, "workspaces": list(service.workspaces),
@@ -96,10 +99,13 @@ def project_documents(service: WorkspaceService) -> dict[str, object]:
                 entry = workspace.records.get(unit.id)
                 if entry is None:
                     raise ValueError("ワークスペースの翻訳行がありません。")
+                tone = entry.tone
                 entries.append({"key": ref.external_id, "original": unit.source_text,
                                 "translation": entry.target_text, "state": entry.state.value,
                                 "context": unit.context,
-                                "source_changed": entry.source_changed})
+                                "source_changed": entry.source_changed,
+                                "tone": {"id": tone.id, "name": tone.name, "prompt": tone.prompt}
+                                    if tone is not None else None})
             documents[prefix + f"files/{relative_path(source.id)}.json"] = entries
     return documents
 
@@ -143,6 +149,13 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
         source_root=root, loaded_files=files, loaded_folders=folders,
         sources=[TranslationSource(path, PurePosixPath(path).name) for path in paths],
     )
+    memory_id = metadata.get("memory_id")
+    if memory_id is None:
+        # Existing archives acquire a stable identity until saved with the new field.
+        identity = json.dumps([project.adapter_id, project.game_id, root, project.name], ensure_ascii=False)
+        project.memory_id = uuid5(NAMESPACE_URL, identity).hex
+    else:
+        project.memory_id = text(memory_id, nonempty=True)
     names = [text(value, nonempty=True) for value in array(required(metadata, "workspaces"))]
     if not names or len(names) != len(set(names)):
         raise ValueError("ワークスペース一覧が不正です。")
@@ -175,7 +188,7 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
             for item in entries:
                 row = record(item)
                 if not {"key", "original", "translation", "state"} <= set(row) or not set(row) <= {
-                    "key", "original", "translation", "state", "context", "source_changed"
+                    "key", "original", "translation", "state", "context", "source_changed", "tone"
                 }:
                     raise ValueError("翻訳行の項目が不正です。")
                 key = text(required(row, "key"), nonempty=True)
@@ -188,9 +201,16 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
                 source_changed = row.get("source_changed", False)
                 if type(source_changed) is not bool:
                     raise ValueError("原文更新状態が不正です。")
+                tone_data = row.get("tone")
+                tone = None
+                if tone_data is not None:
+                    tone_fields = record(tone_data)
+                    tone = ToneItem(text(required(tone_fields, "id"), nonempty=True),
+                                    text(required(tone_fields, "name"), nonempty=True),
+                                    text(required(tone_fields, "prompt"), nonempty=True))
                 workspace.records[unit_id] = TranslationRecord(
                     text(required(row, "translation")), UnitState(text(required(row, "state"))),
-                    source_changed,
+                    source_changed, tone,
                 )
                 if name == names[0]:
                     project.units.append(TranslationUnit(

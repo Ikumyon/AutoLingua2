@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SettingsTonePage</class>
+ <widget class="QWidget" name="SettingsTonePage">
+  <layout class="QVBoxLayout" name="layoutRoot">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item><layout class="QFormLayout" name="formToneCommon">
+    <item row="0" column="0"><widget class="QLabel" name="labelToneSelection"><property name="text"><string>口調：</string></property></widget></item>
+    <item row="0" column="1"><widget class="QWidget" name="paneToneSelection"><layout class="QHBoxLayout" name="layoutToneSelection">
+     <property name="leftMargin"><number>0</number></property>
+     <property name="topMargin"><number>0</number></property>
+     <property name="rightMargin"><number>0</number></property>
+     <property name="bottomMargin"><number>0</number></property>
+    </layout></widget></item>
+    <item row="1" column="0" colspan="2"><widget class="QWidget" name="paneToneCreation"><layout class="QHBoxLayout" name="layoutToneCreation">
+    <property name="leftMargin"><number>0</number></property>
+    <property name="topMargin"><number>0</number></property>
+    <property name="rightMargin"><number>0</number></property>
+    <property name="bottomMargin"><number>0</number></property>
+    <item><widget class="QLabel" name="labelNewToneKind"><property name="text"><string>種類：</string></property></widget></item>
+    <item><widget class="QComboBox" name="comboNewToneKind"/></item>
+   </layout></widget></item>
+    <item row="2" column="0"><widget class="QLabel" name="labelToneName"><property name="text"><string>口調名：</string></property></widget></item>
+    <item row="2" column="1"><widget class="QLineEdit" name="editToneName"/></item>
+   </layout></item>
+   <item><widget class="QStackedWidget" name="stackToneEditor">
+    <widget class="QWidget" name="paneNormalTone"><layout class="QVBoxLayout" name="layoutNormalTone">
+     <property name="leftMargin"><number>0</number></property>
+     <property name="topMargin"><number>0</number></property>
+     <property name="rightMargin"><number>0</number></property>
+     <property name="bottomMargin"><number>0</number></property>
+     <item><widget class="QLabel" name="labelTonePrompt"><property name="text"><string>指示プロンプト：</string></property></widget></item>
+     <item><widget class="QPlainTextEdit" name="editTonePrompt">
+      <property name="minimumHeight"><number>180</number></property>
+      <property name="maximumHeight"><number>180</number></property>
+     </widget></item>
+     <item><spacer name="spacerNormalTone"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property></spacer></item>
+    </layout></widget>
+    <widget class="QWidget" name="paneConditionalTone"><layout class="QVBoxLayout" name="layoutConditionalTone">
+     <property name="leftMargin"><number>0</number></property>
+     <property name="topMargin"><number>0</number></property>
+     <property name="rightMargin"><number>0</number></property>
+     <property name="bottomMargin"><number>0</number></property>
+     <item><widget class="QSplitter" name="splitterTones">
+      <property name="orientation"><enum>Qt::Horizontal</enum></property>
+      <widget class="QWidget" name="paneBranches"><layout class="QVBoxLayout" name="layoutBranches">
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>4</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QLabel" name="labelBranches"><property name="text"><string>分岐（上から判定）</string></property></widget></item>
+       <item><widget class="QTreeWidget" name="treeToneBranches"><property name="headerHidden"><bool>true</bool></property><column><property name="text"><string>分岐</string></property></column></widget></item>
+       <item><widget class="QPushButton" name="buttonAddToneBranch"><property name="text"><string>「もし～なら」を追加</string></property></widget></item>
+       <item><layout class="QHBoxLayout" name="layoutBranchActions">
+        <item><widget class="QPushButton" name="buttonDeleteBranch"><property name="text"><string>分岐を削除</string></property></widget></item>
+        <item><widget class="QPushButton" name="buttonBranchUp"><property name="text"><string>↑</string></property></widget></item>
+        <item><widget class="QPushButton" name="buttonBranchDown"><property name="text"><string>↓</string></property></widget></item>
+       </layout></item>
+       <item><widget class="QLabel" name="labelBranchDepth"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+      </layout></widget>
+      <widget class="QScrollArea" name="scrollConditionEditor">
+       <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+       <property name="widgetResizable"><bool>true</bool></property>
+       <widget class="QWidget" name="paneCondition"><layout class="QVBoxLayout" name="layoutCondition">
+        <property name="leftMargin"><number>4</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+        <item><widget class="QLabel" name="labelSelectBranch"><property name="text"><string>分岐を選択して条件を編集してください。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+        <item><widget class="QWidget" name="paneExpressionEditor"><layout class="QVBoxLayout" name="layoutExpressionEditor">
+         <property name="leftMargin"><number>0</number></property>
+         <property name="topMargin"><number>0</number></property>
+         <property name="rightMargin"><number>0</number></property>
+         <property name="bottomMargin"><number>0</number></property>
+         <item><widget class="QLabel" name="labelCondition"><property name="text"><string>選択した分岐の条件</string></property></widget></item>
+         <item><widget class="QTreeWidget" name="treeExpressions">
+          <property name="minimumHeight"><number>80</number></property>
+          <property name="maximumHeight"><number>140</number></property>
+          <property name="headerHidden"><bool>true</bool></property>
+          <column><property name="text"><string>条件式</string></property></column>
+         </widget></item>
+         <item><layout class="QHBoxLayout" name="layoutExpressionAdd">
+          <item><widget class="QPushButton" name="buttonAddCondition"><property name="text"><string>条件追加</string></property></widget></item>
+          <item><widget class="QPushButton" name="buttonAddGroup"><property name="text"><string>グループ追加</string></property></widget></item>
+         </layout></item>
+         <item><layout class="QHBoxLayout" name="layoutExpressionActions">
+          <item><widget class="QPushButton" name="buttonToggleNot"><property name="text"><string>NOT</string></property><property name="toolTip"><string>NOTで囲む／解除</string></property></widget></item>
+          <item><widget class="QPushButton" name="buttonDeleteExpression"><property name="text"><string>条件削除</string></property></widget></item>
+          <item><widget class="QPushButton" name="buttonExpressionUp"><property name="text"><string>↑</string></property></widget></item>
+          <item><widget class="QPushButton" name="buttonExpressionDown"><property name="text"><string>↓</string></property></widget></item>
+         </layout></item>
+         <item><layout class="QFormLayout" name="formPredicate">
+          <item row="0" column="0"><widget class="QLabel" name="labelOperator"><property name="text"><string>演算子：</string></property></widget></item>
+          <item row="0" column="1"><widget class="QComboBox" name="comboToneOperator"/></item>
+          <item row="1" column="0"><widget class="QLabel" name="labelTarget"><property name="text"><string>対象：</string></property></widget></item>
+          <item row="1" column="1"><widget class="QComboBox" name="comboToneTarget"/></item>
+          <item row="2" column="0"><widget class="QLabel" name="labelComparison"><property name="text"><string>判定方法：</string></property></widget></item>
+          <item row="2" column="1"><widget class="QComboBox" name="comboToneComparison"/></item>
+          <item row="3" column="0"><widget class="QLabel" name="labelValue"><property name="text"><string>文字列：</string></property></widget></item>
+          <item row="3" column="1"><widget class="QLineEdit" name="editToneValue"/></item>
+         </layout></item>
+         <item><widget class="QLabel" name="labelConditionError"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="textFormat"><enum>Qt::PlainText</enum></property></widget></item>
+         <item><widget class="QLabel" name="labelPreview"><property name="text"><string>条件式のプレビュー</string></property></widget></item>
+         <item><widget class="QPlainTextEdit" name="editExpressionPreview"><property name="readOnly"><bool>true</bool></property><property name="maximumHeight"><number>55</number></property></widget></item>
+        </layout></widget></item>
+        <item><widget class="QWidget" name="paneToneOutput"><layout class="QHBoxLayout" name="layoutToneOutput">
+         <property name="leftMargin"><number>0</number></property>
+         <property name="topMargin"><number>0</number></property>
+         <property name="rightMargin"><number>0</number></property>
+         <property name="bottomMargin"><number>0</number></property>
+         <item><widget class="QLabel" name="labelOutputTone"><property name="text"><string>口調：</string></property></widget></item>
+         <item><widget class="QComboBox" name="comboToneOutput"/></item>
+        </layout></widget></item>
+        <item><spacer name="spacerConditionEditor"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property></spacer></item>
+       </layout></widget>
+      </widget>
+     </widget></item>
+    </layout></widget>
+    <widget class="QWidget" name="paneEmptyTone"><layout class="QVBoxLayout" name="layoutEmptyTone">
+     <item><widget class="QLabel" name="labelEmptyTone"><property name="text"><string>口調を選択するか、「＋新しい口調…」から作成してください。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+     <item><spacer name="spacerEmptyTone"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property></spacer></item>
+    </layout></widget>
+   </widget></item>
+   <item><widget class="QLabel" name="labelRulesError"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="textFormat"><enum>Qt::PlainText</enum></property></widget></item>
+   <item><layout class="QHBoxLayout" name="layoutToneActions">
+    <item><widget class="QPushButton" name="buttonDeleteTone"><property name="text"><string>口調を削除</string></property></widget></item>
+    <item><spacer name="spacerToneActions"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property></spacer></item>
+   </layout></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

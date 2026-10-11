@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit,
+    QComboBox, QDialog, QLabel, QLineEdit,
     QMessageBox, QPushButton, QScrollArea, QSpinBox, QStackedWidget,
     QVBoxLayout, QWidget,
 )
@@ -12,7 +12,7 @@ from autolingua2.services.ai_providers import ProviderRegistry
 from autolingua2.services.settings_store import AiModel, AiSettings, save_ai_settings
 from autolingua2.ui.components.ai_model_row import ModelRowWidget
 from autolingua2.ui.i18n import tr
-from autolingua2.ui.resource_api import IconAPI
+from autolingua2.ui.icons import IconManager
 from .base import require_child
 
 
@@ -20,21 +20,22 @@ class AiSettingsPageController(QObject):
     """AI設定の編集状態と接続・保存前検証を管理する。"""
 
     save_ready = Signal()
+    save_aborted = Signal()
     show_requested = Signal()
 
     def __init__(
-        self, dialog: QDialog, registry: ProviderRegistry, icon_manager: IconAPI,
+        self, dialog: QDialog, registry: ProviderRegistry, icon_manager: IconManager,
         provider_id: str, models: dict[str, list[AiModel]],
         selected_models: dict[str, str], api_keys: dict[str, str], concurrency: int,
     ) -> None:
         super().__init__(dialog)
         self.dialog = dialog
         self.icon_manager = icon_manager
-        self.button_box = require_child(dialog, QDialogButtonBox, "buttonBox")
         self.ai_client = AiNetworkClient(self)
         self.ai_client.model_validated.connect(self._on_model_validated)
         self.ai_client.all_validated.connect(self._on_all_models_validated)
         self._testing_for_save = False
+        self._validation_cancelled = False
         self._unvalidated_models_for_save: list[ModelRowWidget] = []
         self._test_results: dict[str, tuple[bool, str]] = {}
         self._setup_ai(registry, provider_id, models, selected_models, api_keys, concurrency)
@@ -51,7 +52,12 @@ class AiSettingsPageController(QObject):
         save_ai_settings(self.settings())
 
     def cancel(self) -> None:
+        testing_for_save = self._testing_for_save
+        self._testing_for_save = False
+        self._validation_cancelled = True
         self.ai_client.cancel_all()
+        if testing_for_save:
+            self.save_aborted.emit()
 
     def _setup_ai(
         self, registry: ProviderRegistry, provider_id: str,
@@ -151,6 +157,8 @@ class AiSettingsPageController(QObject):
                 r.set_status("valid" if is_valid else "invalid", message)
 
     def _on_all_models_validated(self, success_count: int, error_count: int) -> None:
+        if self._validation_cancelled:
+            return
         if self.button_test_connection is not None:
             self.button_test_connection.setEnabled(True)
             self.button_test_connection.setText(tr("SettingsDialog", "接続テスト"))
@@ -223,6 +231,7 @@ class AiSettingsPageController(QObject):
             )
 
     def validate_for_save(self) -> None:
+        self._validation_cancelled = False
         self._save_current_ai_fields()
         api_key = self.ai_api_keys.get(self._current_provider_id, "").strip() or self.edit_api_key.text().strip()
         provider = self.registry.get(self._current_provider_id)
@@ -233,7 +242,7 @@ class AiSettingsPageController(QObject):
             if r.check_enabled.isChecked() and r.field_model.text().strip() and r._status != "valid"
         ]
 
-        # APIキーがない、またはプロバイダがない、または未検証モデルがない場合はそのまま閉じる
+        # 検証が不要な場合は保存処理へ進む。
         if not untested_rows or not api_key or provider is None:
             self.save_ready.emit()
             return
@@ -242,11 +251,6 @@ class AiSettingsPageController(QObject):
         self._testing_for_save = True
         self._unvalidated_models_for_save = untested_rows
 
-        save_btn = self.button_box.button(QDialogButtonBox.StandardButton.Save)
-        if save_btn is not None:
-            save_btn.setEnabled(False)
-            save_btn.setText(tr("SettingsDialog", "検証中..."))
-
         for r in untested_rows:
             r.set_status(None, tr("SettingsDialog", "保存前チェック中..."))
 
@@ -254,11 +258,6 @@ class AiSettingsPageController(QObject):
         self.ai_client.validate_models(provider, api_key, models, timeout_sec=8.0)
 
     def _handle_save_validation_result(self, success_count: int, error_count: int) -> None:
-        save_btn = self.button_box.button(QDialogButtonBox.StandardButton.Save)
-        if save_btn is not None:
-            save_btn.setEnabled(True)
-            save_btn.setText(tr("SettingsDialog", "保存"))
-
         # エラーがあった場合
         if error_count > 0:
             # 1. 自動でAI設定ページへ画面切り替え
@@ -283,9 +282,11 @@ class AiSettingsPageController(QObject):
                     r.check_enabled.setChecked(False)
                 self._save_current_ai_fields()
                 self.save_ready.emit()
+            else:
+                self.save_aborted.emit()
             return
 
-        # すべて有効だった場合はそのまま保存・終了
+        # すべて有効だった場合は保存処理へ進む。
         self.save_ready.emit()
 
     def _populate_models(self) -> None:

@@ -44,12 +44,11 @@ def main() -> int:
         app.setApplicationName("Autolingua Desktop")
         app.setOrganizationName("AutoLingua")
         app.setDesktopFileName("autolingua-desktop")
-        from PySide6.QtGui import QIcon
         from .infrastructure.filesystem import ASSETS_DIR, PROJECT_ROOT
+        entrance = ExtensionEntrance()
         app_icon_path = ASSETS_DIR / "images" / "app.ico"
         if app_icon_path.exists():
-            app.setWindowIcon(QIcon(str(app_icon_path)))
-        entrance = ExtensionEntrance()
+            app.setWindowIcon(entrance.icons.load_icon(app_icon_path))
         startup.phase("plugins", "拡張を読み込んでいます…")
         ui_language = load_ui_language()
         entrance.load_all(PROJECT_ROOT, startup.check, ui_language=ui_language)

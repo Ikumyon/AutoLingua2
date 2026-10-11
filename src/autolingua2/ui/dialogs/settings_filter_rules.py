@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import uuid
 from collections.abc import Mapping
+from copy import deepcopy
 
 from PySide6.QtCore import QObject, Qt
 from PySide6.QtWidgets import (
@@ -19,7 +20,7 @@ from .base import require_child
 
 
 class FilterRulesPageController(QObject):
-    """Edit drafts of game-specific tag rules; persist only on dialog acceptance."""
+    """Edit drafts of game-specific tag rules; persist on save or apply."""
 
     def __init__(
         self, dialog: QDialog, parsers: Mapping[str, FileAdapter],
@@ -187,3 +188,4 @@ class FilterRulesPageController(QObject):
             if config.rules != self._originals[key]:
                 save_game_filter_rules(key[0], key[1], config.to_dict())
                 self.changed_keys.add(key)
+                self._originals[key] = deepcopy(config.rules)

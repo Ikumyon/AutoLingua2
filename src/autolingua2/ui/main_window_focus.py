@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QListWidgetItem, QMenu
 
 from autolingua2.ir import UnitState
@@ -261,52 +261,29 @@ class FocusEditorController(QObject):
         self._save_current_unit_changes(next_entry=False)
 
     def save_with_state(self, state: UnitState) -> None:
-        if self.host.active_workspace is None:
-            return
-        if self.current_unit is not None:
-            self.current_unit.target_text = self.host.edit_translation.toPlainText()
-            self.current_unit.state = state
-            self._after_unit_saved(next_entry=True)
+        self._save_current_unit_changes(next_entry=True, state=state)
 
     def save_as_locked(self) -> None:
-        if self.host.active_workspace is None:
-            return
-        if self.current_unit is not None:
-            self.current_unit.target_text = self.host.edit_translation.toPlainText()
-            self.current_unit.locked = True
-            self.current_unit.state = UnitState.LOCKED
-            self._after_unit_saved(next_entry=True)
+        self.save_with_state(UnitState.LOCKED)
 
     def save_as_hidden(self) -> None:
-        if self.host.active_workspace is None:
-            return
-        if self.current_unit is not None:
-            self.current_unit.target_text = self.host.edit_translation.toPlainText()
-            self.current_unit.hidden = True
-            self.current_unit.state = UnitState.HIDDEN
-            self._after_unit_saved(next_entry=True)
+        self.save_with_state(UnitState.HIDDEN)
 
     def save_as_untranslated(self) -> None:
-        if self.host.active_workspace is None:
-            return
-        if self.current_unit is not None:
-            self.current_unit.state = UnitState.UNTRANSLATED
-            self._after_unit_saved(next_entry=True)
+        self.save_with_state(UnitState.UNTRANSLATED)
 
-    def _save_current_unit_changes(self, next_entry: bool) -> None:
+    def _save_current_unit_changes(self, next_entry: bool, state: UnitState | None = None) -> None:
         if self.current_unit is None or self.host.active_workspace is None:
             return
         text = self.host.edit_translation.toPlainText()
-        self.current_unit.target_text = text
-        if text.strip():
-            self.current_unit.state = UnitState.HUMAN_TRANSLATED
-        else:
-            self.current_unit.state = UnitState.UNTRANSLATED
-        self._after_unit_saved(next_entry=next_entry)
+        presentation = self.host._text_presentation
+        if self.host.render_literal_newlines and presentation is not None and presentation.newline_codec is not None:
+            text = presentation.newline_codec.collapse(text)
+        desired = state if state is not None else UnitState.HUMAN_TRANSLATED if text.strip() else UnitState.UNTRANSLATED
+        if self.host.translation_controller.confirm_manual_translation(self.current_unit, target_text=text, state=desired):
+            self._after_unit_saved(next_entry=next_entry)
 
     def _after_unit_saved(self, next_entry: bool) -> None:
-        if self.current_unit is not None:
-            self.host.translation_controller.confirm_manual_translation(self.current_unit)
         self.host.table_controller.refresh_table()
         if self.current_unit in self.host.filtered_units:
             global_idx = self.host.filtered_units.index(self.current_unit)
@@ -326,7 +303,7 @@ class FocusEditorController(QObject):
                     if icon is not None and not icon.isNull():
                         item.setIcon(icon)
                     else:
-                        item.setIcon(QIcon())
+                        item.setIcon(self.host.icon_manager.get_icon(""))
         if next_entry:
             self.next_entry()
         else:

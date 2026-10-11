@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 )
 
 from autolingua2.services.settings_store import AiModel
-from autolingua2.ui.resource_api import IconAPI
+from autolingua2.ui.icons import IconManager
 
 
 class _InlineLineEdit(QLineEdit):
@@ -31,7 +31,7 @@ class InlineEditableField(QWidget):
         text: str = "",
         placeholder: str = "",
         *,
-        icon_manager: IconAPI,
+        icon_manager: IconManager,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -145,7 +145,7 @@ class ModelRowWidget(QFrame):
     def __init__(
         self,
         entry: AiModel,
-        icon_manager: IconAPI,
+        icon_manager: IconManager,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)

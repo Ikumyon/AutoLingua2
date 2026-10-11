@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog, QDialogButtonBox, QLabel, QPushButton, QSplitter,
+    QDialogButtonBox, QLabel, QMessageBox, QPushButton, QSplitter,
     QStackedWidget, QTreeWidget, QTreeWidgetItem, QWidget,
 )
 
@@ -15,6 +18,7 @@ from .glossary import GlossaryPageController
 from .settings_ai import AiSettingsPageController
 from .settings_filter_rules import FilterRulesPageController
 from .settings_general import GeneralSettingsPageController
+from .settings_tone import TonePageController
 from .source_watch import WatchPageController
 
 
@@ -30,11 +34,17 @@ class SettingsDialogController(SimpleDialogController):
         *, glossary_languages: dict[str, str] | None = None,
         glossary_adapter_id: str = "", glossary_game_id: str = "",
         glossary_id: str = "", glossary_source_language: str = "",
-        glossary_target_language: str = "",
+        glossary_target_language: str = "", tone_id: str = "",
+        on_saved: Callable[[SettingsDialogController], None] | None = None,
     ) -> None:
         super().__init__("dialogs/settings/SettingsDialog.ui", parent)
         self.plugins = entrance.plugins
         self.icon_manager = entrance.icons
+        self._on_saved = on_saved
+        self._saving = False
+        self._close_after_save = False
+        self._saving_category = "tone"
+        self._save_category: QTreeWidgetItem | None = None
         self._plugin_settings_widgets: list[tuple[SettingsPageProvider, QWidget]] = []
         self._categories = require_child(self.dialog, QTreeWidget, "treeCategories")
         self._stack = require_child(self.dialog, QStackedWidget, "stackSettings")
@@ -42,6 +52,9 @@ class SettingsDialogController(SimpleDialogController):
         self._category_items: dict[str, QTreeWidgetItem] = {}
 
         self._mount_pages()
+        self.tone_page = TonePageController(
+            require_child(self.dialog, QWidget, "SettingsTonePage"), self.icon_manager, tone_id,
+        )
         self.watch_page = WatchPageController(self.dialog, self.plugins.parsers, self.icon_manager)
         self.glossary_page = GlossaryPageController(
             require_child(self.dialog, QWidget, "SettingsGlossaryPage"), entrance,
@@ -57,14 +70,22 @@ class SettingsDialogController(SimpleDialogController):
 
         self.button_box = require_child(self.dialog, QDialogButtonBox, "buttonBox")
         self.button_box.accepted.disconnect()
+        save_button = self.button_box.button(QDialogButtonBox.StandardButton.Save)
+        apply_button = self.button_box.button(QDialogButtonBox.StandardButton.Apply)
+        if save_button is None or apply_button is None:
+            raise RuntimeError("保存・適用ボタンがありません。")
+        self.save_button = save_button
+        self.apply_button = apply_button
         self.ai_page = AiSettingsPageController(
             self.dialog, self.plugins.providers, self.icon_manager, provider_id,
             models or {}, selected_models or {}, api_keys or {}, concurrency,
         )
         self.ai_page.save_ready.connect(self._finish_validation)
+        self.ai_page.save_aborted.connect(self._save_aborted)
         self.ai_page.show_requested.connect(lambda: self.select_category("ai"))
         self.button_box.accepted.connect(self._validate_for_save)
-        self.button_box.rejected.connect(self.ai_page.cancel)
+        self.apply_button.clicked.connect(lambda: self._validate_for_save(False))
+        self.dialog.rejected.connect(self._cancel_save)
         self.general_page = GeneralSettingsPageController(self.dialog, entrance)
         self.filter_rules_page = FilterRulesPageController(
             self.dialog, self.plugins.parsers, glossary_adapter_id, glossary_game_id,
@@ -78,6 +99,7 @@ class SettingsDialogController(SimpleDialogController):
             ("input", "入力", "pageInput", "InputPage.ui", "application"),
             ("translation", "翻訳", "pageTranslation", "TranslationPage.ui", ""),
             ("ai", "AI", "pageAI", "AiPage.ui", "translation"),
+            ("tone", "口調", "pageTone", "TonePage.ui", "translation"),
             ("glossary", "用語集", "pageGlossary", "GlossaryPage.ui", "translation"),
             ("filter_rules", "除外ルール", "pageFilterRules", "FilterRulesPage.ui", "translation"),
             ("file", "ファイル", "pageFile", "FilePage.ui", ""),
@@ -145,6 +167,7 @@ class SettingsDialogController(SimpleDialogController):
             cancel_btn = button_box.button(QDialogButtonBox.StandardButton.Cancel)
             if cancel_btn is not None:
                 cancel_btn.setText(tr("SettingsDialog", "キャンセル"))
+            self.apply_button.setText(tr("SettingsDialog", "適用"))
 
     def _connect_category_stack(self) -> None:
         self._categories.currentItemChanged.connect(self._on_category_changed)
@@ -162,26 +185,94 @@ class SettingsDialogController(SimpleDialogController):
         self._stack.setCurrentWidget(page)
         self._category_title.setText(current.text(0))
 
-    def _validate_for_save(self) -> None:
-        if self.filter_rules_page.validate():
+    def _set_saving(self, saving: bool) -> None:
+        self._saving = saving
+        self.save_button.setEnabled(not saving)
+        self.apply_button.setEnabled(not saving)
+        self._stack.setEnabled(not saving)
+        self._categories.setEnabled(not saving)
+        self.save_button.setText(tr("SettingsDialog", "保存"))
+        self.apply_button.setText(tr("SettingsDialog", "適用"))
+        if saving:
+            button = self.save_button if self._close_after_save else self.apply_button
+            button.setText(tr("SettingsDialog", "保存中..."))
+
+    def _save_aborted(self) -> None:
+        self._set_saving(False)
+
+    def _cancel_save(self) -> None:
+        self._save_aborted()
+        self.ai_page.cancel()
+
+    def _save_error(self, error: Exception) -> None:
+        logging.getLogger(__name__).exception("Settings save failed")
+        self._save_aborted()
+        self.ai_page.cancel()
+        self.select_category(self._saving_category)
+        QMessageBox.warning(self.dialog, tr("SettingsDialog", "保存エラー"), str(error))
+
+    def _validate_for_save(self, close_after_save: bool = True) -> None:
+        if self._saving:
+            return
+        self._close_after_save = close_after_save
+        self._save_category = self._categories.currentItem()
+        self._set_saving(True)
+        try:
+            self._saving_category = "tone"
+            if not self.tone_page.validate():
+                self.select_category("tone")
+                self._save_aborted()
+                return
+            self._saving_category = "filter_rules"
+            if not self.filter_rules_page.validate():
+                self.select_category("filter_rules")
+                self._save_aborted()
+                return
+            self._saving_category = "ai"
             self.ai_page.validate_for_save()
-        else:
-            self.select_category("filter_rules")
+        except Exception as error:
+            self._save_error(error)
 
     def _finish_validation(self) -> None:
-        if self.filter_rules_page.validate():
-            self.watch_page.save(self.dialog.accept)
-        else:
-            self.select_category("filter_rules")
+        if not self._saving:
+            return
+        try:
+            self._saving_category = "source_watch"
+            self.watch_page.save(self._save_pages, self._watch_save_failed)
+        except Exception as error:
+            self._save_error(error)
 
-    def exec(self) -> int:
-        result = super().exec()
-        if result != QDialog.DialogCode.Accepted:
-            return result
+    def _watch_save_failed(self) -> None:
+        self.select_category("source_watch")
+        self._save_aborted()
 
-        self.ai_page.save()
-        self.general_page.save()
-        self.filter_rules_page.save()
-        for provider, widget in self._plugin_settings_widgets:
-            provider.save_settings(widget)
-        return result
+    def _save_pages(self) -> None:
+        if not self._saving:
+            return
+        try:
+            self._saving_category = "tone"
+            if not self.tone_page.save():
+                self.select_category("tone")
+                self._save_aborted()
+                return
+            self._saving_category = "ai"
+            self.ai_page.save()
+            self._saving_category = "application"
+            self.general_page.save()
+            self._saving_category = "filter_rules"
+            self.filter_rules_page.save()
+            for provider, widget in self._plugin_settings_widgets:
+                self._saving_category = provider.id
+                provider.save_settings(widget)
+            self._saving_category = "application"
+            if self._on_saved is not None:
+                self._on_saved(self)
+            self.filter_rules_page.changed_keys.clear()
+        except Exception as error:
+            self._save_error(error)
+            return
+        self._save_aborted()
+        if self._close_after_save:
+            self.dialog.accept()
+        elif self._save_category is not None:
+            self._categories.setCurrentItem(self._save_category)

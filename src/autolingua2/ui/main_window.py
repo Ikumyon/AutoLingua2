@@ -7,7 +7,7 @@ import sys
 from typing import Callable
 
 from PySide6.QtCore import QByteArray, QEasingCurve, QEvent, QModelIndex, QObject, QPoint, QPropertyAnimation, QSize, Qt, QSignalBlocker, QTimer, QLocale, QItemSelection, QItemSelectionModel
-from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QContextMenuEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QPixmap, QSyntaxHighlighter
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QContextMenuEvent, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QSyntaxHighlighter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -60,6 +60,8 @@ from autolingua2.ir import Issue, TranslationProject, TranslationSource, UnitSta
 from autolingua2.ir.workspace import UnitView as TranslationUnit, Workspace
 from autolingua2.services.workspaces import WorkspaceService
 from autolingua2.services.glossary_store import GlossaryStore
+from autolingua2.services.tone_store import ToneStore
+from autolingua2.ir.tone import DEFAULT_TONE_ID, ConditionalTone, Tone, ToneItem
 from autolingua2.ir.glossary import Glossary, glossary_chain
 from autolingua2.ui.dialogs.glossary import STORAGE_ERRORS
 from autolingua2.ui.dialogs.workspace_language import WorkspaceLanguageDialog
@@ -229,6 +231,9 @@ class MainWindowController(QObject):
         self.glossary_store = GlossaryStore()
         self.selected_glossary_id = ""
         self.glossary_choices: list[Glossary] = []
+        self.tone_store = ToneStore()
+        self.selected_tone_id = DEFAULT_TONE_ID
+        self.tone_choices: list[Tone] = []
         self.units: list[TranslationUnit] = []
         self.filtered_units: list[TranslationUnit] = []
         self.table_controller = TranslationTableController(self)
@@ -568,6 +573,9 @@ class MainWindowController(QObject):
         self.button_translate_all = require_child(self.window, QPushButton, "buttonTranslateAll")
         self.combo_ai_provider = require_child(self.window, QComboBox, "comboAiProvider")
         self.combo_ai_model = require_child(self.window, QComboBox, "comboAiModel")
+        self.combo_tone = require_child(self.window, QComboBox, "comboTone")
+        self.button_manage_tone = require_child(self.window, QPushButton, "buttonManageTone")
+        self._refresh_tone_choices()
         self.combo_glossary = require_child(self.window, QComboBox, "comboGlossary")
         self.label_glossary_chain = require_child(self.window, QLabel, "labelGlossaryChain")
         self.button_manage_glossary = require_child(self.window, QPushButton, "buttonManageGlossary")
@@ -696,6 +704,8 @@ class MainWindowController(QObject):
         self.button_project_notification_settings.clicked.connect(lambda: self.open_settings("source_watch"))
         self.combo_ai_provider.currentIndexChanged.connect(self._on_ai_provider_changed)
         self.combo_ai_model.currentIndexChanged.connect(self._on_ai_model_changed)
+        self.combo_tone.currentIndexChanged.connect(self._on_tone_changed)
+        self.button_manage_tone.clicked.connect(lambda: self.open_settings("tone"))
         self.combo_glossary.currentIndexChanged.connect(self._on_glossary_changed)
         self.button_manage_glossary.clicked.connect(lambda: self.open_settings("glossary"))
         self.action_glossary = QAction(tr("MainWindow", "用語集…"), self.window)
@@ -1117,35 +1127,61 @@ class MainWindowController(QObject):
             glossary_id=self.selected_glossary_id,
             glossary_source_language=self.project.source_language,
             glossary_target_language=self.project.target_language,
+            tone_id=self.selected_tone_id,
+            on_saved=self._apply_settings,
         )
         controller.watch_page.update_requested.connect(self.request_source_update)
         if initial_category is not None:
             controller.select_category(initial_category)
             if initial_category == "source_watch" and self.project.source_root:
                 controller.watch_page.select_project(str(Path(self.project.source_root).resolve()))
-        if controller.exec() == QDialog.DialogCode.Accepted:
-            settings = controller.ai_page.settings()
-            self.ai_models = settings.models
-            self.ai_selected_models = settings.selected_models
-            self.ai_api_keys = settings.api_keys
-            self.ai_concurrency = settings.concurrency
-            self._refresh_ai_choices()
-            self.chat_dock.refresh_choices()
-            self._save_ai_choice()
-            _, icon_theme = load_theme_settings()
-            self.icon_manager.set_current_iconset(icon_theme)
-            self.chat_dock.refresh_icons()
-            self.chat_dock.refresh_voice_input()
-            if self.active_creation_panel:
-                from PySide6.QtCore import QCoreApplication
-                QCoreApplication.sendEvent(self.active_creation_panel, QEvent(QEvent.Type.LanguageChange))
-            if (self.project.adapter_id, self.project.game_id) in controller.filter_rules_page.changed_keys:
-                self._refresh_source_rules()
-            if self.units:
-                self.refresh_all()
+        controller.exec()
 
         self._refresh_glossary_choices()
+        self._refresh_tone_choices()
         self._refresh_project_notification()
+
+    def _apply_settings(self, controller: SettingsDialogController) -> None:
+        settings = deepcopy(controller.ai_page.settings())
+        self.ai_models = settings.models
+        self.ai_selected_models = settings.selected_models
+        self.ai_api_keys = settings.api_keys
+        self.ai_concurrency = settings.concurrency
+        self._refresh_ai_choices()
+        self.chat_dock.refresh_choices()
+        self._save_ai_choice()
+        _, icon_theme = load_theme_settings()
+        self.icon_manager.set_current_iconset(icon_theme)
+        self.chat_dock.refresh_icons()
+        self.chat_dock.refresh_voice_input()
+        if self.active_creation_panel:
+            from PySide6.QtCore import QCoreApplication
+            QCoreApplication.sendEvent(self.active_creation_panel, QEvent(QEvent.Type.LanguageChange))
+        if (self.project.adapter_id, self.project.game_id) in controller.filter_rules_page.changed_keys:
+            self._refresh_source_rules()
+        if self.units:
+            self.refresh_all()
+        self._refresh_glossary_choices()
+        self._refresh_tone_choices()
+        self._refresh_project_notification()
+
+    def _refresh_tone_choices(self) -> None:
+        try:
+            self.tone_choices = self.tone_store.load()
+        except (OSError, ValueError) as exc:
+            self.tone_choices = []
+            QMessageBox.warning(self.window, tr("MainWindow", "口調を読み込めません"), str(exc))
+        with QSignalBlocker(self.combo_tone):
+            self.combo_tone.clear()
+            self.combo_tone.addItem(tr("MainWindow", "なし"), "")
+            for tone in self.tone_choices:
+                label = tone.name + (tr("MainWindow", "［条件付き］") if isinstance(tone, ConditionalTone) else "")
+                self.combo_tone.addItem(label, tone.id)
+            self.combo_tone.setCurrentIndex(max(0, self.combo_tone.findData(self.selected_tone_id)))
+        self._on_tone_changed()
+
+    def _on_tone_changed(self, _index: int = 0) -> None:
+        self.selected_tone_id = str(self.combo_tone.currentData() or "")
 
     def _refresh_glossary_choices(self) -> None:
         self.glossary_choices = []
@@ -1458,7 +1494,7 @@ class MainWindowController(QObject):
     def set_project_icon(self, path: Path) -> None:
         if not path.is_file():
             return
-        pixmap = QPixmap(str(path))
+        pixmap = self.icon_manager.load_pixmap(path)
         if pixmap.isNull():
             QMessageBox.warning(self.window, tr("MainWindow", "エラー"), tr("MainWindow", "有効な画像ファイルではありません。"))
             return
@@ -1477,7 +1513,7 @@ class MainWindowController(QObject):
 
     def clear_project_icon(self) -> None:
         self.selected_icon_path = None
-        self.label_icon_preview.setPixmap(QPixmap())
+        self.label_icon_preview.clear()
         self.label_icon_preview.setText(tr("MainWindow", "アイコン画像\nDnD / 選択"))
         self.edit_icon_path.clear()
         self.edit_icon_path.setToolTip("")
@@ -2192,6 +2228,17 @@ class MainWindowController(QObject):
         selected_model = self.combo_ai_model.currentData()
         default_model = str(selected_model) if selected_model is not None else ""
 
+        selected_tone = deepcopy(next((tone for tone in self.tone_choices if tone.id == self.selected_tone_id), None))
+        tone_items = tuple(deepcopy(tone) for tone in self.tone_choices if isinstance(tone, ToneItem))
+        try:
+            applied_tone = self.translation_controller.service.resolved_tone(unit, selected_tone, tone_items)
+            peers = self.translation_controller.service.matching_tone_peers(
+                self.workspace_service.exact_peers(workspace, unit.id), applied_tone, selected_tone, tone_items)
+        except ValueError as exc:
+            QMessageBox.warning(self.window, tr("MainWindow", "口調"), str(exc))
+            return
+        eligible_ids = {peer.id for peer in peers}
+
         dialog = MultiModelTranslationDialog(
             source_text=unit.source_text,
             active_models=active_models,
@@ -2205,6 +2252,7 @@ class MainWindowController(QObject):
             source_language_name=workspace_language_name(self.workspace_service, source_lang)
                 if source_lang in self.workspace_service.languages else "",
             target_language_name=workspace_language_name(self.workspace_service, target_lang),
+            tone=applied_tone.prompt if applied_tone is not None else None,
             parent=self.window,
         )
 
@@ -2213,17 +2261,8 @@ class MainWindowController(QObject):
                 return
             unit.target_text = adopted_text
             unit.state = UnitState.AI_TRANSLATED
-            if self.active_workspace is not workspace:
-                return
-            row = self.filtered_units.index(unit) if unit in self.filtered_units else -1
-            if row >= 0:
-                self.table_controller._sync_unit_row_content(row, unit)
-            else:
-                self.table_controller.refresh_table()
-            if self.focus_controller.current_unit is not None and self.focus_controller.current_unit.id == unit.id:
-                self.focus_controller.refresh_focus(sync_list=False)
-            self.focus_controller.refresh_focus_unit_list()
-            self.window.statusBar().showMessage(tr("MainWindow", f"[{unit.label}] に翻訳を採用しました。"), 4000)
+            workspace.records[unit.id].tone = applied_tone
+            self.translation_controller._unit_translated(workspace, unit, False, eligible_ids=eligible_ids)
 
         dialog.translation_adopted.connect(on_adopted)
         dialog.exec()

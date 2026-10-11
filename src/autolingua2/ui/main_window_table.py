@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QEvent, QObject, QPoint, Qt
+from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
 from PySide6.QtGui import QAction, QIcon, QMouseEvent
 from PySide6.QtWidgets import QHeaderView, QMenu, QTableWidgetItem
 
@@ -325,15 +325,24 @@ class TranslationTableController(QObject):
         if unit.target_text == new_text:
             return
         self.host.translation_controller.remember_confirmation(unit)
-        unit.target_text = new_text
-        if unit.state == UnitState.UNTRANSLATED and new_text.strip():
-            unit.state = UnitState.HUMAN_TRANSLATED
-
+        desired = UnitState.HUMAN_TRANSLATED if unit.state == UnitState.UNTRANSLATED and new_text.strip() else unit.state
         self._sync_unit_row_content(row, unit)
-        if self.host.focus_controller.current_unit is unit:
-            if not self.host.focus_controller._updating_focus and self.host.edit_translation.toPlainText() != new_text:
-                self.host.edit_translation.setPlainText(new_text)
-        self.host.translation_controller.confirm_manual_translation(unit, deferred=True)
+        self.host.translation_controller.confirm_manual_translation(
+            unit, target_text=new_text, state=desired, deferred=True,
+            on_cancel=lambda: QTimer.singleShot(0, lambda: self._resume_target_edit(unit, new_text)),
+        )
+
+    def _resume_target_edit(self, unit: TranslationUnit, text: str) -> None:
+        if unit not in self.host.filtered_units:
+            return
+        row = self.host.filtered_units.index(unit)
+        column = next((index for index, item in enumerate(self.visible_columns()) if item.id == "target_text"), None)
+        if column is None:
+            return
+        item = self.host.table.item(row, column)
+        if item is not None:
+            item.setText(text)
+            self.host.table.editItem(item)
 
     def _on_table_selection_changed(self) -> None:
         self.host.focus_controller.sync_focus_from_table()

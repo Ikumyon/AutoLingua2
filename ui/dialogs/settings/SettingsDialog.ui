@@ -84,6 +84,14 @@ QTreeWidget#treeCategories::item { height: 36px; }</string>
         </property>
        </layout>
       </widget>
+      <widget class="QWidget" name="pageTone">
+       <layout class="QVBoxLayout" name="layoutPageTone">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+       </layout>
+      </widget>
       <widget class="QWidget" name="pageFile">
        <layout class="QVBoxLayout" name="layoutPageFile">
         <property name="leftMargin">
@@ -193,7 +201,7 @@ QTreeWidget#treeCategories::item { height: 36px; }</string>
    <item>
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="standardButtons">
-      <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Save</set>
+      <set>QDialogButtonBox::StandardButton::Apply|QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Save</set>
      </property>
     </widget>
    </item>

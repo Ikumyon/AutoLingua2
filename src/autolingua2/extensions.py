@@ -12,7 +12,7 @@ from .plugins.manager import PluginManager
 from .ui.i18n import LocalizationManager, current_ui_language, language_events
 from .ui.icons import IconManager
 from .ui.theme import ThemeManager
-from .ui.resource_api import IconAPI, LocalizationAPI, ThemeAPI
+from .ui.resource_api import LocalizationAPI, ThemeAPI
 
 ResourceKind = Literal["ui_translation", "theme", "icon_theme"]
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class ExtensionEntrance:
         return self._themes
 
     @property
-    def icons(self) -> IconAPI:
+    def icons(self) -> IconManager:
         return self._icons
 
     @property

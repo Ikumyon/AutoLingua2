@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QCoreApplication, QObject, Qt
-from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QComboBox, QDialog, QListWidget, QListWidgetItem
 
 from autolingua2.extensions import ExtensionEntrance
@@ -69,11 +68,7 @@ class GeneralSettingsPageController(QObject):
 
         for code, info in available_languages.items():
             if info.flag_path is not None and info.flag_path.is_file():
-                path_str = str(info.flag_path)
-                icon = QIcon()
-                icon.addFile(path_str, mode=QIcon.Mode.Normal)
-                icon.addFile(path_str, mode=QIcon.Mode.Selected)
-                icon.addFile(path_str, mode=QIcon.Mode.Active)
+                icon = self.icon_manager.load_icon(info.flag_path, fixed_modes=True)
                 self.combo_ui_language.addItem(icon, info.name, code)
             else:
                 self.combo_ui_language.addItem(info.name, code)
@@ -115,7 +110,7 @@ class GeneralSettingsPageController(QObject):
             item = QListWidgetItem(info.name)
             item.setData(Qt.ItemDataRole.UserRole, theme_id)
             if info.preview_path and info.preview_path.is_file():
-                item.setIcon(QIcon(str(info.preview_path)))
+                item.setIcon(self.icon_manager.load_icon(info.preview_path))
             item.setToolTip(f"{info.name}\n{info.description}" if info.description else info.name)
             self.list_themes.addItem(item)
             if theme_id == current_theme:
@@ -132,7 +127,7 @@ class GeneralSettingsPageController(QObject):
             item = QListWidgetItem(info.name)
             item.setData(Qt.ItemDataRole.UserRole, icon_id)
             if info.preview_path and info.preview_path.is_file():
-                item.setIcon(QIcon(str(info.preview_path)))
+                item.setIcon(self.icon_manager.load_icon(info.preview_path))
             item.setToolTip(f"{info.name}\n{info.description}" if info.description else info.name)
             self.list_icon_themes.addItem(item)
             if icon_id == current_icon_theme:

@@ -152,6 +152,7 @@ class AiNetworkClient(QObject):
         *,
         source_language_name: str = "",
         target_language_name: str = "",
+        tone: str | None = None,
     ) -> None:
         """指定されたプロバイダとモデルを用いて単一テキストを完全非同期で翻訳します。"""
         try:
@@ -163,7 +164,7 @@ class AiNetworkClient(QObject):
             translator: BaseHttpTranslator = raw_translator
             source_description = f"{source_language_name}[{source_language}]" if source_language_name else source_language
             target_description = f"{target_language_name}[{target_language}]" if target_language_name else target_language
-            system_prompt = translator.build_system_prompt(source_description, target_description)
+            system_prompt = translator.build_system_prompt(source_description, target_description, tone=tone)
             payload = translator.build_payload(text, source_language, target_language, system_prompt)
             headers = translator.build_headers()
 

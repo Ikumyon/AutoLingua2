@@ -23,19 +23,20 @@ from autolingua2.services.source_updates import (
 )
 from autolingua2.infrastructure.filesystem import ASSETS_DIR
 from autolingua2.ui.operation_worker import OperationWorker
-from autolingua2.ui.resource_api import IconAPI
+from autolingua2.ui.icons import IconManager
 from autolingua2.ui.i18n import tr
 from .base import SimpleDialogController, require_child
 
 
-def notification_pixmap(path: str) -> QPixmap:
-    return QPixmap(path or str(ASSETS_DIR / "images/app.png")).scaled(
+def notification_pixmap(path: str, icons: IconManager) -> QPixmap:
+    return icons.load_pixmap(path or ASSETS_DIR / "images/app.png").scaled(
         48, 48, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
 
 
 class SourceWatchTargetDialog(SimpleDialogController):
-    def __init__(self, target: WatchTarget, targets: list[WatchTarget], editing: bool, parent: QWidget, icons: IconAPI) -> None:
+    def __init__(self, target: WatchTarget, targets: list[WatchTarget], editing: bool, parent: QWidget, icons: IconManager) -> None:
         super().__init__("dialogs/SourceWatchTargetDialog.ui", parent)
+        self.icons = icons
         self.target = deepcopy(target)
         self.original = target
         self.targets = targets
@@ -75,7 +76,7 @@ class SourceWatchTargetDialog(SimpleDialogController):
                 self.name.setText(Path(selected).name)
 
     def refresh_notification(self) -> None:
-        self.icon.setPixmap(notification_pixmap(self.target.icon_path))
+        self.icon.setPixmap(notification_pixmap(self.target.icon_path, self.icons))
         self.icon.setToolTip(self.target.icon_path)
         self.sound.setText(tr("SourceWatchTargetDialog", "通知音：{name}").format(
             name=Path(self.target.sound_path).name if self.target.sound_path else tr("SourceWatchTargetDialog", "標準")))
@@ -93,7 +94,7 @@ class SourceWatchTargetDialog(SimpleDialogController):
             if sound:
                 self.target.sound_path = path
             else:
-                if QPixmap(path).isNull():
+                if self.icons.load_pixmap(path).isNull():
                     raise ValueError("通知画像を読み込めません。")
                 self.target.icon_path = path
             self.refresh_notification()
@@ -133,7 +134,7 @@ class SourceWatchTargetDialog(SimpleDialogController):
 class WatchPageController(QObject):
     update_requested = Signal(str)
 
-    def __init__(self, dialog: QDialog, parsers: Mapping[str, FileAdapter], icons: IconAPI) -> None:
+    def __init__(self, dialog: QDialog, parsers: Mapping[str, FileAdapter], icons: IconManager) -> None:
         super().__init__(dialog)
         self.dialog = dialog
         self.parsers = parsers
@@ -204,7 +205,7 @@ class WatchPageController(QObject):
             card.setFrameShape(QFrame.Shape.StyledPanel)
             layout = QGridLayout(card)
             icon = QLabel(card)
-            icon.setPixmap(notification_pixmap(target.icon_path))
+            icon.setPixmap(notification_pixmap(target.icon_path, self.icons))
             icon.setFixedSize(48, 48)
             layout.addWidget(icon, 0, 0, 2, 1)
             name = QLabel(target.name, card)
@@ -274,14 +275,14 @@ class WatchPageController(QObject):
         def requested() -> None:
             self.update_requested.emit(project)
             self.dialog.reject()
-        self.save(requested)
+        self.save(requested, lambda: None)
 
     def toggle_enabled(self) -> None:
         self.settings.enabled = not self.settings.enabled
         self.persist()
 
     def persist(self) -> None:
-        self.save(self.refresh)
+        self.save(self.refresh, lambda: None)
 
     def select_project(self, project: str) -> None:
         card = self.cards.get(project)
@@ -315,12 +316,13 @@ class WatchPageController(QObject):
         self.settings.targets.remove(target)
         self.persist()
 
-    def save(self, accepted: Callable[[], None]) -> None:
+    def save(self, on_saved: Callable[[], None], on_failed: Callable[[], None]) -> None:
         if self.worker is not None:
+            on_failed()
             return
         settings = deepcopy(self.settings)
         if settings == load_watch_settings():
-            accepted()
+            on_saved()
             return
         self.dialog.setEnabled(False)
         worker = OperationWorker(lambda: apply_watch_settings(settings), self.dialog)
@@ -330,18 +332,21 @@ class WatchPageController(QObject):
             self.worker = None
             self.dialog.setEnabled(True)
             if worker.error is not None:
-                error = worker.error
-                logging.getLogger(__name__).error("Watcher operation failed", exc_info=(type(error), error, error.__traceback__))
-                message = (
-                    tr("SettingsDialog", "設定ファイルを保存できませんでした。\n保存先：{path}").format(path=error.path)
-                    if isinstance(error, SettingsSaveError) else
-                    tr("SettingsDialog", "監視設定を反映できませんでした。ネイティブモジュールとデーモンのビルドを確認してください。")
-                )
-                QMessageBox.warning(self.dialog, tr("SettingsDialog", "監視設定エラー"), message)
-                self.settings = load_watch_settings()
-                self.refresh()
+                try:
+                    error = worker.error
+                    logging.getLogger(__name__).error("Watcher operation failed", exc_info=(type(error), error, error.__traceback__))
+                    message = (
+                        tr("SettingsDialog", "設定ファイルを保存できませんでした。\n保存先：{path}").format(path=error.path)
+                        if isinstance(error, SettingsSaveError) else
+                        tr("SettingsDialog", "監視設定を反映できませんでした。ネイティブモジュールとデーモンのビルドを確認してください。")
+                    )
+                    QMessageBox.warning(self.dialog, tr("SettingsDialog", "監視設定エラー"), message)
+                    self.settings = load_watch_settings()
+                    self.refresh()
+                finally:
+                    on_failed()
             else:
-                accepted()
+                on_saved()
 
         worker.finished.connect(completed)
         worker.finished.connect(worker.deleteLater)

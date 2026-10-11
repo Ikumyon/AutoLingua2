@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter, deque
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, QTimer
@@ -9,10 +9,12 @@ from PySide6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QLabel, QMes
 
 from autolingua2.ir import UnitState
 from autolingua2.ir.workspace import UnitView as TranslationUnit, Workspace
-from autolingua2.services.translation import TranslationOptions, TranslationService
+from autolingua2.services.translation import TranslationOptions, TranslationService, tone_context
+from autolingua2.ir.tone import ToneItem
 from autolingua2.services.translation_memory import TranslationMemoryError
 from autolingua2.ui.i18n import tr
 from autolingua2.ui.language_names import workspace_language_name
+from autolingua2.ui.dialogs.translation_tone import TranslationToneDialog
 
 if TYPE_CHECKING:
     from autolingua2.ui.main_window import MainWindowController
@@ -24,11 +26,12 @@ class MainWindowTranslationController(QObject):
     def __init__(self, host: MainWindowController) -> None:
         super().__init__(host)
         self.host = host
-        self._confirmed_values: dict[tuple[str, str], tuple[Workspace, str, UnitState]] = {}
-        self._share_queue: deque[tuple[Workspace, TranslationUnit, bool, str, UnitState]] = deque()
+        self._confirmed_values: dict[tuple[str, str], tuple[Workspace, str, UnitState, ToneItem | None]] = {}
+        self._share_queue: deque[tuple[Workspace, TranslationUnit, bool, str, UnitState, TranslationOptions | None, ToneItem | None, set[str] | None]] = deque()
         self._sharing = False
         self.service = TranslationService(
             host.ai_client, host._workspace_is_alive, self._options, self,
+            get_tone_context=lambda unit: tone_context(host.imported, unit),
         )
         self.service.unit_translated.connect(self._unit_translated)
         self.service.translation_failed.connect(self._translation_failed)
@@ -66,6 +69,8 @@ class MainWindowTranslationController(QObject):
             workspace_language_name(host.workspace_service, source)
                 if source in host.workspace_service.languages else "",
             workspace_language_name(host.workspace_service, target),
+            tone=next((tone for tone in host.tone_choices if tone.id == host.selected_tone_id), None),
+            tone_items=tuple(tone for tone in host.tone_choices if isinstance(tone, ToneItem)),
         )
 
     def _start_batch_translation(self, targets: list[TranslationUnit]) -> None:
@@ -93,7 +98,8 @@ class MainWindowTranslationController(QObject):
         host.window.statusBar().showMessage(tr("MainWindow", f"[{unit.label}] を翻訳中..."), 3000)
         self.service.translate_single(workspace, unit, options)
 
-    def _unit_translated(self, workspace: Workspace, unit: TranslationUnit, batch: bool) -> None:
+    def _unit_translated(self, workspace: Workspace, unit: TranslationUnit, batch: bool,
+                         *, eligible_ids: set[str] | None = None) -> None:
         host = self.host
         memory_error = self._record_translations(workspace, (unit,))
         if host.active_workspace is not workspace:
@@ -110,7 +116,9 @@ class MainWindowTranslationController(QObject):
         if not batch:
             host.focus_controller.refresh_focus_unit_list()
             host.window.statusBar().showMessage(tr("MainWindow", f"[{unit.label}] の翻訳が完了しました。"), 4000)
-        self._offer_shared_translation(workspace, unit, manual=False)
+        self._offer_shared_translation(workspace, unit, manual=False,
+                                       options=self.service.completed_options if eligible_ids is None else None,
+                                       eligible_ids=eligible_ids)
         self._show_memory_error(memory_error)
 
     def reset_confirmations(self) -> None:
@@ -124,15 +132,53 @@ class MainWindowTranslationController(QObject):
         key = (workspace.language_code, unit.id)
         previous = self._confirmed_values.get(key)
         if previous is None or previous[0] is not workspace:
-            self._confirmed_values[key] = (workspace, unit.target_text, unit.state)
+            self._confirmed_values[key] = (workspace, unit.target_text, unit.state, workspace.records[unit.id].tone)
 
-    def confirm_manual_translation(self, unit: TranslationUnit, *, deferred: bool = False) -> None:
+    def confirm_manual_translation(self, unit: TranslationUnit, *, target_text: str, state: UnitState,
+                                   deferred: bool = False, on_cancel: Callable[[], None] | None = None) -> bool:
         workspace = self.host.active_workspace
         if workspace is None:
-            return
+            return False
+        if deferred:
+            QTimer.singleShot(0, lambda: self._confirm_manual_translation(workspace, unit, target_text, state, on_cancel))
+            return False
+        return self._confirm_manual_translation(workspace, unit, target_text, state, on_cancel)
+
+    def _confirm_manual_translation(self, workspace: Workspace, unit: TranslationUnit,
+                                    target_text: str, state: UnitState, on_cancel: Callable[[], None] | None) -> bool:
+        host = self.host
+        if not host._workspace_is_alive(workspace):
+            return False
+        tones = [tone for tone in host.tone_choices if isinstance(tone, ToneItem)]
+        if not tones:
+            QMessageBox.warning(host.window, tr("MainWindow", "口調"),
+                                tr("MainWindow", "個別口調を登録してから確定してください。"))
+            if on_cancel is not None:
+                on_cancel()
+            return False
+        record = workspace.records[unit.id]
+        before = (record.target_text, record.state, record.tone)
+        dialog = TranslationToneDialog(unit.source_text, target_text, tones, host.window)
+        accepted = dialog.exec() == QDialog.DialogCode.Accepted
+        tone = dialog.selected_tone()
+        dialog.deleteLater()
+        if not accepted or tone is None:
+            if on_cancel is not None:
+                on_cancel()
+            return False
+        if not host._workspace_is_alive(workspace) or (record.target_text, record.state, record.tone) != before:
+            return False
+        host.workspace_service.confirm_translation(workspace, unit.id, target_text, state, tone)
         memory_error = self._record_translations(workspace, (unit,))
-        self._offer_shared_translation(workspace, unit, manual=True, deferred=deferred)
+        if host.active_workspace is workspace:
+            row = host.filtered_units.index(unit) if unit in host.filtered_units else -1
+            if row >= 0:
+                host.table_controller._sync_unit_row_content(row, unit)
+            if host.focus_controller.current_unit is unit:
+                host.focus_controller.refresh_focus(sync_list=False)
+        self._offer_shared_translation(workspace, unit, manual=True)
         self._show_memory_error(memory_error)
+        return True
 
     def _record_translations(self, workspace: Workspace, units: Sequence[TranslationUnit]) -> str | None:
         try:
@@ -148,20 +194,19 @@ class MainWindowTranslationController(QObject):
             )
 
     def _offer_shared_translation(
-        self, workspace: Workspace, unit: TranslationUnit, *, manual: bool, deferred: bool = False,
+        self, workspace: Workspace, unit: TranslationUnit, *, manual: bool,
+        options: TranslationOptions | None = None,
+        eligible_ids: set[str] | None = None,
     ) -> None:
         key = (workspace.language_code, unit.id)
-        confirmed = (workspace, unit.target_text, unit.state)
+        tone = workspace.records[unit.id].tone
+        confirmed = (workspace, unit.target_text, unit.state, tone)
         previous = self._confirmed_values.get(key)
         self._confirmed_values[key] = confirmed
         if manual and previous is not None and previous[0] is workspace and previous[1:] == confirmed[1:]:
             return
-        self._share_queue.append((workspace, unit, manual, unit.target_text, unit.state))
-        if deferred:
-            # Let the table delegate finish closing its editor before showing a modal dialog.
-            QTimer.singleShot(0, self._drain_shared_translations)
-        else:
-            self._drain_shared_translations()
+        self._share_queue.append((workspace, unit, manual, unit.target_text, unit.state, options, tone, eligible_ids))
+        self._drain_shared_translations()
 
     def _drain_shared_translations(self) -> None:
         if self._sharing:
@@ -169,23 +214,30 @@ class MainWindowTranslationController(QObject):
         self._sharing = True
         try:
             while self._share_queue:
-                workspace, unit, manual, text, state = self._share_queue.popleft()
+                workspace, unit, manual, text, state, options, tone, eligible_ids = self._share_queue.popleft()
                 if (not self.host._workspace_is_alive(workspace)
-                        or unit.target_text != text or unit.state != state):
+                        or unit.target_text != text or unit.state != state or workspace.records[unit.id].tone != tone):
                     continue
-                self._show_shared_translation_dialog(workspace, unit, manual=manual)
+                self._show_shared_translation_dialog(workspace, unit, manual=manual, options=options, eligible_ids=eligible_ids)
         finally:
             self._sharing = False
 
     def _show_shared_translation_dialog(
         self, workspace: Workspace, unit: TranslationUnit, *, manual: bool,
+        options: TranslationOptions | None = None,
+        eligible_ids: set[str] | None = None,
     ) -> None:
         host = self.host
         peers = host.workspace_service.exact_peers(workspace, unit.id)
+        if eligible_ids is not None:
+            peers = [peer for peer in peers if peer.id in eligible_ids]
+        if not manual and options is not None:
+            peers = self.service.matching_tone_peers(peers, workspace.records[unit.id].tone,
+                                                   options.tone, options.tone_items)
         if not peers:
             return
         counts = Counter(peer.state for peer in peers)
-        original_text, original_state = unit.target_text, unit.state
+        original_text, original_state, original_tone = unit.target_text, unit.state, workspace.records[unit.id].tone
         dialog = QDialog(host.window)
         dialog.setWindowTitle(tr("MainWindow", "完全一致する項目への適用"))
         layout = QVBoxLayout(dialog)
@@ -224,12 +276,16 @@ class MainWindowTranslationController(QObject):
         states = {state for state, checkbox in checkboxes.items() if checkbox.isChecked()}
         dialog.deleteLater()
         if (not accepted or not host._workspace_is_alive(workspace)
-                or unit.target_text != original_text or unit.state != original_state):
+                or unit.target_text != original_text or unit.state != original_state
+                or workspace.records[unit.id].tone != original_tone):
             return
-        changed = host.workspace_service.share_translation(workspace, unit.id, states, manual=manual)
+        changed = host.workspace_service.share_translation(
+            workspace, unit.id, states, manual=manual, eligible_ids={peer.id for peer in peers},
+        )
         memory_error = self._record_translations(workspace, changed)
         for peer in changed:
-            self._confirmed_values[(workspace.language_code, peer.id)] = (workspace, peer.target_text, peer.state)
+            self._confirmed_values[(workspace.language_code, peer.id)] = (
+                workspace, peer.target_text, peer.state, workspace.records[peer.id].tone)
         if host.active_workspace is workspace:
             changed_ids = {peer.id for peer in changed}
             for row, visible_unit in enumerate(host.filtered_units):

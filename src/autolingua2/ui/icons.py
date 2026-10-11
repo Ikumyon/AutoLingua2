@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QPixmap
 
 from autolingua2.ir.validation import record, required, text, string_field
 from autolingua2.ui.i18n import system_language
@@ -86,6 +86,8 @@ class IconManager:
 
     def get_icon(self, icon_name: str) -> QIcon:
         """指定されたアイコン名の QIcon を取得して返す（キャッシュ対応）。"""
+        if not icon_name:
+            return QIcon()
         cache_key = f"{self._current_iconset_id}:{icon_name}"
         if cache_key in self._icon_cache:
             return self._icon_cache[cache_key]
@@ -105,9 +107,22 @@ class IconManager:
                 break
 
         if icon_path and icon_path.is_file():
-            icon = QIcon(str(icon_path))
+            icon = self.load_icon(icon_path)
         else:
             icon = QIcon()
 
         self._icon_cache[cache_key] = icon
         return icon
+
+    def load_icon(self, path: Path | str, *, fixed_modes: bool = False) -> QIcon:
+        """Load a file icon without registering an icon-set package."""
+        if not fixed_modes:
+            return QIcon(str(path))
+        icon = QIcon()
+        for mode in (QIcon.Mode.Normal, QIcon.Mode.Selected, QIcon.Mode.Active):
+            icon.addFile(str(path), mode=mode)
+        return icon
+
+    def load_pixmap(self, path: Path | str) -> QPixmap:
+        """Load a current image for user-selected icons and previews."""
+        return QPixmap(str(path))

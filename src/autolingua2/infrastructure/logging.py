@@ -4,7 +4,6 @@ import logging
 from logging.handlers import RotatingFileHandler
 import re
 import sys
-import traceback
 from types import TracebackType
 
 from .platform import log_directory
@@ -14,15 +13,11 @@ _SECRET = re.compile(r"(?i)(authorization|api[_-]?key|token|password)(\s*[:=]\s*
 
 class DiagnosticFormatter(logging.Formatter):
     def formatException(self, ei: tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None]) -> str:
-        # Do not print source lines or exception messages that may embed payloads.
         if ei[0] is None:
             return ""
-        frames = traceback.extract_tb(ei[2])
-        return "\n".join(["Traceback (most recent call last):",
-            *(f'  File "{f.filename}", line {f.lineno}, in {f.name}' for f in frames),
-            ei[0].__name__])
+        return super().formatException(ei)
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         return _SECRET.sub(r"\1\2[REDACTED]", super().format(record))
 
 

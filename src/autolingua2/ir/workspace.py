@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from .state import UnitState
 from .unit import TranslationUnit
 from .issue import Issue
+from .tone import ToneItem
 
 
 @dataclass(slots=True)
@@ -12,6 +13,7 @@ class TranslationRecord:
     target_text: str = ""
     state: UnitState = UnitState.UNTRANSLATED
     source_changed: bool = False
+    tone: ToneItem | None = None
 
 
 @dataclass(slots=True)

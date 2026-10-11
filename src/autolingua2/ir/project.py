@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from uuid import uuid4
 
 from .issue import Issue
 from .unit import TranslationUnit
@@ -28,6 +29,7 @@ class TranslationProject:
     adapter_id: str = ""
     units: list[TranslationUnit] = field(default_factory=list)
     sources: list[TranslationSource] = field(default_factory=list)
+    memory_id: str = field(default_factory=lambda: uuid4().hex)
 
     def extend(self, other: TranslationProject) -> None:
         self.units.extend(other.units)
