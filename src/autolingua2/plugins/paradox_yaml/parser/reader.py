@@ -7,7 +7,7 @@ from collections.abc import Callable
 from autolingua2.plugins.contracts import (
     Issue, TranslationProject, TranslationSource, TranslationUnit,
     GameProfile, GameSlot, ImportedTranslation, SourceRef, FilterRule, TagKind,
-    KeyEntry, KeyFile,
+    KeyEntry, KeyFile, TranslationTextRules,
 )
 
 
@@ -66,17 +66,17 @@ PARADOX_GAMES: list[GameProfile] = [
 ]
 
 PARADOX_YAML_DEFAULT_RULES: list[FilterRule] = [
-    FilterRule("paradox_color", TagKind.NON_TEXT, pattern=r"§[^\r\n]", example="§Y / §!"),
-    FilterRule("paradox_newline", TagKind.NON_TEXT, pattern=r"\\n", example=r"\n"),
-    FilterRule("paradox_scope", TagKind.TEXT,
+    FilterRule("paradox_color", TagKind.DISPLAY_CONTROL, pattern=r"§[^\r\n]", example="§Y / §!"),
+    FilterRule("paradox_newline", TagKind.DISPLAY_CONTROL, pattern=r"\\n", example=r"\n"),
+    FilterRule("paradox_scope", TagKind.DISPLAY_CONTENT,
                pattern=r"@?\[[^\[\]\r\n]+\]", example="[Root.GetName]"),
-    FilterRule("paradox_reference", TagKind.TEXT,
+    FilterRule("paradox_reference", TagKind.DISPLAY_CONTENT,
                pattern=r"[@£]?\$[^$\r\n]+\$", example="$NAME$ / @$ICON$"),
-    FilterRule("paradox_icon", TagKind.NON_TEXT,
+    FilterRule("paradox_icon", TagKind.DISPLAY_CONTROL,
                pattern=r"£[^£\r\n]*£|¤", example="£gold£ / ¤"),
-    FilterRule("paradox_at_icon", TagKind.TEXT,
+    FilterRule("paradox_at_icon", TagKind.DISPLAY_CONTENT,
                pattern=r"@[\w]+!", example="@gold!"),
-    FilterRule("paradox_variable", TagKind.TEXT,
+    FilterRule("paradox_variable", TagKind.DISPLAY_CONTENT,
                pattern=r"(?<!\w)@\w+", example="@variable"),
 ]
 
@@ -90,6 +90,7 @@ class ParadoxYamlAdapter:
         (slot.language_code, slot.name) for slot in PARADOX_STANDARD_SLOTS
     ))
     default_filter_rules = PARADOX_YAML_DEFAULT_RULES
+    translation_text_rules = TranslationTextRules(sentence_exceptions=(r"\b(?:Mr|Mrs|Dr|St|e\.g|i\.e)\.",))
 
     def __init__(self, read_text: Callable[[Path], str], detect_encoding: Callable[[bytes], str]) -> None:
         self._read_text = read_text

@@ -17,7 +17,7 @@ from autolingua2.ir.state import UnitState
 from autolingua2.ir.unit import TranslationUnit
 from autolingua2.ir.tone import ToneItem
 from autolingua2.ir.validation import array, record, required, text
-from autolingua2.ir.workspace import TranslationRecord, Workspace
+from autolingua2.ir.workspace import ConfirmedTranslation, TranslationRecord, Workspace
 from autolingua2.services.workspaces import Language, WorkspaceService, normalize_language_code
 from autolingua2.adapters.base import FileAdapter
 from autolingua2.services.source_classification import classify_sources
@@ -64,6 +64,19 @@ def _json_bytes(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
+def _tone_document(tone: ToneItem | None) -> dict[str, str] | None:
+    return {"id": tone.id, "name": tone.name, "prompt": tone.prompt} if tone is not None else None
+
+
+def _restore_tone(value: object) -> ToneItem | None:
+    if value is None:
+        return None
+    fields = record(value)
+    return ToneItem(text(required(fields, "id"), nonempty=True),
+                    text(required(fields, "name"), nonempty=True),
+                    text(required(fields, "prompt"), nonempty=True))
+
+
 def project_documents(service: WorkspaceService) -> dict[str, object]:
     project = service.imported.project
     paths = _relative_files(project.source_root, project.loaded_files, project.loaded_folders)
@@ -99,13 +112,15 @@ def project_documents(service: WorkspaceService) -> dict[str, object]:
                 entry = workspace.records.get(unit.id)
                 if entry is None:
                     raise ValueError("ワークスペースの翻訳行がありません。")
-                tone = entry.tone
+                pending = entry.pending_confirmation
                 entries.append({"key": ref.external_id, "original": unit.source_text,
                                 "translation": entry.target_text, "state": entry.state.value,
                                 "context": unit.context,
                                 "source_changed": entry.source_changed,
-                                "tone": {"id": tone.id, "name": tone.name, "prompt": tone.prompt}
-                                    if tone is not None else None})
+                                "tone": _tone_document(entry.tone),
+                                "pending_confirmation": {
+                                    "translation": pending.target_text, "tone": _tone_document(pending.tone),
+                                } if pending is not None else None})
             documents[prefix + f"files/{relative_path(source.id)}.json"] = entries
     return documents
 
@@ -188,7 +203,8 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
             for item in entries:
                 row = record(item)
                 if not {"key", "original", "translation", "state"} <= set(row) or not set(row) <= {
-                    "key", "original", "translation", "state", "context", "source_changed", "tone"
+                    "key", "original", "translation", "state", "context", "source_changed", "tone",
+                    "pending_confirmation"
                 }:
                     raise ValueError("翻訳行の項目が不正です。")
                 key = text(required(row, "key"), nonempty=True)
@@ -201,16 +217,18 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
                 source_changed = row.get("source_changed", False)
                 if type(source_changed) is not bool:
                     raise ValueError("原文更新状態が不正です。")
-                tone_data = row.get("tone")
-                tone = None
-                if tone_data is not None:
-                    tone_fields = record(tone_data)
-                    tone = ToneItem(text(required(tone_fields, "id"), nonempty=True),
-                                    text(required(tone_fields, "name"), nonempty=True),
-                                    text(required(tone_fields, "prompt"), nonempty=True))
+                tone = _restore_tone(row.get("tone"))
+                pending_data = row.get("pending_confirmation")
+                pending = None
+                if pending_data is not None:
+                    pending_fields = record(pending_data)
+                    if set(pending_fields) != {"translation", "tone"}:
+                        raise ValueError("編集中の翻訳行の項目が不正です。")
+                    pending = ConfirmedTranslation(text(required(pending_fields, "translation")),
+                                                   _restore_tone(required(pending_fields, "tone")))
                 workspace.records[unit_id] = TranslationRecord(
                     text(required(row, "translation")), UnitState(text(required(row, "state"))),
-                    source_changed, tone,
+                    source_changed, tone, pending,
                 )
                 if name == names[0]:
                     project.units.append(TranslationUnit(

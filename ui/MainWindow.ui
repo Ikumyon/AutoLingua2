@@ -874,11 +874,16 @@
           <item>
            <widget class="QComboBox" name="comboStatusFilter">
             <property name="currentIndex">
-             <number>1</number>
+             <number>2</number>
             </property>
             <item>
              <property name="text">
               <string>すべて</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>未確定</string>
              </property>
             </item>
             <item>
@@ -1376,7 +1381,7 @@ QTableCornerButton::section {
                <item>
                 <widget class="QPushButton" name="buttonRevert">
                  <property name="text">
-                  <string>変更を戻す</string>
+                  <string>元に戻す</string>
                  </property>
                 </widget>
                </item>
@@ -1549,6 +1554,7 @@ QToolButton#buttonSaveSplit::menu-arrow {
     <property name="title">
      <string>ヘルプ</string>
     </property>
+    <addaction name="actionInitialSetup"/>
     <addaction name="actionProblems"/>
     <addaction name="separator"/>
     <addaction name="actionAbout"/>
@@ -1591,30 +1597,14 @@ QToolButton#buttonSaveSplit::menu-arrow {
       <number>12</number>
      </property>
      <item>
-      <widget class="QLabel" name="labelAiProvider">
-       <property name="styleSheet">
-        <string notr="true">font-weight: 600;</string>
-       </property>
-       <property name="text">
-        <string>AIプロバイダ:</string>
-       </property>
+      <widget class="QLabel" name="labelTranslationModels">
+       <property name="text"><string>高モデル：未設定
+低モデル：未設定</string></property>
+       <property name="wordWrap"><bool>true</bool></property>
       </widget>
      </item>
      <item>
-      <widget class="QComboBox" name="comboAiProvider"/>
-     </item>
-     <item>
-      <widget class="QLabel" name="labelAiModel">
-       <property name="styleSheet">
-        <string notr="true">font-weight: 600;</string>
-       </property>
-       <property name="text">
-        <string>モデル:</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QComboBox" name="comboAiModel"/>
+      <widget class="QPushButton" name="buttonTranslationSettings"><property name="text"><string>翻訳設定を開く…</string></property></widget>
      </item>
      <item>
       <widget class="QLabel" name="labelToneChoice">
@@ -2069,6 +2059,11 @@ QPushButton#buttonChatModel::menu-indicator {
   <action name="actionAbout">
    <property name="text">
     <string>バージョン情報</string>
+   </property>
+  </action>
+  <action name="actionInitialSetup">
+   <property name="text">
+    <string>初期セットアップウィザード…</string>
    </property>
   </action>
   <action name="actionToggleAiChat">

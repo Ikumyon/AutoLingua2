@@ -24,6 +24,7 @@ from .api import (
     GameTextPresentation,
     UIContribution,
     ExportSettingsPanel,
+    AiSetupOption,
 )
 from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter, VoiceInputProvider
 
@@ -128,6 +129,10 @@ class PluginManager:
             pages.extend(contribution.settings_pages)
         return pages
 
+    @property
+    def ai_setup_options(self) -> tuple[AiSetupOption, ...]:
+        return tuple(ui.ai_setup for ui in self._ui_contributions.values() if ui.ai_setup is not None)
+
     def get_highlighter_factory(self, plugin_id: str) -> HighlighterFactory | None:
         contribution = self._ui_contributions.get(plugin_id)
         if contribution is not None:
@@ -214,6 +219,18 @@ class PluginManager:
                 if not isinstance(ui, UIContribution):
                     raise ValueError("Invalid UI extension contract")
                 ui_contribution = ui
+                if ui.ai_setup is not None:
+                    option = ui.ai_setup
+                    if (not isinstance(option, AiSetupOption) or provider is None
+                            or option.provider_id != provider.id
+                            or not isinstance(option.title, str) or not option.title.strip()
+                            or not isinstance(option.description, str)
+                            or option.mode not in {"common", "auth", "custom"}
+                            or any(item.provider_id == option.provider_id for item in self.ai_setup_options)):
+                        raise ValueError("Invalid or duplicate AI setup option")
+                    if ((option.mode == "common" and option.create_panel is not None)
+                            or (option.mode != "common" and not callable(option.create_panel))):
+                        raise ValueError("AI setup mode and panel factory do not match")
                 creation_adapter = ui.creation_panel
                 if ui.chat_icon is not None and not callable(ui.chat_icon):
                     raise ValueError("Invalid chat icon provider")

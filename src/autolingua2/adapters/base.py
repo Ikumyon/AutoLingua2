@@ -6,6 +6,7 @@ from typing import Protocol, runtime_checkable
 from autolingua2.ir.imported import GameProfile, ImportedTranslation
 from autolingua2.ir.filter_rules import FilterRule
 from autolingua2.ir.key_conflict import KeyFile
+from autolingua2.ir.translation import TranslationTextRules
 
 
 @runtime_checkable
@@ -39,4 +40,10 @@ class KeyConflictAdapter(Protocol):
 
     def remove_key_lines(self, snapshot: KeyFile, lines: set[int]) -> bytes:
         ...
+
+
+@runtime_checkable
+class TranslationTextAdapter(Protocol):
+    """Optional public game-specific sentence boundaries and exceptions."""
+    translation_text_rules: TranslationTextRules
 

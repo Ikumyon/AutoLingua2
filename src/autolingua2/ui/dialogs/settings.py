@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from autolingua2.extensions import ExtensionEntrance
 from autolingua2.plugins.api import SettingsPageProvider
 from autolingua2.services.settings_store import AiModel
+from autolingua2.ir.translation import LowModelRange, ModelSelection
 from autolingua2.ui.i18n import tr
 from .base import SimpleDialogController, load_ui, require_child
 from .glossary import GlossaryPageController
@@ -31,7 +32,8 @@ class SettingsDialogController(SimpleDialogController):
         selected_models: dict[str, str] | None = None,
         api_keys: dict[str, str] | None = None,
         concurrency: int = 4,
-        *, glossary_languages: dict[str, str] | None = None,
+        *, high_model: ModelSelection | None = None, low_model: ModelSelection | None = None,
+        low_model_range: LowModelRange = LowModelRange.STANDARD, glossary_languages: dict[str, str] | None = None,
         glossary_adapter_id: str = "", glossary_game_id: str = "",
         glossary_id: str = "", glossary_source_language: str = "",
         glossary_target_language: str = "", tone_id: str = "",
@@ -79,6 +81,7 @@ class SettingsDialogController(SimpleDialogController):
         self.ai_page = AiSettingsPageController(
             self.dialog, self.plugins.providers, self.icon_manager, provider_id,
             models or {}, selected_models or {}, api_keys or {}, concurrency,
+            high_model, low_model, low_model_range,
         )
         self.ai_page.save_ready.connect(self._finish_validation)
         self.ai_page.save_aborted.connect(self._save_aborted)

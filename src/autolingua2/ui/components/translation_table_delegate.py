@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 from PySide6.QtCore import (
     QAbstractItemModel,
     QEvent,
     QModelIndex,
     QObject,
     QPersistentModelIndex,
+    QSignalBlocker,
     QRect,
     QSize,
     Qt,
@@ -15,6 +16,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QIcon, QMouseEvent, QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
+    QAbstractItemDelegate,
     QComboBox,
     QPlainTextEdit,
     QStyle,
@@ -23,11 +25,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from autolingua2.ir import UnitState
+from autolingua2.ir import TranslationUnit, UnitState
+from autolingua2.ir.workspace import UnitView, WorkspaceUnit
 from autolingua2.ui.i18n import tr
 
-if TYPE_CHECKING:
-    from autolingua2.ir import TranslationUnit
+def _index_unit(index: QModelIndex | QPersistentModelIndex) -> UnitView:
+    unit = index.data(Qt.ItemDataRole.UserRole)
+    if not isinstance(unit, (TranslationUnit, WorkspaceUnit)):
+        raise ValueError("編集対象の翻訳行がありません。")
+    return unit
 
 
 def _opt_rect(option: QStyleOptionViewItem) -> QRect:
@@ -49,11 +55,18 @@ class StatusComboBoxDelegate(QStyledItemDelegate):
     通常時はコンボボックスの見た目をペイントし、クリック時に本物のQComboBoxを展開する。
     """
 
-    status_changed = Signal(int, object)  # row: int, new_status: UnitState | str
+    status_changed = Signal(object, object)
+    editing_started = Signal(object)
+    editing_finished = Signal(object)
 
     def __init__(self, icon_getter: Callable[[str], QIcon], parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.icon_getter = icon_getter
+        self._editor_units: dict[QWidget, UnitView] = {}
+
+    @property
+    def has_editor(self) -> bool:
+        return bool(self._editor_units)
 
     def _get_status_options(self) -> list[tuple[str, UnitState | str, str]]:
         return [
@@ -121,6 +134,9 @@ class StatusComboBoxDelegate(QStyledItemDelegate):
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QWidget:
         combo = QComboBox(parent)
+        unit = _index_unit(index)
+        self._editor_units[combo] = unit
+        self.editing_started.emit(unit)
         combo.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         combo.setStyleSheet(
             "QComboBox { border: 1px solid palette(mid); border-radius: 4px; padding: 2px 6px; } "
@@ -144,9 +160,9 @@ class StatusComboBoxDelegate(QStyledItemDelegate):
     def setEditorData(self, editor: QWidget, index: QModelIndex | QPersistentModelIndex) -> None:
         if not isinstance(editor, QComboBox):
             return
-        unit: TranslationUnit | None = index.data(Qt.ItemDataRole.UserRole)
+        unit = self._editor_units.get(editor)
         if unit is None:
-            return
+            raise ValueError("状態を編集する翻訳行がありません。")
 
         current_val: UnitState | str
         if unit.hidden:
@@ -164,7 +180,16 @@ class StatusComboBoxDelegate(QStyledItemDelegate):
         if not isinstance(editor, QComboBox):
             return
         data = editor.currentData()
-        self.status_changed.emit(index.row(), data)
+        unit = self._editor_units.get(editor)
+        if unit is None:
+            raise ValueError("状態を編集する翻訳行がありません。")
+        self.status_changed.emit(unit, data)
+
+    def destroyEditor(self, editor: QWidget, index: QModelIndex | QPersistentModelIndex) -> None:
+        unit = self._editor_units.pop(editor, None)
+        super().destroyEditor(editor, index)
+        if unit is not None:
+            self.editing_finished.emit(unit)
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
         return QSize(140, 36)
@@ -297,10 +322,23 @@ class MultiLineTextDelegate(QStyledItemDelegate):
     通常時は折り返しテキストを描画し、編集時はQPlainTextEditを起動する。
     """
 
-    text_committed = Signal(int, str)  # row: int, new_text: str
+    text_edited = Signal(object, str)
+    text_committed = Signal(object, str)
+    editing_started = Signal(object)
+    editing_finished = Signal(object)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
+        self._editor_units: dict[QWidget, UnitView] = {}
+
+    def cancel_edit(self, unit: UnitView) -> None:
+        for editor, edited_unit in list(self._editor_units.items()):
+            if edited_unit is unit:
+                self.closeEditor.emit(editor, QAbstractItemDelegate.EndEditHint.RevertModelCache)
+
+    @property
+    def has_editor(self) -> bool:
+        return bool(self._editor_units)
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> None:
         painter.save()
@@ -327,6 +365,10 @@ class MultiLineTextDelegate(QStyledItemDelegate):
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QWidget:
         edit = QPlainTextEdit(parent)
+        unit = _index_unit(index)
+        self._editor_units[edit] = unit
+        edit.textChanged.connect(lambda: self.text_edited.emit(unit, edit.toPlainText()))
+        self.editing_started.emit(unit)
         edit.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
         edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         edit.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -336,9 +378,19 @@ class MultiLineTextDelegate(QStyledItemDelegate):
     def setEditorData(self, editor: QWidget, index: QModelIndex | QPersistentModelIndex) -> None:
         if isinstance(editor, QPlainTextEdit):
             text = index.data(Qt.ItemDataRole.DisplayRole) or ""
-            editor.setPlainText(text)
+            with QSignalBlocker(editor):
+                editor.setPlainText(text)
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex | QPersistentModelIndex) -> None:
         if isinstance(editor, QPlainTextEdit):
             new_text = editor.toPlainText()
-            self.text_committed.emit(index.row(), new_text)
+            unit = self._editor_units.get(editor)
+            if unit is None:
+                raise ValueError("訳文を編集する翻訳行がありません。")
+            self.text_committed.emit(unit, new_text)
+
+    def destroyEditor(self, editor: QWidget, index: QModelIndex | QPersistentModelIndex) -> None:
+        unit = self._editor_units.pop(editor, None)
+        super().destroyEditor(editor, index)
+        if unit is not None:
+            self.editing_finished.emit(unit)

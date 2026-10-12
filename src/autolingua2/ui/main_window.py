@@ -57,7 +57,7 @@ from autolingua2.infrastructure.platform import current_platform, log_directory
 from autolingua2.infrastructure.platform.base import PlatformDriver
 from autolingua2.infrastructure.operations import OperationCancelled
 from autolingua2.ir import Issue, TranslationProject, TranslationSource, UnitState
-from autolingua2.ir.workspace import UnitView as TranslationUnit, Workspace
+from autolingua2.ir.workspace import UnitView as TranslationUnit, Workspace, is_pending_translation
 from autolingua2.services.workspaces import WorkspaceService
 from autolingua2.services.glossary_store import GlossaryStore
 from autolingua2.services.tone_store import ToneStore
@@ -72,7 +72,7 @@ from autolingua2.services.filter_rules import get_filter_config
 from autolingua2.services.source_classification import classify_sources
 from autolingua2.ir.classification import ClassificationResult
 from autolingua2.ir.key_conflict import KeyConflict
-from autolingua2.services.translation_memory import TranslationMemoryError
+from autolingua2.ir.translation import ModelSelection
 from autolingua2.ui.dialogs.key_conflict import KeyConflictDialog
 from autolingua2.ui.components.translation_table_delegate import (
     ActionButtonDelegate,
@@ -119,15 +119,16 @@ from autolingua2.ui.main_window_table import TranslationTableController
 from autolingua2.ui.main_window_translation import MainWindowTranslationController
 
 STATUS_MATCHERS: dict[str, Callable[[TranslationUnit], bool]] = {
-    "hidden": lambda unit: unit.hidden or unit.state == UnitState.HIDDEN,
-    "locked": lambda unit: unit.locked or unit.state == UnitState.LOCKED,
+    "pending": is_pending_translation,
+    "hidden": lambda unit: not is_pending_translation(unit) and (unit.hidden or unit.state == UnitState.HIDDEN),
+    "locked": lambda unit: not is_pending_translation(unit) and (unit.locked or unit.state == UnitState.LOCKED),
     "has_issues": lambda unit: bool(unit.issues),
-    "doubtful": lambda unit: unit.state == UnitState.DOUBTFUL,
-    "ai_reviewed": lambda unit: unit.state == UnitState.AI_REVIEWED,
-    "human_reviewed": lambda unit: unit.state == UnitState.HUMAN_REVIEWED,
-    "ai_translated": lambda unit: unit.state == UnitState.AI_TRANSLATED,
-    "human_translated": lambda unit: unit.state == UnitState.HUMAN_TRANSLATED,
-    "untranslated": lambda unit: unit.state == UnitState.UNTRANSLATED,
+    "doubtful": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.DOUBTFUL,
+    "ai_reviewed": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.AI_REVIEWED,
+    "human_reviewed": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.HUMAN_REVIEWED,
+    "ai_translated": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.AI_TRANSLATED,
+    "human_translated": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.HUMAN_TRANSLATED,
+    "untranslated": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.UNTRANSLATED,
 }
 
 class MainWindowCreationContext:
@@ -199,6 +200,7 @@ class MainWindowController(QObject):
         super().__init__()
         self.platform = platform_driver
         self.entrance = entrance
+        self._initial_setup_dialog: QDialog | None = None
         self.plugins = entrance.plugins
         self._known_plugin_errors = len(self.plugins.errors)
         self.io_worker: OperationWorker | None = None
@@ -224,6 +226,9 @@ class MainWindowController(QObject):
         self.ai_models = ai_settings.models
         self.ai_selected_models = ai_settings.selected_models
         self.ai_concurrency = ai_settings.concurrency
+        self.ai_high_model = ai_settings.high_model
+        self.ai_low_model = ai_settings.low_model
+        self.ai_low_model_range = ai_settings.low_model_range
         self.ai_api_keys = ai_settings.api_keys
         self.project = self.imported.project
         self.workspace_service = WorkspaceService(self.imported)
@@ -556,6 +561,7 @@ class MainWindowController(QObject):
         self.action_pause_translation = require_child(self.window, QAction, "actionPauseTranslation")
         self.action_stop_translation = require_child(self.window, QAction, "actionStopTranslation")
         self.action_settings = require_child(self.window, QAction, "actionSettings")
+        self.action_initial_setup = require_child(self.window, QAction, "actionInitialSetup")
         self.check_project_notification = require_child(self.window, QCheckBox, "checkProjectNotification")
         self.button_project_notification_settings = require_child(self.window, QToolButton, "buttonProjectNotificationSettings")
         self.button_project_notification_settings.setIcon(self.icon_manager.get_icon("settings"))
@@ -571,8 +577,8 @@ class MainWindowController(QObject):
         self.action_toggle_ai_panel = require_child(self.window, QAction, "actionToggleAiPanel")
         self.label_source_language_work = require_child(self.window, QLabel, "labelSourceLanguageWork")
         self.button_translate_all = require_child(self.window, QPushButton, "buttonTranslateAll")
-        self.combo_ai_provider = require_child(self.window, QComboBox, "comboAiProvider")
-        self.combo_ai_model = require_child(self.window, QComboBox, "comboAiModel")
+        self.label_translation_models = require_child(self.window, QLabel, "labelTranslationModels")
+        self.button_translation_settings = require_child(self.window, QPushButton, "buttonTranslationSettings")
         self.combo_tone = require_child(self.window, QComboBox, "comboTone")
         self.button_manage_tone = require_child(self.window, QPushButton, "buttonManageTone")
         self._refresh_tone_choices()
@@ -618,14 +624,21 @@ class MainWindowController(QObject):
         )
         self.table.setShowGrid(True)
         self.table.viewport().installEventFilter(self)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self.table_controller.open_row_menu)
 
         self.status_delegate = StatusComboBoxDelegate(self.icon_manager.get_icon, self.table)
         self.status_delegate.status_changed.connect(self.table_controller._on_table_status_delegate_changed)
+        self.status_delegate.editing_started.connect(self.table_controller._on_table_status_editing_started)
+        self.status_delegate.editing_finished.connect(self.table_controller._on_table_status_editing_finished)
         self.action_delegate = ActionButtonDelegate(self.icon_manager.get_icon, self.table)
         self.action_delegate.action_clicked.connect(self.table_controller._on_table_action_delegate_clicked)
         self.action_delegate.action_all_models_clicked.connect(self._on_table_action_all_models_clicked)
         self.target_text_delegate = MultiLineTextDelegate(self.table)
+        self.target_text_delegate.text_edited.connect(self.table_controller._on_table_target_text_edited)
+        self.target_text_delegate.editing_started.connect(self.table_controller._on_table_target_editing_started)
         self.target_text_delegate.text_committed.connect(self.table_controller._on_table_target_text_committed)
+        self.target_text_delegate.editing_finished.connect(self.table_controller._on_table_target_editing_finished)
 
         self.progress.setVisible(False)
         count_label = QLabel(self.window)
@@ -700,10 +713,10 @@ class MainWindowController(QObject):
         self.button_create_project.clicked.connect(self.create_project)
 
         self.action_settings.triggered.connect(self.open_settings)
+        self.action_initial_setup.triggered.connect(self.open_initial_setup)
         self.check_project_notification.toggled.connect(self._toggle_project_notification)
         self.button_project_notification_settings.clicked.connect(lambda: self.open_settings("source_watch"))
-        self.combo_ai_provider.currentIndexChanged.connect(self._on_ai_provider_changed)
-        self.combo_ai_model.currentIndexChanged.connect(self._on_ai_model_changed)
+        self.button_translation_settings.clicked.connect(lambda: self.open_settings("translation"))
         self.combo_tone.currentIndexChanged.connect(self._on_tone_changed)
         self.button_manage_tone.clicked.connect(lambda: self.open_settings("tone"))
         self.combo_glossary.currentIndexChanged.connect(self._on_glossary_changed)
@@ -737,7 +750,7 @@ class MainWindowController(QObject):
         self.button_focus_mode.clicked.connect(self.show_focus_mode)
         self.button_previous.clicked.connect(self.focus_controller.previous_entry)
         self.button_next.clicked.connect(self.focus_controller.next_entry)
-        self.button_revert.clicked.connect(self.focus_controller.refresh_focus)
+        self.button_revert.clicked.connect(self.focus_controller.discard_current_draft)
         self.button_copy_source.clicked.connect(self.focus_controller.copy_source_to_translation)
         self.button_ai_translate.clicked.connect(self.ai_translate_current_unit)
         self.button_ai_translate_all_models.clicked.connect(self.ai_translate_all_models_current_unit)
@@ -1121,6 +1134,7 @@ class MainWindowController(QObject):
         controller = SettingsDialogController(
             self.entrance, self.window, self.ai_provider_id,
             self.ai_models, self.ai_selected_models, self.ai_api_keys, self.ai_concurrency,
+            high_model=self.ai_high_model, low_model=self.ai_low_model, low_model_range=self.ai_low_model_range,
             glossary_languages={code: workspace_language_name(self.workspace_service, code)
                                 for code in self.workspace_service.languages},
             glossary_adapter_id=self.project.adapter_id, glossary_game_id=self.project.game_id,
@@ -1141,12 +1155,51 @@ class MainWindowController(QObject):
         self._refresh_tone_choices()
         self._refresh_project_notification()
 
+    def show_initial_setup_if_needed(self) -> None:
+        from autolingua2.services.settings_store import initial_setup_seen
+        if not initial_setup_seen():
+            self.open_initial_setup()
+
+    def open_initial_setup(self) -> None:
+        from .dialogs.initial_setup import InitialSetupController
+        if self._initial_setup_dialog is not None:
+            self._initial_setup_dialog.raise_()
+            self._initial_setup_dialog.activateWindow()
+            return
+        controller: InitialSetupController | None = None
+        try:
+            controller = InitialSetupController(self.entrance, self.window)
+            self._initial_setup_dialog = controller.dialog
+            controller.exec()
+            if controller.saved:
+                settings = load_ai_settings(self.provider_registry)
+                self.ai_provider_id = settings.provider_id
+                self.ai_models = settings.models
+                self.ai_selected_models = settings.selected_models
+                self.ai_api_keys = settings.api_keys
+                self.ai_concurrency = settings.concurrency
+                self.ai_high_model = settings.high_model
+                self.ai_low_model = settings.low_model
+                self.ai_low_model_range = settings.low_model_range
+                self._refresh_ai_choices()
+                self.chat_dock.refresh_choices()
+        except Exception as error:
+            QMessageBox.warning(self.window, tr("MainWindow", "初期設定"), str(error))
+        finally:
+            self._initial_setup_dialog = None
+            if controller is not None:
+                controller.dialog.deleteLater()
+                controller.deleteLater()
+
     def _apply_settings(self, controller: SettingsDialogController) -> None:
         settings = deepcopy(controller.ai_page.settings())
         self.ai_models = settings.models
         self.ai_selected_models = settings.selected_models
         self.ai_api_keys = settings.api_keys
         self.ai_concurrency = settings.concurrency
+        self.ai_high_model = settings.high_model
+        self.ai_low_model = settings.low_model
+        self.ai_low_model_range = settings.low_model_range
         self._refresh_ai_choices()
         self.chat_dock.refresh_choices()
         self._save_ai_choice()
@@ -1210,31 +1263,18 @@ class MainWindowController(QObject):
         self.label_glossary_chain.setText(self.combo_glossary.currentText())
 
     def _refresh_ai_choices(self) -> None:
-        self.combo_ai_provider.blockSignals(True)
-        self.combo_ai_provider.clear()
-        for plugin in self.provider_registry.providers.values():
-            self.combo_ai_provider.addItem(plugin.display_name, plugin.id)
-        if self.combo_ai_provider.findData(self.ai_provider_id) < 0:
-            self.combo_ai_provider.addItem(f"{self.ai_provider_id} (利用不可)", self.ai_provider_id)
-        self.combo_ai_provider.setCurrentIndex(self.combo_ai_provider.findData(self.ai_provider_id))
-        self.combo_ai_provider.blockSignals(False)
-        self._refresh_ai_models()
-
-    def _refresh_ai_models(self) -> None:
-        self.combo_ai_model.blockSignals(True)
-        self.combo_ai_model.clear()
-        for entry in self.ai_models.get(self.ai_provider_id, []):
-
-            if entry.enabled:
-                self.combo_ai_model.addItem(entry.name, entry.model)
-        selected = self.ai_selected_models.get(self.ai_provider_id, "")
-        index = self.combo_ai_model.findData(selected)
-        self.combo_ai_model.setCurrentIndex(index if index >= 0 else 0 if self.combo_ai_model.count() else -1)
-        if self.combo_ai_model.currentData() is not None:
-            self.ai_selected_models[self.ai_provider_id] = str(self.combo_ai_model.currentData())
-        else:
-            self.ai_selected_models.pop(self.ai_provider_id, None)
-        self.combo_ai_model.blockSignals(False)
+        def describe(selection: ModelSelection | None) -> str:
+            if selection is None:
+                return tr("MainWindow", "未設定")
+            provider = self.provider_registry.get(selection.provider_id)
+            model = next((item for item in self.ai_models.get(selection.provider_id, [])
+                          if item.model == selection.model_id and item.enabled), None)
+            if provider is None or model is None:
+                return tr("MainWindow", "利用不可：{provider} / {model}").format(
+                    provider=selection.provider_id, model=selection.model_id)
+            return f"{provider.display_name} / {model.name}"
+        self.label_translation_models.setText(tr("MainWindow", "高モデル：{high}\n低モデル：{low}").format(
+            high=describe(self.ai_high_model), low=describe(self.ai_low_model)))
 
     def _save_ai_choice(self) -> None:
         save_ai_settings(AiSettings(
@@ -1243,25 +1283,14 @@ class MainWindowController(QObject):
             selected_models=self.ai_selected_models,
             api_keys=self.ai_api_keys,
             concurrency=self.ai_concurrency,
+            high_model=self.ai_high_model, low_model=self.ai_low_model, low_model_range=self.ai_low_model_range,
         ))
-
-    def _on_ai_provider_changed(self, index: int) -> None:
-        if index < 0:
-            return
-        self.ai_provider_id = str(self.combo_ai_provider.itemData(index))
-        self._refresh_ai_models()
-        self._save_ai_choice()
-
-    def _on_ai_model_changed(self, index: int) -> None:
-        if index < 0:
-            return
-        self.ai_selected_models[self.ai_provider_id] = str(self.combo_ai_model.itemData(index))
-        self._save_ai_choice()
 
     def _chat_settings(self) -> AiSettings:
         return AiSettings(provider_id=self.ai_provider_id, models=self.ai_models,
                           selected_models=self.ai_selected_models, api_keys=self.ai_api_keys,
-                          concurrency=self.ai_concurrency)
+                          concurrency=self.ai_concurrency, high_model=self.ai_high_model,
+                          low_model=self.ai_low_model, low_model_range=self.ai_low_model_range)
 
     @staticmethod
     def _chat_reference(unit: TranslationUnit) -> ChatReference:
@@ -1974,11 +2003,6 @@ class MainWindowController(QObject):
             ),
             5000,
         )
-        try:
-            self.workspace_service.record_all_translations()
-        except TranslationMemoryError as exc:
-            self.translation_controller._show_memory_error(str(exc))
-
     def _sync_workspace_language_ui(self) -> None:
         adapter = self.plugins.parsers.get(self.project.adapter_id)
         game = None
@@ -2175,6 +2199,12 @@ class MainWindowController(QObject):
             return presentation.newline_codec.expand(text)
         return text
 
+    def _collapse_display_text(self, text: str) -> str:
+        presentation = self._text_presentation
+        if self.render_literal_newlines and presentation is not None and presentation.newline_codec is not None:
+            return presentation.newline_codec.collapse(text)
+        return text
+
     def _update_status_bar_counts(self) -> None:
         if self.status_count_label is None:
             return
@@ -2196,7 +2226,10 @@ class MainWindowController(QObject):
         else:
             text = count_str
 
-        self.status_count_label.setText(text)
+        pending_count = sum(is_pending_translation(unit) for unit in self.units)
+        self.status_count_label.setText(
+            text + " | " + tr("MainWindow", "未確定 {count}件").format(count=pending_count)
+        )
 
     def ai_translate_current_unit(self) -> None:
         unit = self.focus_controller.current_unit
@@ -2225,8 +2258,7 @@ class MainWindowController(QObject):
 
         source_lang = self.project.source_language or "en"
         target_lang = self.project.target_language
-        selected_model = self.combo_ai_model.currentData()
-        default_model = str(selected_model) if selected_model is not None else ""
+        default_model = self.ai_high_model.model_id if self.ai_high_model is not None else ""
 
         selected_tone = deepcopy(next((tone for tone in self.tone_choices if tone.id == self.selected_tone_id), None))
         tone_items = tuple(deepcopy(tone) for tone in self.tone_choices if isinstance(tone, ToneItem))
@@ -2245,7 +2277,7 @@ class MainWindowController(QObject):
             providers=self.plugins.providers,
             api_keys_map=self.ai_api_keys,
             default_model_id=default_model,
-            default_provider_id=self.ai_provider_id,
+            default_provider_id=self.ai_high_model.provider_id if self.ai_high_model is not None else self.ai_provider_id,
             ai_client=self.ai_client,
             source_lang=source_lang,
             target_lang=target_lang,
@@ -2262,6 +2294,7 @@ class MainWindowController(QObject):
             unit.target_text = adopted_text
             unit.state = UnitState.AI_TRANSLATED
             workspace.records[unit.id].tone = applied_tone
+            workspace.records[unit.id].pending_confirmation = None
             self.translation_controller._unit_translated(workspace, unit, False, eligible_ids=eligible_ids)
 
         dialog.translation_adopted.connect(on_adopted)
@@ -2283,6 +2316,7 @@ class MainWindowController(QObject):
         self._open_multi_model_dialog(unit, row)
 
     def show_list_mode(self) -> None:
+        was_focus = self.stack.currentIndex() == 1
         self.stack.setCurrentIndex(0)
         self.button_list_mode.setChecked(True)
         self.button_focus_mode.setChecked(False)
@@ -2292,6 +2326,8 @@ class MainWindowController(QObject):
         # 一覧表示でのファイル表示廃止
         self.frame_files.setVisible(False)
         self.action_toggle_file_sidebar.setEnabled(False)
+        if was_focus:
+            self.apply_filters()
 
     def _animate_segment_indicator(self, target_btn: QToolButton) -> None:
         geom = target_btn.geometry()
@@ -2354,6 +2390,7 @@ class MainWindowController(QObject):
         self.display_settings_menu.exec(pos)
 
     def show_focus_mode(self) -> None:
+        was_list = self.stack.currentIndex() == 0
         if self.focus_controller.current_unit is None and self.filtered_units:
             self.focus_controller.current_unit = self.filtered_units[0]
         self.stack.setCurrentIndex(1)
@@ -2368,7 +2405,10 @@ class MainWindowController(QObject):
         self.frame_files.setVisible(self._focus_sidebar_visible)
         if self._focus_sidebar_visible:
             self.focus_controller._ensure_focus_sidebar_minimum_width()
-        self.focus_controller.refresh_focus()
+        if was_list:
+            self.apply_filters()
+        else:
+            self.focus_controller.refresh_focus()
 
     def toggle_file_sidebar(self) -> None:
         if self.stack.currentIndex() == 1:
@@ -2400,13 +2440,19 @@ class MainWindowController(QObject):
         dialog.exec()
 
     def status_text(self, unit: TranslationUnit) -> str:
-        if unit.source_changed:
+        previous = self._confirmed_status_text(unit, show_issues=not is_pending_translation(unit))
+        if is_pending_translation(unit):
+            return tr("MainWindow", "未確定（前回：{state}）").format(state=previous)
+        return previous
+
+    def _confirmed_status_text(self, unit: TranslationUnit, *, show_issues: bool = True) -> str:
+        if show_issues and unit.source_changed:
             return tr("MainWindow", "原文更新・要確認")
         if unit.hidden or unit.state == UnitState.HIDDEN:
             return tr("MainWindow", "非表示")
         if unit.locked or unit.state == UnitState.LOCKED:
             return tr("MainWindow", "ロック")
-        if unit.issues:
+        if show_issues and unit.issues:
             return tr("MainWindow", "問題あり")
         if unit.state == UnitState.DOUBTFUL:
             return tr("MainWindow", "疑問あり")
@@ -2426,6 +2472,7 @@ class MainWindowController(QObject):
 
     def status_matchers_by_label(self) -> dict[str, Callable[[TranslationUnit], bool]]:
         return {
+            tr("MainWindow", "未確定"): STATUS_MATCHERS["pending"],
             tr("MainWindow", "非表示"): STATUS_MATCHERS["hidden"],
             tr("MainWindow", "ロック"): STATUS_MATCHERS["locked"],
             tr("MainWindow", "問題あり"): STATUS_MATCHERS["has_issues"],

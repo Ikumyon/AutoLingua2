@@ -7,7 +7,7 @@ from PySide6.QtGui import QAction, QIcon, QMouseEvent
 from PySide6.QtWidgets import QHeaderView, QMenu, QTableWidgetItem
 
 from autolingua2.ir import UnitState
-from autolingua2.ir.workspace import UnitView as TranslationUnit
+from autolingua2.ir.workspace import UnitView as TranslationUnit, is_pending_translation, is_translating
 from autolingua2.services.settings_store import (
     ColumnLayout, load_translation_table_columns, save_translation_table_columns,
 )
@@ -34,6 +34,8 @@ class TranslationTableController(QObject):
         self._syncing_header_order = False
         self._is_header_dragging = False
         self._drag_start_global_pos: QPoint | None = None
+        self._status_editing_unit: TranslationUnit | None = None
+        self.row_menu_open = False
 
     def refresh_columns(self) -> None:
         self.columns = default_translation_table_columns(self.host.status_text)
@@ -253,19 +255,20 @@ class TranslationTableController(QObject):
 
                 if column.id == "target_text":
                     item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable |
-                                  (Qt.ItemFlag.ItemIsEditable if self.host.active_workspace is not None else Qt.ItemFlag.NoItemFlags))
+                                  (Qt.ItemFlag.ItemIsEditable if self.host.active_workspace is not None and not is_translating(unit) else Qt.ItemFlag.NoItemFlags))
                     display_text = unit.target_text
                     if self.host.render_literal_newlines:
                         display_text = self.host._expand_display_text(display_text)
                     item.setText(display_text)
                 elif column.id == "actions":
                     item.setFlags(Qt.ItemFlag.ItemIsSelectable |
-                                  (Qt.ItemFlag.ItemIsEnabled if self.host.active_workspace is not None else Qt.ItemFlag.NoItemFlags))
+                                  (Qt.ItemFlag.ItemIsEnabled if self.host.active_workspace is not None and not is_translating(unit) else Qt.ItemFlag.NoItemFlags))
                     item.setText("")
                 elif column.id == "status":
                     item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable |
-                                  (Qt.ItemFlag.ItemIsEditable if self.host.active_workspace is not None else Qt.ItemFlag.NoItemFlags))
+                                  (Qt.ItemFlag.ItemIsEditable if self.host.active_workspace is not None and not is_translating(unit) else Qt.ItemFlag.NoItemFlags))
                     item.setText(self.host.status_text(unit))
+                    item.setToolTip(self.host.status_text(unit))
                     item.setIcon(self.status_icon(unit))
                 else:
                     item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
@@ -288,27 +291,29 @@ class TranslationTableController(QObject):
         icon = self._unit_status_icon(unit)
         return icon or self.host.icon_manager.get_icon("circle")
 
-    def _on_table_status_delegate_changed(self, row: int, data: object) -> None:
-        if self.host.active_workspace is None:
-            return
-        if not (0 <= row < len(self.host.filtered_units)):
-            return
-        unit = self.host.filtered_units[row]
-        if data == "locked":
-            unit.locked = True
-            unit.hidden = False
-        elif data == "hidden":
-            unit.hidden = True
-            unit.locked = False
-        elif isinstance(data, UnitState):
-            unit.locked = False
-            unit.hidden = False
-            unit.state = data
+    def _on_table_status_editing_started(self, unit: TranslationUnit) -> None:
+        self._status_editing_unit = unit
+        self.host.translation_controller.cancel_deferred_confirmation(unit)
 
-        self._sync_unit_row_content(row, unit)
-        if self.host.focus_controller.current_unit is unit:
-            self.host.focus_controller.refresh_focus(sync_list=False)
-        self.host.focus_controller.refresh_focus_unit_list()
+    def _on_table_status_editing_finished(self, unit: TranslationUnit) -> None:
+        if self._status_editing_unit is unit:
+            self._status_editing_unit = None
+        self._on_table_target_editing_finished(unit)
+
+    def _on_table_status_delegate_changed(self, unit: TranslationUnit, data: object) -> None:
+        if self.host.translation_controller._workspace_for_unit(unit) is None:
+            return
+        if data == "locked":
+            state = UnitState.LOCKED
+        elif data == "hidden":
+            state = UnitState.HIDDEN
+        elif isinstance(data, UnitState):
+            state = data
+        else:
+            return
+        self.host.translation_controller.confirm_manual_translation(
+            unit, target_text=unit.target_text, state=state, deferred=True,
+        )
 
     def _on_table_action_delegate_clicked(self, row: int) -> None:
         if not (0 <= row < len(self.host.filtered_units)):
@@ -316,33 +321,46 @@ class TranslationTableController(QObject):
         unit = self.host.filtered_units[row]
         self.host.translation_controller._translate_single_unit(unit)
 
-    def _on_table_target_text_committed(self, row: int, new_text: str) -> None:
-        if self.host.active_workspace is None:
+    def _on_table_target_text_edited(self, unit: TranslationUnit, new_text: str) -> None:
+        if self.host.translation_controller.update_draft(unit, new_text, sync_target=False):
+            if self.host.focus_controller.current_unit is unit:
+                self.host.focus_controller.refresh_focus(sync_list=False)
+
+    def _on_table_target_editing_started(self, unit: TranslationUnit) -> None:
+        self.host.translation_controller.cancel_deferred_confirmation(unit)
+
+    def _on_table_target_editing_finished(self, unit: TranslationUnit) -> None:
+        workspace = self.host.translation_controller._workspace_for_unit(unit)
+        if workspace is not None:
+            QTimer.singleShot(0, lambda: self.host.translation_controller.refresh_after_edit(workspace))
+
+    def _on_table_target_text_committed(self, unit: TranslationUnit, new_text: str) -> None:
+        self._on_table_target_text_edited(unit, new_text)
+        if self._status_editing_unit is unit or not is_pending_translation(unit):
             return
+        self.host.translation_controller.confirm_manual_translation(
+            unit, target_text=unit.target_text, deferred=True,
+        )
+
+    def open_row_menu(self, position: QPoint) -> None:
+        row = self.host.table.indexAt(position).row()
         if not (0 <= row < len(self.host.filtered_units)):
             return
         unit = self.host.filtered_units[row]
-        if unit.target_text == new_text:
-            return
-        self.host.translation_controller.remember_confirmation(unit)
-        desired = UnitState.HUMAN_TRANSLATED if unit.state == UnitState.UNTRANSLATED and new_text.strip() else unit.state
-        self._sync_unit_row_content(row, unit)
-        self.host.translation_controller.confirm_manual_translation(
-            unit, target_text=new_text, state=desired, deferred=True,
-            on_cancel=lambda: QTimer.singleShot(0, lambda: self._resume_target_edit(unit, new_text)),
-        )
-
-    def _resume_target_edit(self, unit: TranslationUnit, text: str) -> None:
-        if unit not in self.host.filtered_units:
-            return
-        row = self.host.filtered_units.index(unit)
-        column = next((index for index, item in enumerate(self.visible_columns()) if item.id == "target_text"), None)
-        if column is None:
-            return
-        item = self.host.table.item(row, column)
-        if item is not None:
-            item.setText(text)
-            self.host.table.editItem(item)
+        self.host.translation_controller.cancel_deferred_confirmation(unit)
+        menu = QMenu(self.host.table)
+        revert = menu.addAction(tr("MainWindow", "元に戻す"))
+        revert.setEnabled(is_pending_translation(unit))
+        viewport = self.host.table.viewport()
+        if viewport is None:
+            raise RuntimeError("翻訳一覧の表示領域がありません。")
+        self.row_menu_open = True
+        try:
+            if menu.exec(viewport.mapToGlobal(position)) is revert:
+                self.host.translation_controller.discard_draft(unit)
+        finally:
+            self.row_menu_open = False
+            self._on_table_target_editing_finished(unit)
 
     def _on_table_selection_changed(self) -> None:
         self.host.focus_controller.sync_focus_from_table()
@@ -355,20 +373,27 @@ class TranslationTableController(QObject):
             return []
         return sorted({idx.row() for idx in selection_model.selectedRows()})
 
-    def _sync_unit_row_content(self, row: int, unit: TranslationUnit) -> None:
+    def _sync_unit_row_content(self, row: int, unit: TranslationUnit, *, sync_target: bool = True) -> None:
         visible_columns = self.visible_columns()
         for col_idx, col in enumerate(visible_columns):
             item = self.host.table.item(row, col_idx)
             if item is None:
                 continue
             item.setData(Qt.ItemDataRole.UserRole, unit)
-            if col.id == "target_text":
+            if col.id in {"status", "target_text"}:
+                item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable |
+                              (Qt.ItemFlag.ItemIsEditable if self.host.active_workspace is not None and not is_translating(unit) else Qt.ItemFlag.NoItemFlags))
+            elif col.id == "actions":
+                item.setFlags(Qt.ItemFlag.ItemIsSelectable |
+                              (Qt.ItemFlag.ItemIsEnabled if self.host.active_workspace is not None and not is_translating(unit) else Qt.ItemFlag.NoItemFlags))
+            if col.id == "target_text" and sync_target:
                 display_text = unit.target_text
                 if self.host.render_literal_newlines:
                     display_text = self.host._expand_display_text(display_text)
                 item.setText(display_text)
             elif col.id == "status":
                 item.setText(self.host.status_text(unit))
+                item.setToolTip(self.host.status_text(unit))
                 item.setIcon(self.status_icon(unit))
 
     def _on_table_cell_clicked(self, row: int, column: int) -> None:
@@ -379,6 +404,8 @@ class TranslationTableController(QObject):
                 self.host.focus_controller.refresh_focus()
 
             visible_columns = self.visible_columns()
+            if is_translating(unit):
+                return
             if 0 <= column < len(visible_columns):
                 col = visible_columns[column]
                 if col.id in {"status", "target_text"}:
@@ -386,6 +413,8 @@ class TranslationTableController(QObject):
                     self.host.table.edit(model_index)
 
     def _unit_status_icon(self, unit: TranslationUnit) -> QIcon | None:
+        if is_pending_translation(unit):
+            return self.host.icon_manager.get_icon("person-edit-32")
         if unit.source_changed:
             return self.host.icon_manager.get_icon("triangle-alert")
         if unit.hidden or unit.state == UnitState.HIDDEN:

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Literal
 from dataclasses import asdict
 from PySide6.QtCore import QIODevice, QSaveFile
 from autolingua2.ir.source_watch import WatchSettings, WatchTarget
+from autolingua2.ir.translation import LowModelRange, ModelSelection
 from autolingua2.ir.validation import array, record, required, text
 from autolingua2.infrastructure.filesystem import PROJECT_ROOT
 from autolingua2.infrastructure.platform import qt_file_path
@@ -39,6 +40,7 @@ KEY_AI_SELECTED_MODEL = "selected_model"
 KEY_AI_MODELS = "models"
 KEY_AI_SELECTED_MODELS = "selected_models"
 KEY_AI_CONCURRENCY = "concurrency"
+KEY_INITIAL_SETUP_SEEN = "initial_setup_seen"
 KEY_WINDOW_GEOMETRY = "window_geometry"
 KEY_WINDOW_STATE = "window_state"
 KEY_SPLITTER_MAIN = "splitter_main"
@@ -106,6 +108,17 @@ class AiSettings:
     selected_models: dict[str, str] = field(default_factory=dict)
     api_keys: dict[str, str] = field(default_factory=dict)
     concurrency: int = 4
+    high_model: ModelSelection | None = None
+    low_model: ModelSelection | None = None
+    low_model_range: LowModelRange = LowModelRange.STANDARD
+
+
+@dataclass(frozen=True)
+class AiSetupValues:
+    """Provider configuration exchanged through the public setup contract."""
+
+    api_key: str
+    models: tuple[AiModel, ...]
 
 
 def load_ai_settings(registry: ProviderRegistry) -> AiSettings:
@@ -149,22 +162,41 @@ def load_ai_settings(registry: ProviderRegistry) -> AiSettings:
 
     provider = group.get(KEY_AI_PROVIDER)
     concurrency = group.get(KEY_AI_CONCURRENCY, 4)
+    def assignment(key: str) -> ModelSelection | None:
+        value = group.get(key)
+        if not isinstance(value, dict):
+            return None
+        provider_id, model_id = value.get("provider_id"), value.get("model_id")
+        if not isinstance(provider_id, str) or not isinstance(model_id, str) or not provider_id or not model_id:
+            return None
+        return ModelSelection(provider_id, model_id)
+    range_value = group.get("low_model_range", "standard")
+    low_range = next((item for item in LowModelRange if item.value == range_value), LowModelRange.STANDARD)
     return AiSettings(
         provider_id=provider if isinstance(provider, str) and provider else DEFAULT_AI_PROVIDER,
         models=models,
         selected_models=selected_models,
         api_keys=api_keys,
         concurrency=concurrency if type(concurrency) is int and 1 <= concurrency <= 32 else 4,
+        high_model=assignment("high_model"), low_model=assignment("low_model"), low_model_range=low_range,
     )
 
 
 def save_ai_settings(settings: AiSettings) -> None:
     data = _read_settings_file()
+    _update_ai_settings(data, settings)
+    _write_settings_file(data)
+
+
+def _update_ai_settings(data: dict[str, object], settings: AiSettings) -> None:
     group = data.get(GROUP_AI, {})
     if not isinstance(group, dict):
         group = {}
     group[KEY_AI_PROVIDER] = settings.provider_id
     group[KEY_AI_CONCURRENCY] = max(1, min(32, settings.concurrency))
+    group["high_model"] = asdict(settings.high_model) if settings.high_model is not None else None
+    group["low_model"] = asdict(settings.low_model) if settings.low_model is not None else None
+    group["low_model_range"] = settings.low_model_range.value
 
     all_provider_ids = set(settings.models.keys()) | set(settings.api_keys.keys()) | set(settings.selected_models.keys())
     providers_data: dict[str, dict[str, object]] = {}
@@ -187,6 +219,36 @@ def save_ai_settings(settings: AiSettings) -> None:
     group.pop("api_keys", None)
 
     data[GROUP_AI] = group
+
+
+def initial_setup_seen() -> bool:
+    return _read_settings_file().get(KEY_INITIAL_SETUP_SEEN) is True
+
+
+def mark_initial_setup_seen() -> None:
+    data = _read_settings_file()
+    data[KEY_INITIAL_SETUP_SEEN] = True
+    _write_settings_file(data)
+
+
+def save_initial_setup(registry: ProviderRegistry, provider_id: str, values: AiSetupValues) -> None:
+    if registry.get(provider_id) is None:
+        raise ValueError("選択したAIは利用できません。")
+    models = [AiModel(item.name.strip() or item.model.strip(), item.model.strip(), item.enabled)
+              for item in values.models]
+    if (not values.api_key.strip() or not any(item.enabled for item in models)
+            or any(not item.model for item in models)
+            or len({item.model for item in models}) != len(models)):
+        raise ValueError("認証情報と有効なモデルを設定してください。")
+    settings = load_ai_settings(registry)
+    settings.provider_id = provider_id
+    settings.api_keys[provider_id] = values.api_key.strip()
+    settings.models[provider_id] = models
+    if settings.selected_models.get(provider_id) not in {item.model for item in models}:
+        settings.selected_models.pop(provider_id, None)
+    data = _read_settings_file()
+    _update_ai_settings(data, settings)
+    data[KEY_INITIAL_SETUP_SEEN] = True
     _write_settings_file(data)
 
 

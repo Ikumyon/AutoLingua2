@@ -74,6 +74,7 @@ def main() -> int:
             try:
                 startup.ready()
                 is_ready = True
+                QTimer.singleShot(0, window.show_initial_setup_if_needed)
                 if notification_project is not None:
                     window.request_source_update(notification_project)
             except Exception:

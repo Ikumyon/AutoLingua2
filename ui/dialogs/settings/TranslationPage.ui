@@ -3,12 +3,26 @@
  <class>SettingsTranslationPage</class>
  <widget class="QWidget" name="SettingsTranslationPage">
   <layout class="QFormLayout" name="formTranslation">
-   <item row="0" column="0">
+   <item row="0" column="0"><widget class="QLabel" name="labelHighModel"><property name="text"><string>高モデル</string></property></widget></item>
+   <item row="0" column="1"><widget class="QComboBox" name="comboHighModel"/></item>
+   <item row="1" column="0"><widget class="QLabel" name="labelLowModel"><property name="text"><string>低モデル</string></property></widget></item>
+   <item row="1" column="1"><widget class="QComboBox" name="comboLowModel"/></item>
+   <item row="2" column="0"><widget class="QLabel" name="labelLowModelRange"><property name="text"><string>低モデルを使う範囲</string></property></widget></item>
+   <item row="2" column="1">
+    <widget class="QWidget" name="widgetLowModelRange">
+     <layout class="QVBoxLayout" name="layoutLowModelRange">
+      <item><widget class="QSlider" name="sliderLowModelRange"><property name="maximum"><number>2</number></property><property name="value"><number>1</number></property><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="tickPosition"><enum>QSlider::TicksBelow</enum></property><property name="tickInterval"><number>1</number></property></widget></item>
+      <item><widget class="QLabel" name="labelLowModelPositions"><property name="text"><string>狭い　　　　　　　　標準　　　　　　　　広い</string></property></widget></item>
+      <item><widget class="QLabel" name="labelLowModelDescription"><property name="text"><string>4文字以下の変更、または12文字以下かつ類似度90%以上を低へ</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item row="3" column="0">
     <widget class="QLabel" name="labelConcurrency">
      <property name="text"><string>同時リクエスト数</string></property>
     </widget>
    </item>
-   <item row="0" column="1">
+   <item row="3" column="1">
     <widget class="QSpinBox" name="spinConcurrency">
      <property name="minimum"><number>1</number></property>
      <property name="maximum"><number>32</number></property>

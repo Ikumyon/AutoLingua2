@@ -28,18 +28,20 @@ class _Cluster:
     min_length: int
 
 
-def _comparison_texts(units: list[TranslationUnit], rules: TagRules) -> tuple[list[str], set[str]]:
-    result: list[str] = []
+def _comparison_texts(units: list[TranslationUnit], rules: TagRules) -> tuple[list[str], list[str], set[str]]:
+    exact_texts: list[str] = []
+    comparison_texts: list[str] = []
     excluded: set[str] = set()
     for start in range(0, len(units), 1024):
         check_cancelled()
         for unit in units[start:start + 1024]:
             check_cancelled()
-            comparison, hidden = rules.analyze(unit.source_text)
-            result.append(comparison)
+            exact, comparison, hidden = rules.analyze(unit.source_text)
+            exact_texts.append(exact)
+            comparison_texts.append(comparison)
             if hidden:
                 excluded.add(unit.id)
-    return result, excluded
+    return exact_texts, comparison_texts, excluded
 
 
 def _similarity(a: str, b: str, edits: int) -> Fraction:
@@ -151,45 +153,33 @@ def classify_sources(
     units = sorted(imported.project.units, key=lambda unit: unit.id)
     if len({unit.id for unit in units}) != len(units):
         raise ValueError("翻訳項目IDが重複しています。")
-    remaining = set(range(len(units)))
+    exact_texts, texts, excluded = _comparison_texts(units, rules)
+    eligible = {unit_index for unit_index, unit in enumerate(units) if unit.id not in excluded}
+    remaining = eligible.copy()
     memberships: list[tuple[SourceCategory, list[int]]] = []
     report_progress("完全一致の原文を分類しています…")
     exact: dict[str, list[int]] = defaultdict(list)
-    for unit_index, unit in enumerate(units):
+    for unit_index in sorted(remaining):
         check_cancelled()
-        exact[unit.source_text].append(unit_index)
+        exact[exact_texts[unit_index]].append(unit_index)
     for members in exact.values():
         check_cancelled()
         if len(members) >= 2:
             memberships.append((SourceCategory.EXACT, members))
-            remaining.difference_update(members)
-
-    report_progress("非言語文字列の違いを分類しています…")
-    texts, excluded = _comparison_texts(units, rules)
-    normalized: dict[str, list[int]] = defaultdict(list)
-    for unit_index in sorted(remaining):
-        check_cancelled()
-        if texts[unit_index]:
-            normalized[texts[unit_index]].append(unit_index)
-    for members in normalized.values():
-        check_cancelled()
-        if len(members) >= 2:
-            memberships.append((SourceCategory.NON_LANGUAGE, members))
-            remaining.difference_update(members)
+            # Keep the representative available for other group categories.
+            remaining.difference_update(members[1:])
 
     for members in _similar_groups(texts, remaining, Fraction(str(threshold))):
         memberships.append((SourceCategory.SIMILAR, members))
-        remaining.difference_update(members)
-    memberships.extend((SourceCategory.OTHER, [unit_index]) for unit_index in sorted(remaining))
+    grouped = {unit_index for _, members in memberships for unit_index in members}
+    memberships.extend((SourceCategory.OTHER, [unit_index]) for unit_index in sorted(eligible - grouped))
 
     order = {category: position for position, category in enumerate(SourceCategory)}
     memberships.sort(key=lambda item: (order[item[0]], item[1][0]))
-    counts: dict[SourceCategory, int] = defaultdict(int)
     groups: list[SourceGroup] = []
     report_progress("集合体の差分を記録しています…")
     for category, members in memberships:
         check_cancelled()
-        counts[category] += 1
         representative_index = members[0]
         representative = units[representative_index]
         elements: list[ClassifiedElement] = []
@@ -220,7 +210,7 @@ def classify_sources(
                     unit.id, edits, float(_similarity(texts[representative_index], texts[member], edits)), differences,
                 ))
         groups.append(SourceGroup(
-            f"{'ABCD'[order[category]]}-{counts[category]:03d}", category, representative.id, tuple(elements),
+            category, representative.id, tuple(elements),
         ))
     result = ClassificationResult(threshold, tuple(groups))
     check_cancelled()

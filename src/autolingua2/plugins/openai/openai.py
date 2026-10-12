@@ -5,7 +5,7 @@ import json
 
 from autolingua2.plugins.contracts import (
     BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
-    object_value, string_value,
+    object_value, string_value, TranslationUsage, usage_number,
 )
 
 
@@ -13,6 +13,17 @@ class OpenAiTranslator(BaseHttpTranslator):
     """OpenAI API用の翻訳トランスレーター（BaseHttpTranslatorの差分のみ実装）。"""
 
     supports_chat = True
+
+    def extract_usage(self, data: dict[str, Any]) -> TranslationUsage:
+        usage = data.get("usage")
+        if not isinstance(usage, dict):
+            return TranslationUsage()
+        return TranslationUsage(
+            input_tokens=usage_number(usage, "prompt_tokens"), output_tokens=usage_number(usage, "completion_tokens"),
+            reasoning_tokens=usage_number(usage.get("completion_tokens_details"), "reasoning_tokens"),
+            cache_read_tokens=usage_number(usage.get("prompt_tokens_details"), "cached_tokens"),
+            cache_write_tokens=usage_number(usage.get("prompt_tokens_details"), "cache_write_tokens"),
+        )
 
     def build_chat_payload(self, messages: list[ChatMessage], system_prompt: str,
                            tools: list[dict[str, Any]], continuation: list[dict[str, Any]]) -> dict[str, Any]:
@@ -68,7 +79,7 @@ class OpenAiTranslator(BaseHttpTranslator):
         target_language: str,
         system_prompt: str,
     ) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -76,6 +87,11 @@ class OpenAiTranslator(BaseHttpTranslator):
             ],
             "temperature": 0.3,
         }
+        if self.model.startswith(("gpt-5", "gpt-6", "o3", "o4-mini")):
+            payload.pop("temperature")
+            if "pro" not in self.model and "chat" not in self.model:
+                payload["reasoning_effort"] = "low"
+        return payload
 
     def extract_translation(self, response_data: dict[str, Any]) -> str:
         choices = response_data.get("choices")

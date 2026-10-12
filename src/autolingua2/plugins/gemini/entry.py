@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PySide6.QtGui import QIcon
 
-from autolingua2.plugins.api import PluginContext, PluginContribution, UIContribution
+from autolingua2.plugins.api import AiSetupOption, PluginContext, PluginContribution, UIContribution
 from .gemini import GeminiProvider
 
 
@@ -15,6 +15,15 @@ def register(context: PluginContext) -> None:
         PluginContribution(
             id="gemini",
             provider=GeminiProvider(),
-            ui=UIContribution(chat_icon=_chat_icon),
+            ui=UIContribution(
+                chat_icon=_chat_icon,
+                ai_setup=AiSetupOption(
+                    provider_id="gemini",
+                    title="Google Gemini",
+                    description="Google Gemini APIキーを使用してGeminiモデルを利用します。",
+                    mode="common",
+                ),
+            ),
         )
     )
+

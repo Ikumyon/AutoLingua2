@@ -8,12 +8,20 @@ from .issue import Issue
 from .tone import ToneItem
 
 
+@dataclass(frozen=True, slots=True)
+class ConfirmedTranslation:
+    target_text: str
+    tone: ToneItem | None
+
+
 @dataclass(slots=True)
 class TranslationRecord:
     target_text: str = ""
     state: UnitState = UnitState.UNTRANSLATED
     source_changed: bool = False
     tone: ToneItem | None = None
+    pending_confirmation: ConfirmedTranslation | None = None
+    translating: bool = False
 
 
 @dataclass(slots=True)
@@ -101,3 +109,11 @@ class WorkspaceUnit:
 
 
 UnitView = TranslationUnit | WorkspaceUnit
+
+
+def is_pending_translation(unit: UnitView) -> bool:
+    return isinstance(unit, WorkspaceUnit) and unit.record.pending_confirmation is not None
+
+
+def is_translating(unit: UnitView) -> bool:
+    return isinstance(unit, WorkspaceUnit) and unit.record.translating

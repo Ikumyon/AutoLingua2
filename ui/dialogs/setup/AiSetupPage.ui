@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AiSetupPage</class>
+ <widget class="QWidget" name="AiSetupPage">
+  <layout class="QVBoxLayout" name="layoutAiSetup">
+   <item><widget class="QWidget" name="authContainer"><layout class="QVBoxLayout" name="layoutAuth">
+    <item><widget class="QLabel" name="labelApiKey"><property name="text"><string>APIキー</string></property></widget></item>
+    <item><widget class="QLineEdit" name="editApiKey"><property name="echoMode"><enum>QLineEdit::EchoMode::Password</enum></property></widget></item>
+   </layout></widget></item>
+   <item><widget class="QLabel" name="labelModel"><property name="text"><string>モデル</string></property></widget></item>
+   <item><widget class="QScrollArea" name="scrollAreaModels">
+    <property name="widgetResizable"><bool>true</bool></property>
+    <property name="minimumSize"><size><width>0</width><height>140</height></size></property>
+    <widget class="QWidget" name="modelContainer"><layout class="QVBoxLayout" name="layoutModelList"><property name="spacing"><number>4</number></property></layout></widget>
+   </widget></item>
+   <item><layout class="QHBoxLayout" name="layoutModelActions">
+    <item><widget class="QPushButton" name="buttonAddModel"><property name="text"><string>＋ モデルを追加</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+    <item><widget class="QPushButton" name="buttonResetModels"><property name="text"><string>初期モデルにリセット</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+   </layout></item>
+   <item><widget class="QPushButton" name="buttonTestConnection"><property name="text"><string>接続テスト</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+   <item><widget class="QLabel" name="labelStatus"><property name="text"><string>未確認</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

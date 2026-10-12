@@ -1,16 +1,19 @@
 from __future__ import annotations
+import json
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QLabel, QLineEdit,
-    QMessageBox, QPushButton, QScrollArea, QSpinBox, QStackedWidget,
+    QMessageBox, QPushButton, QScrollArea, QSlider, QSpinBox, QStackedWidget,
     QVBoxLayout, QWidget,
 )
 
 from autolingua2.services.ai_network import AiNetworkClient
 from autolingua2.services.ai_providers import ProviderRegistry
 from autolingua2.services.settings_store import AiModel, AiSettings, save_ai_settings
+from autolingua2.ir.translation import LowModelRange, ModelSelection
 from autolingua2.ui.components.ai_model_row import ModelRowWidget
+from autolingua2.ui.components.ai_model_list import ModelListController
 from autolingua2.ui.i18n import tr
 from autolingua2.ui.icons import IconManager
 from .base import require_child
@@ -27,6 +30,8 @@ class AiSettingsPageController(QObject):
         self, dialog: QDialog, registry: ProviderRegistry, icon_manager: IconManager,
         provider_id: str, models: dict[str, list[AiModel]],
         selected_models: dict[str, str], api_keys: dict[str, str], concurrency: int,
+        high_model: ModelSelection | None = None, low_model: ModelSelection | None = None,
+        low_model_range: LowModelRange = LowModelRange.STANDARD,
     ) -> None:
         super().__init__(dialog)
         self.dialog = dialog
@@ -39,6 +44,16 @@ class AiSettingsPageController(QObject):
         self._unvalidated_models_for_save: list[ModelRowWidget] = []
         self._test_results: dict[str, tuple[bool, str]] = {}
         self._setup_ai(registry, provider_id, models, selected_models, api_keys, concurrency)
+        self.combo_high = require_child(dialog, QComboBox, "comboHighModel")
+        self.combo_low = require_child(dialog, QComboBox, "comboLowModel")
+        self.slider_low_range = require_child(dialog, QSlider, "sliderLowModelRange")
+        self.label_low_range = require_child(dialog, QLabel, "labelLowModelDescription")
+        self._refresh_translation_models(high_model, low_model)
+        self.slider_low_range.setValue(list(LowModelRange).index(low_model_range))
+        self.slider_low_range.valueChanged.connect(self._update_low_description)
+        self._update_low_description()
+        self._translation_refresh_pending = False
+        self.model_list.changed.connect(self._queue_translation_models_refresh)
 
     def settings(self) -> AiSettings:
         self._save_current_ai_fields()
@@ -46,7 +61,55 @@ class AiSettingsPageController(QObject):
             provider_id=self.selected_provider_id, models=self.ai_models,
             selected_models=self.ai_selected_models, api_keys=self.ai_api_keys,
             concurrency=self.spin_concurrency.value(),
+            high_model=self._assignment(self.combo_high), low_model=self._assignment(self.combo_low),
+            low_model_range=list(LowModelRange)[self.slider_low_range.value()],
         )
+
+    @staticmethod
+    def _assignment(combo: QComboBox) -> ModelSelection | None:
+        value = combo.currentData()
+        if not isinstance(value, str) or not value:
+            return None
+        provider_id, model_id = json.loads(value)
+        if not isinstance(provider_id, str) or not isinstance(model_id, str):
+            raise ValueError("翻訳モデルの選択が不正です。")
+        return ModelSelection(provider_id, model_id)
+
+    def _refresh_translation_models(self, high: ModelSelection | None, low: ModelSelection | None) -> None:
+        for combo, selected in ((self.combo_high, high), (self.combo_low, low)):
+            combo.clear()
+            combo.addItem(tr("SettingsDialog", "未設定"), "")
+            for provider_id, models in self.ai_models.items():
+                provider = self.registry.get(provider_id)
+                if provider is None:
+                    continue
+                for model in models:
+                    if model.enabled and model.model.strip():
+                        combo.addItem(f"{provider.display_name} / {model.name}", json.dumps([provider_id, model.model]))
+            if selected is not None:
+                data = json.dumps([selected.provider_id, selected.model_id])
+                index = combo.findData(data)
+                if index < 0:
+                    combo.addItem(tr("SettingsDialog", "利用不可：{provider} / {model}").format(
+                        provider=selected.provider_id, model=selected.model_id), data)
+                    index = combo.count() - 1
+                combo.setCurrentIndex(index)
+
+    def _translation_models_changed(self) -> None:
+        self._translation_refresh_pending = False
+        high, low = self._assignment(self.combo_high), self._assignment(self.combo_low)
+        self._save_current_ai_fields()
+        self._refresh_translation_models(high, low)
+
+    def _queue_translation_models_refresh(self) -> None:
+        if not self._translation_refresh_pending:
+            self._translation_refresh_pending = True
+            QTimer.singleShot(0, self._translation_models_changed)
+
+    def _update_low_description(self, _value: int = 0) -> None:
+        a, b, similarity = list(LowModelRange)[self.slider_low_range.value()].bounds
+        self.label_low_range.setText(tr("SettingsDialog", "{a}文字以下の変更、または{b}文字以下かつ類似度{s}%以上を低へ").format(
+            a=a, b=b, s=round(similarity * 100)))
 
     def save(self) -> None:
         save_ai_settings(self.settings())
@@ -77,7 +140,7 @@ class AiSettingsPageController(QObject):
         self.button_reset_models = require_child(self.dialog, QPushButton, "buttonResetModels")
         self.spin_concurrency = require_child(self.dialog, QSpinBox, "spinConcurrency")
         self.spin_concurrency.setValue(concurrency)
-        self._row_widgets: list[ModelRowWidget] = []
+        self.model_list = ModelListController(self.scroll_area_models, self.layout_model_list, self.icon_manager)
 
         self.combo_provider.clear()
         for plugin in self.registry.providers.values():
@@ -290,54 +353,17 @@ class AiSettingsPageController(QObject):
         self.save_ready.emit()
 
     def _populate_models(self) -> None:
-        if self.layout_model_list is not None:
-            while self.layout_model_list.count():
-                item = self.layout_model_list.takeAt(0)
-                if item is None:
-                    continue
-                widget = item.widget()
-                if widget is not None:
-                    widget.deleteLater()
+        self.model_list.populate(self.ai_models.get(self._current_provider_id, []))
 
-        self._row_widgets = []
-        for entry in self.ai_models.get(self._current_provider_id, []):
-            self._add_row_widget(entry)
-        if self.layout_model_list is not None:
-            self.layout_model_list.addStretch()
-
-    def _add_row_widget(self, entry: AiModel) -> ModelRowWidget:
-        row = ModelRowWidget(entry, icon_manager=self.icon_manager, parent=self.scroll_area_models)
-        row.deleted.connect(self._on_row_deleted)
-        # 入力確定時の同期通信を全廃（ステータスのみクリア）
-        row.modelCommitted.connect(lambda r: r.set_status(None))
-        if self.layout_model_list is not None:
-            insert_idx = max(0, self.layout_model_list.count() - 1) if self._row_widgets else 0
-            self.layout_model_list.insertWidget(insert_idx, row)
-        self._row_widgets.append(row)
-        return row
-
-    def _on_row_deleted(self, row: ModelRowWidget) -> None:
-        if row in self._row_widgets:
-            self._row_widgets.remove(row)
-        if self.layout_model_list is not None:
-            self.layout_model_list.removeWidget(row)
-        row.deleteLater()
+    @property
+    def _row_widgets(self) -> list[ModelRowWidget]:
+        return self.model_list.rows
 
     def _read_model_list(self) -> list[AiModel]:
-        entries: list[AiModel] = []
-        seen: set[str] = set()
-        for row in self._row_widgets:
-            item = row.to_ai_model()
-            if not item.model or item.model in seen:
-                continue
-            entries.append(item)
-            seen.add(item.model)
-        return entries
+        return self.model_list.read()
 
     def _add_model(self) -> None:
-        entry = AiModel("新規モデル", "", True)
-        row = self._add_row_widget(entry)
-        row.field_model.start_edit()
+        self.model_list.add_empty()
 
     def _refresh_provider_errors(self) -> None:
         messages = list(self.registry.errors)

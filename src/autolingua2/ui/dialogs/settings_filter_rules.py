@@ -107,8 +107,8 @@ class FilterRulesPageController(QObject):
             return
         rules = self._configs[key].rules
         tooltips = (
-            tr("SettingsDialog", "文字・数字・アイコンそのものを表示せず、色や改行などを制御するタグです。\n例：§Y、§!、\\n"),
-            tr("SettingsDialog", "ゲーム画面で文字・数字・アイコンとして表示される内容を表すタグです。\n例：[Root]、$NAME$、£gold£"),
+            tr("SettingsDialog", "色・改行などを制御するタグです。\nタグ自体は翻訳せず保持し、違いは差分として記録します。\n例：§Y、§!、\\n"),
+            tr("SettingsDialog", "ゲーム画面で文字・数字・アイコンなどに展開されるタグです。\nタグ自体は翻訳せず保持し、違いは差分として記録します。\n例：[Root.GetName]、$NAME$、@gold!"),
         )
         self.table.setRowCount(len(rules))
         for row, rule in enumerate(rules):
@@ -118,8 +118,8 @@ class FilterRulesPageController(QObject):
             check.setData(Qt.ItemDataRole.UserRole, rule.id)
             self.table.setItem(row, 0, check)
             kind = QComboBox(self.table)
-            kind.addItem(tr("SettingsDialog", "非文字タグ"), TagKind.NON_TEXT.value)
-            kind.addItem(tr("SettingsDialog", "文字タグ"), TagKind.TEXT.value)
+            kind.addItem(tr("SettingsDialog", "表示制御タグ"), TagKind.DISPLAY_CONTROL.value)
+            kind.addItem(tr("SettingsDialog", "表示内容タグ"), TagKind.DISPLAY_CONTENT.value)
             for index, tooltip in enumerate(tooltips):
                 kind.setItemData(index, tooltip, Qt.ItemDataRole.ToolTipRole)
             kind.setCurrentIndex(kind.findData(rule.kind.value))
@@ -136,7 +136,7 @@ class FilterRulesPageController(QObject):
         key = self._current_key
         if key is None:
             return
-        self._configs[key].rules.append(FilterRule(f"custom_{uuid.uuid4().hex}", TagKind.NON_TEXT))
+        self._configs[key].rules.append(FilterRule(f"custom_{uuid.uuid4().hex}", TagKind.DISPLAY_CONTROL))
         self._populate_table()
         row = self.table.rowCount() - 1
         self.table.selectRow(row)

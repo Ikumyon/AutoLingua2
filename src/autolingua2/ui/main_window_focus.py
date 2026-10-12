@@ -7,7 +7,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QListWidgetItem, QMenu
 
 from autolingua2.ir import UnitState
-from autolingua2.ir.workspace import UnitView as TranslationUnit
+from autolingua2.ir.workspace import UnitView as TranslationUnit, is_pending_translation, is_translating
 from autolingua2.ui.i18n import tr
 
 if TYPE_CHECKING:
@@ -45,24 +45,50 @@ class FocusEditorController(QObject):
             page_units = self.host.filtered_units[start:end]
 
             for unit in page_units:
-                preview = " ".join(unit.source_text.split())
-                if len(preview) > 50:
-                    preview = preview[:47] + "..."
-                if not preview:
-                    preview = f"<{unit.label}>"
-                item = QListWidgetItem(preview)
-                icon = self.host.table_controller._unit_status_icon(unit)
-                if icon is not None and not icon.isNull():
-                    item.setIcon(icon)
-                source_name = self.host.source_name_for_unit(unit)
-                tooltip = f"キー: {unit.label}\nファイル: {source_name}\n状態: {self.host.status_text(unit)}\n\n原文:\n{unit.source_text}"
-                if unit.target_text:
-                    tooltip += f"\n\n訳文:\n{unit.target_text}"
-                item.setToolTip(tooltip)
+                item = QListWidgetItem()
+                self._set_unit_list_item(item, unit)
                 self.host.list_focus_units.addItem(item)
             self._sync_focus_list_selection()
         finally:
             self._syncing_focus_list = False
+
+    def _set_unit_list_item(self, item: QListWidgetItem, unit: TranslationUnit) -> None:
+        preview = " ".join(unit.source_text.split())
+        if len(preview) > 50:
+            preview = preview[:47] + "..."
+        if not preview:
+            preview = f"<{unit.label}>"
+        if is_pending_translation(unit):
+            preview += " " + tr("MainWindow", "［未確定］")
+        item.setText(preview)
+        icon = self.host.table_controller._unit_status_icon(unit)
+        item.setIcon(icon if icon is not None else self.host.icon_manager.get_icon(""))
+        source_name = self.host.source_name_for_unit(unit)
+        tooltip = f"キー: {unit.label}\nファイル: {source_name}\n状態: {self.host.status_text(unit)}\n\n原文:\n{unit.source_text}"
+        if unit.target_text:
+            tooltip += f"\n\n訳文:\n{unit.target_text}"
+        item.setToolTip(tooltip)
+
+    def refresh_unit_status(self, unit: TranslationUnit) -> None:
+        if unit not in self.host.filtered_units:
+            return
+        index = self.host.filtered_units.index(unit)
+        page_index = index - (self.focus_current_page - 1) * self.focus_page_size
+        if 0 <= page_index < self.focus_page_size:
+            item = self.host.list_focus_units.item(page_index)
+            if item is not None:
+                self._set_unit_list_item(item, unit)
+        if self.current_unit is unit:
+            self.host.edit_translation.setReadOnly(self.host.active_workspace is None or is_translating(unit))
+            enabled = self.host.active_workspace is not None and not is_translating(unit)
+            for widget in (self.host.button_ai_translate, self.host.button_ai_translate_all_models,
+                           self.host.button_copy_source, self.host.button_save_split):
+                widget.setEnabled(enabled)
+            text = f"{index + 1} / {len(self.host.filtered_units)}"
+            if is_pending_translation(unit):
+                text += " " + tr("MainWindow", "［未確定］")
+            self.host.label_position.setText(text)
+            self.host.button_revert.setEnabled(self.host.active_workspace is not None and is_pending_translation(unit))
 
     def total_focus_pages(self) -> int:
         if not self.host.filtered_units:
@@ -133,8 +159,11 @@ class FocusEditorController(QObject):
         if 0 <= global_idx < len(self.host.filtered_units):
             unit = self.host.filtered_units[global_idx]
             if unit is not self.current_unit:
+                previous = self.current_unit
                 self.current_unit = unit
                 self.refresh_focus(sync_list=False)
+                if previous is not None and is_pending_translation(previous):
+                    self.host.apply_filters()
 
     def sync_focus_from_table(self) -> None:
         selected = self.host.table.selectedItems()
@@ -162,6 +191,7 @@ class FocusEditorController(QObject):
             position = self.host.filtered_units.index(unit) + 1 if unit in self.host.filtered_units else 0
             self.host.translation_controller.remember_confirmation(unit)
             self.host.label_position.setText(f"{position} / {len(self.host.filtered_units)}")
+            self.refresh_unit_status(unit)
             self.host.edit_key.setText(unit.label)
             self.host.edit_file.setText(self.host.source_name_for_unit(unit))
             source_display = unit.source_text
@@ -183,19 +213,11 @@ class FocusEditorController(QObject):
     def mark_focus_edited(self) -> None:
         if self._updating_focus or self.current_unit is None or self.host.active_workspace is None:
             return
-        new_target = self.host.edit_translation.toPlainText()
-        if new_target == self.host._expand_display_text(self.current_unit.target_text):
-            return  # Syntax formatting also emits textChanged without changing text.
-        presentation = self.host._text_presentation
-        if self.host.render_literal_newlines and presentation is not None and presentation.newline_codec is not None:
-            new_target = presentation.newline_codec.collapse(new_target)
-        self.host.workspace_service.begin_translation_edit(self.host.active_workspace, self.current_unit.id)
-        self.current_unit.target_text = new_target
-        if self.current_unit in self.host.filtered_units:
-            row = self.host.filtered_units.index(self.current_unit)
-            self.host.table_controller._sync_unit_row_content(row, self.current_unit)
-        else:
-            self.host.table_controller.refresh_table()
+        self.host.translation_controller.update_draft(self.current_unit, self.host.edit_translation.toPlainText())
+
+    def discard_current_draft(self) -> None:
+        if self.current_unit is not None:
+            self.host.translation_controller.discard_draft(self.current_unit)
 
     def copy_source_to_translation(self) -> None:
         if self.host.active_workspace is None:
@@ -275,39 +297,16 @@ class FocusEditorController(QObject):
     def _save_current_unit_changes(self, next_entry: bool, state: UnitState | None = None) -> None:
         if self.current_unit is None or self.host.active_workspace is None:
             return
-        text = self.host.edit_translation.toPlainText()
-        presentation = self.host._text_presentation
-        if self.host.render_literal_newlines and presentation is not None and presentation.newline_codec is not None:
-            text = presentation.newline_codec.collapse(text)
-        desired = state if state is not None else UnitState.HUMAN_TRANSLATED if text.strip() else UnitState.UNTRANSLATED
-        if self.host.translation_controller.confirm_manual_translation(self.current_unit, target_text=text, state=desired):
+        text = self.host._collapse_display_text(self.host.edit_translation.toPlainText())
+        if self.host.translation_controller.confirm_manual_translation(self.current_unit, target_text=text, state=state):
             self._after_unit_saved(next_entry=next_entry)
+        else:
+            self.host.apply_filters()
 
     def _after_unit_saved(self, next_entry: bool) -> None:
-        self.host.table_controller.refresh_table()
-        if self.current_unit in self.host.filtered_units:
-            global_idx = self.host.filtered_units.index(self.current_unit)
-            start = (self.focus_current_page - 1) * self.focus_page_size
-            end = start + self.focus_page_size
-            if start <= global_idx < end:
-                page_idx = global_idx - start
-                item = self.host.list_focus_units.item(page_idx)
-                if item is not None:
-                    preview = " ".join(self.current_unit.source_text.split())
-                    if len(preview) > 50:
-                        preview = preview[:47] + "..."
-                    if not preview:
-                        preview = f"<{self.current_unit.label}>"
-                    item.setText(preview)
-                    icon = self.host.table_controller._unit_status_icon(self.current_unit)
-                    if icon is not None and not icon.isNull():
-                        item.setIcon(icon)
-                    else:
-                        item.setIcon(self.host.icon_manager.get_icon(""))
         if next_entry:
             self.next_entry()
-        else:
-            self.refresh_focus(sync_list=False)
+        self.host.apply_filters()
 
     def previous_entry(self) -> None:
         self.move_focus(-1)
@@ -318,12 +317,15 @@ class FocusEditorController(QObject):
     def move_focus(self, step: int) -> None:
         if not self.host.filtered_units:
             return
+        previous = self.current_unit
         if self.current_unit in self.host.filtered_units:
             index = self.host.filtered_units.index(self.current_unit)
         else:
             index = 0
         self.current_unit = self.host.filtered_units[(index + step) % len(self.host.filtered_units)]
         self.refresh_focus()
+        if previous is not None and is_pending_translation(previous):
+            self.host.apply_filters()
 
     def _ensure_focus_sidebar_minimum_width(self) -> None:
         """ページネーションの桁数に応じてサイドバーの最小幅を更新し、不足していればスプリッターを強制拡張。"""

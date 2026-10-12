@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Protocol, runtime_checkable
+from typing import Callable, Literal, Protocol, runtime_checkable
 
 from PySide6.QtGui import QIcon, QSyntaxHighlighter, QTextDocument
 from PySide6.QtWidgets import QWidget
@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QWidget
 from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter, ImportedTranslation, VoiceInputProvider
 from autolingua2.infrastructure.encoding import detect_encoding, read_text_auto
 from autolingua2.infrastructure.platform import current_platform
-from autolingua2.services.settings_store import load_plugin_settings, save_plugin_settings
+from autolingua2.services.settings_store import AiModel, AiSetupValues, load_plugin_settings, save_plugin_settings
 from autolingua2.ui.creation_contract import CreationAdapter, CreationContext
 
 __all__ = [
@@ -28,6 +28,12 @@ __all__ = [
     "PluginSettings",
     "UIContribution",
     "ExportSettingsPanel",
+    "AiModel",
+    "AiSetupValues",
+    "AiSetupCallbacks",
+    "AiSetupPanel",
+    "AiSetupFactory",
+    "AiSetupOption",
 ]
 
 HighlighterFactory = Callable[[str, QTextDocument, Callable[[], bool], Callable[[], bool]], QSyntaxHighlighter | None]
@@ -94,6 +100,49 @@ class ExportSettingsPanel(Protocol):
 
 
 @dataclass(frozen=True)
+class AiSetupCallbacks:
+    """Notify the host of credential changes or full custom panel readiness."""
+
+    changed: Callable[[], None]
+    ready_changed: Callable[[bool], None]
+
+
+@runtime_checkable
+class AiSetupPanel(Protocol):
+    @property
+    def widget(self) -> QWidget: ...
+
+    @property
+    def ready(self) -> bool:
+        """Whether a complete custom configuration can be saved."""
+        ...
+
+    def read_settings(self) -> AiSetupValues:
+        """Auth panels return credentials; full panels also return their model list."""
+        ...
+
+    def save_settings(self) -> None:
+        """Persist private settings through PluginContext.settings."""
+        ...
+
+    def cancel(self) -> None:
+        """Stop outstanding work without saving pending changes."""
+        ...
+
+
+AiSetupFactory = Callable[[QWidget, AiSetupValues, AiSetupCallbacks], AiSetupPanel]
+
+
+@dataclass(frozen=True)
+class AiSetupOption:
+    provider_id: str
+    title: str
+    description: str = ""
+    mode: Literal["common", "auth", "custom"] = "common"
+    create_panel: AiSetupFactory | None = None
+
+
+@dataclass(frozen=True)
 class UIContribution:
     """プラグインが4F（UI層）に提供する拡張機能コンテナ。"""
 
@@ -103,6 +152,7 @@ class UIContribution:
     text_presentation: Callable[[str], GameTextPresentation | None] | None = None
     highlighter_factory: HighlighterFactory | None = None
     export_settings: dict[str, ExportSettingsPanel] = field(default_factory=dict)
+    ai_setup: AiSetupOption | None = None
 
 
 @dataclass(frozen=True)

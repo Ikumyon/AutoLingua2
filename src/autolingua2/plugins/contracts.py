@@ -3,7 +3,8 @@
 Internal model locations may change; plugin authors should import these names here.
 These are the host's actual types, not copies or compatibility implementations.
 """
-from autolingua2.adapters.base import FileAdapter, KeyConflictAdapter
+from autolingua2.adapters.base import FileAdapter, KeyConflictAdapter, TranslationTextAdapter
+from autolingua2.ir.translation import TranslationTextRules
 from autolingua2.ir.key_conflict import KeyEntry, KeyFile
 from autolingua2.ir import Issue, TranslationProject, TranslationSource, TranslationUnit, UnitState
 from autolingua2.ir.filter_rules import FilterRule, TagKind
@@ -24,6 +25,7 @@ from autolingua2.services.ai_providers.base import (
     BaseHttpTranslator,
     TextTranslator,
     TranslationProviderError,
+    TranslationUsage, usage_number,
 )
 
 __all__ = [
@@ -31,8 +33,10 @@ __all__ = [
     "ChatMessage", "ChatReply", "ChatToolCall", "object_value", "string_value",
     "ExportFile", "TranslationExporter",
     "FileAdapter", "KeyConflictAdapter", "KeyEntry", "KeyFile",
+    "TranslationTextAdapter", "TranslationTextRules",
     "AiProviderPlugin", "TextTranslator", "TranslationProviderError",
     "BaseHttpTranslator", "BaseAiProvider",
+    "TranslationUsage", "usage_number",
     "Issue", "TranslationProject", "TranslationSource", "TranslationUnit", "UnitState",
     "FilterRule", "TagKind", "GameProfile", "GameSlot", "ImportedTranslation", "SourceRef",
     "ClassificationResult", "ClassifiedElement", "DifferenceKind", "SourceCategory", "SourceGroup", "TextDifference",

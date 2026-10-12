@@ -14,11 +14,11 @@ from PySide6.QtNetworkAuth import (
 
 logger = logging.getLogger(__name__)
 
-# ChatGPT 固有の OAuth 2.0 PKCE 設定
-AUTH_URL = "https://auth.openai.com/oauth/authorize"
-TOKEN_URL = "https://auth.openai.com/oauth/token"
-SCOPE = "openid profile email offline_access"
-CLIENT_ID = "autolingua-desktop"
+# ChatGPT 固有の OAuth 2.0 PKCE 設定 (OpenAI 公式仕様)
+AUTH_URL = "https://auth.openai.com/api/accounts/authorize"
+TOKEN_URL = "https://auth.openai.com/api/accounts/oauth/token"
+SCOPE = "openid profile email offline_access resource.invoke"
+CLIENT_ID = "dynamic_agent_client"
 
 
 def decode_jwt_payload(token: str) -> dict[str, Any]:
@@ -98,6 +98,16 @@ class ChatGptAuthManager(QObject):
         if self._oauth is not None:
             self._oauth.setToken("")
         self.auth_status_changed.emit("未ログイン")
+
+    def cancel(self) -> None:
+        if self._reply_handler is not None:
+            self._reply_handler.deleteLater()
+            self._reply_handler = None
+        if self._oauth is not None:
+            self._oauth.deleteLater()
+            self._oauth = None
+        if not self._access_token:
+            self.auth_status_changed.emit("未ログイン")
 
     def _on_granted(self) -> None:
         if self._oauth is None:

@@ -5,7 +5,7 @@ import json
 
 from autolingua2.plugins.contracts import (
     BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
-    object_value, string_value,
+    object_value, string_value, TranslationUsage, usage_number,
 )
 
 DEFAULT_CLAUDE_MODELS: tuple[tuple[str, str], ...] = (
@@ -20,6 +20,15 @@ class ClaudeTranslator(BaseHttpTranslator):
     """Anthropic Claude API用の翻訳トランスレーター（BaseHttpTranslatorの差分のみ実装）。"""
 
     supports_chat = True
+
+    def extract_usage(self, data: dict[str, Any]) -> TranslationUsage:
+        usage = data.get("usage")
+        uncached = usage_number(usage, "input_tokens")
+        read = usage_number(usage, "cache_read_input_tokens")
+        write = usage_number(usage, "cache_creation_input_tokens")
+        total = uncached + read + write if uncached is not None and read is not None and write is not None else None
+        return TranslationUsage(input_tokens=total, output_tokens=usage_number(usage, "output_tokens"),
+                                cache_read_tokens=read, cache_write_tokens=write)
 
     def build_chat_payload(self, messages: list[ChatMessage], system_prompt: str,
                            tools: list[dict[str, Any]], continuation: list[dict[str, Any]]) -> dict[str, Any]:
@@ -76,7 +85,7 @@ class ClaudeTranslator(BaseHttpTranslator):
         return {
             "model": self.model,
             "max_tokens": 4096,
-            "system": system_prompt,
+            "system": [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             "messages": [
                 {"role": "user", "content": text},
             ],

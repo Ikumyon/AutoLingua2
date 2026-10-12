@@ -4,7 +4,7 @@ from typing import Any
 
 from autolingua2.plugins.contracts import (
     BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
-    object_value, string_value,
+    object_value, string_value, TranslationUsage, usage_number,
 )
 
 DEFAULT_GEMINI_MODELS: tuple[tuple[str, str], ...] = (
@@ -18,6 +18,14 @@ class GeminiTranslator(BaseHttpTranslator):
     """Google Gemini API用の翻訳トランスレーター（BaseHttpTranslatorの差分のみ実装）。"""
 
     supports_chat = True
+
+    def extract_usage(self, data: dict[str, Any]) -> TranslationUsage:
+        usage = data.get("usageMetadata")
+        return TranslationUsage(
+            input_tokens=usage_number(usage, "promptTokenCount"), output_tokens=usage_number(usage, "candidatesTokenCount"),
+            reasoning_tokens=usage_number(usage, "thoughtsTokenCount"),
+            cache_read_tokens=usage_number(usage, "cachedContentTokenCount"), reasoning_in_output=False,
+        )
 
     def build_chat_payload(self, messages: list[ChatMessage], system_prompt: str,
                            tools: list[dict[str, Any]], continuation: list[dict[str, Any]]) -> dict[str, Any]:
@@ -77,6 +85,13 @@ class GeminiTranslator(BaseHttpTranslator):
         target_language: str,
         system_prompt: str,
     ) -> dict[str, Any]:
+        generation: dict[str, Any] = {"temperature": 0.3}
+        if self.model.startswith("gemini-3"):
+            generation = {"thinkingConfig": {"thinkingLevel": "LOW"}}
+        elif self.model.startswith("gemini-2.5-flash"):
+            generation["thinkingConfig"] = {"thinkingBudget": 0}
+        elif self.model.startswith("gemini-2.5-pro"):
+            generation["thinkingConfig"] = {"thinkingBudget": 128}
         return {
             "system_instruction": {
                 "parts": [{"text": system_prompt}],
@@ -87,9 +102,7 @@ class GeminiTranslator(BaseHttpTranslator):
                     "parts": [{"text": text}],
                 }
             ],
-            "generationConfig": {
-                "temperature": 0.3,
-            },
+            "generationConfig": generation,
         }
 
     def extract_translation(self, response_data: dict[str, Any]) -> str:
