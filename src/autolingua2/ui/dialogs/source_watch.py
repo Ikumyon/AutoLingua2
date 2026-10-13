@@ -22,7 +22,7 @@ from autolingua2.services.source_updates import (
     notifications_available, preview_notification_sound, validate_notification_file,
 )
 from autolingua2.infrastructure.filesystem import ASSETS_DIR
-from autolingua2.ui.operation_worker import OperationWorker
+from autolingua2.services.operation_worker import OperationWorker
 from autolingua2.ui.icons import IconManager
 from autolingua2.ui.i18n import tr
 from .base import SimpleDialogController, require_child

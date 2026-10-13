@@ -8,6 +8,7 @@ import json
 import re
 import logging
 from pathlib import Path
+from uuid import uuid4
 
 from PySide6.QtCore import QObject, QTimer, Signal
 from autolingua2_native import classification as native
@@ -114,17 +115,21 @@ class TranslationService(QObject):
 
     def __init__(self, client: AiNetworkClient, workspace_is_alive: Callable[[Workspace], bool],
                  get_options: Callable[[], TranslationOptions | None], parent: QObject | None = None,
-                 *, get_tone_context: Callable[[UnitView], ToneContext]) -> None:
+                 *, get_tone_context: Callable[[UnitView], ToneContext],
+                 dispatch_source: str = "translation", store_memory: bool = True) -> None:
         super().__init__(parent)
         self.client = client
         self._workspace_is_alive = workspace_is_alive
         self._get_options = get_options
         self._get_tone_context = get_tone_context
         self.memory = TranslationMemoryStore()
+        self._store_memory = store_memory
         self.slots = client.translation_slots
         self.slots.freed.connect(lambda: QTimer.singleShot(0, self._pump))
         self.slots.ready_changed.connect(lambda: QTimer.singleShot(0, self._pump))
-        self.slots.register_source("translation", self._has_ready_jobs)
+        self._dispatch_source = dispatch_source
+        self._request_prefix = uuid4().hex
+        self.slots.register_source(dispatch_source, self._has_ready_jobs)
         self._ids = count()
         self._jobs: dict[int, _Job] = {}
         self._individual_ready: deque[int] = deque()
@@ -415,8 +420,8 @@ class TranslationService(QObject):
                 self._pending[request_id].append((job.id, mapping))
                 self.usage_counts["inflight_sharing"] += 1
                 return True
-            request_id = str(next(self._ids))
-            if not self.slots.acquire(request_id, source="translation"):
+            request_id = f"{self._request_prefix}:{next(self._ids)}"
+            if not self.slots.acquire(request_id, source=self._dispatch_source):
                 self._resume_job(job)
                 return False
             self._pending[request_id] = [(job.id, mapping)]
@@ -497,8 +502,9 @@ class TranslationService(QObject):
             return
         context = job.options.text_context
         try:
-            self.memory.store(context.adapter_id, context.game_id, job.options.source_language, job.options.target_language,
-                              job.memory_pairs, job.conditions, user_confirmed=False)
+            if self._store_memory:
+                self.memory.store(context.adapter_id, context.game_id, job.options.source_language, job.options.target_language,
+                                  job.memory_pairs, job.conditions, user_confirmed=False)
         except TranslationMemoryError as exc:
             self.memory_failed.emit(str(exc))
         self.completed_options = job.options
@@ -575,6 +581,7 @@ class TranslationService(QObject):
                 self.activity_changed.emit(job.workspace, unit, False)
         self._individual_ready.clear()
         self._prefer_batch = True
+        request_ids = tuple(self._pending)
         self._pending.clear()
         self._inflight.clear()
         self._request_keys.clear()
@@ -582,7 +589,8 @@ class TranslationService(QObject):
         self._planner = None
         self._batch_jobs.clear()
         self._batch_results.clear()
-        self.slots.clear()
         self.client.cancel_all()
+        for request_id in request_ids:
+            self.slots.release(request_id)
         if was_busy:
             self.batch_stopped.emit()

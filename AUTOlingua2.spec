@@ -6,6 +6,8 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import PySide6
 
 lrelease_binary = next(Path(PySide6.__file__).parent.glob('lrelease*'))
+if not Path('assets/chat/index.html').is_file():
+    raise RuntimeError('Build the chat frontend first: cd web && npm run build')
 
 sys.path.insert(0, str(Path('src').resolve()))
 plugin_datas = []
@@ -22,7 +24,8 @@ a = Analysis(
     pathex=['src', '.', 'build/native'],
     binaries=[(str(lrelease_binary), 'PySide6')],
     datas=[('ui', 'ui'), ('assets/images/app.ico', 'assets/images'),
-           ('assets/images/app.png', 'assets/images'), ('assets/i18n', 'assets/i18n')]
+           ('assets/images/app.png', 'assets/images'), ('assets/i18n', 'assets/i18n'),
+           ('assets/chat', 'assets/chat')]
           + plugin_datas,
     hiddenimports=['autolingua2_native'] + plugin_imports,
     hookspath=[],

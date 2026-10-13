@@ -17,7 +17,7 @@ from autolingua2.ir.state import UnitState
 from autolingua2.ir.unit import TranslationUnit
 from autolingua2.ir.tone import ToneItem
 from autolingua2.ir.validation import array, record, required, text
-from autolingua2.ir.workspace import ConfirmedTranslation, TranslationRecord, Workspace
+from autolingua2.ir.workspace import ConfirmedTranslation, TranslationNotes, TranslationRecord, Workspace
 from autolingua2.services.workspaces import Language, WorkspaceService, normalize_language_code
 from autolingua2.adapters.base import FileAdapter
 from autolingua2.services.source_classification import classify_sources
@@ -88,6 +88,7 @@ def project_documents(service: WorkspaceService) -> dict[str, object]:
             "game_id": project.game_id, "source_slot": project.source_slot,
             "memory_id": project.memory_id,
             "source_language": project.source_language,
+            "active_language": project.target_language,
             "source_root": project.source_root, "files": project.loaded_files,
             "folders": project.loaded_folders, "workspaces": list(service.workspaces),
         },
@@ -100,6 +101,7 @@ def project_documents(service: WorkspaceService) -> dict[str, object]:
         documents[prefix + "workspace.json"] = {
             "language_code": workspace.language_code, "language_name": language.name,
             "output_slot": workspace.output_slot,
+            "glossary_id": workspace.glossary_id, "tone_id": workspace.tone_id,
         }
         for source in project.sources:
             entries: list[dict[str, object]] = []
@@ -118,6 +120,9 @@ def project_documents(service: WorkspaceService) -> dict[str, object]:
                                 "context": unit.context,
                                 "source_changed": entry.source_changed,
                                 "tone": _tone_document(entry.tone),
+                                "notes": {"candidates": entry.notes.candidates,
+                                          "rationale": entry.notes.rationale,
+                                          "sources": entry.notes.sources, "review": entry.notes.review},
                                 "pending_confirmation": {
                                     "translation": pending.target_text, "tone": _tone_document(pending.tone),
                                 } if pending is not None else None})
@@ -174,6 +179,10 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
     names = [text(value, nonempty=True) for value in array(required(metadata, "workspaces"))]
     if not names or len(names) != len(set(names)):
         raise ValueError("ワークスペース一覧が不正です。")
+    active_language = text(metadata.get("active_language", ""))
+    if active_language and active_language not in names:
+        raise ValueError("選択中の翻訳言語がワークスペース一覧にありません。")
+    project.target_language = active_language
     expected = {"project.json"}
     languages: dict[str, Language] = {}
     restored: dict[str, Workspace] = {}
@@ -194,7 +203,9 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
             raise ValueError("同じ言語の表示名が一致しません。")
         languages[code] = language
         slot = text(required(data, "output_slot"))
-        workspace = Workspace(code, output_slot=slot)
+        workspace = Workspace(code, output_slot=slot,
+                              glossary_id=text(data.get("glossary_id", "")),
+                              tone_id=text(data.get("tone_id", "")))
         for path in paths:
             filename = prefix + f"files/{path}.json"
             expected.add(filename)
@@ -204,7 +215,7 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
                 row = record(item)
                 if not {"key", "original", "translation", "state"} <= set(row) or not set(row) <= {
                     "key", "original", "translation", "state", "context", "source_changed", "tone",
-                    "pending_confirmation"
+                    "pending_confirmation", "notes"
                 }:
                     raise ValueError("翻訳行の項目が不正です。")
                 key = text(required(row, "key"), nonempty=True)
@@ -226,9 +237,18 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
                         raise ValueError("編集中の翻訳行の項目が不正です。")
                     pending = ConfirmedTranslation(text(required(pending_fields, "translation")),
                                                    _restore_tone(required(pending_fields, "tone")))
+                notes = record(row.get("notes", {}))
+                if set(notes) - {"candidates", "rationale", "sources", "review"}:
+                    raise ValueError("翻訳メモの項目が不正です。")
                 workspace.records[unit_id] = TranslationRecord(
                     text(required(row, "translation")), UnitState(text(required(row, "state"))),
                     source_changed, tone, pending,
+                    notes=TranslationNotes(
+                        [text(value) for value in array(notes.get("candidates", []))],
+                        text(notes.get("rationale", "")),
+                        [text(value) for value in array(notes.get("sources", []))],
+                        text(notes.get("review", "")),
+                    ),
                 )
                 if name == names[0]:
                     project.units.append(TranslationUnit(

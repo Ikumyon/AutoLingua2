@@ -1,6 +1,8 @@
 use super::security::verify_directory;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+pub fn canonicalize_path(path: &Path) -> io::Result<PathBuf> { path.canonicalize() }
 
 pub fn development_python() -> &'static str { ".venv/bin/python" }
 pub fn log_directory() -> std::io::Result<PathBuf> {

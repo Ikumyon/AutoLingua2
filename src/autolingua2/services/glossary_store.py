@@ -105,6 +105,29 @@ class GlossaryStore:
             connection.execute("DELETE FROM glossary_terms WHERE glossary_id = ?", (glossary_id,))
             connection.execute("DELETE FROM glossaries WHERE id = ?", (glossary_id,))
 
+    def list_terms(self, glossary_id: str) -> list[GlossaryTerm]:
+        with self._connection() as connection:
+            result: list[GlossaryTerm] = []
+            for row in connection.execute("SELECT * FROM glossary_terms WHERE glossary_id = ? ORDER BY id", (glossary_id,)):
+                variants = json.loads(row["variants"])
+                if not isinstance(variants, list) or any(not isinstance(value, str) for value in variants):
+                    raise ValueError("用語の他形態データが不正です。")
+                result.append(GlossaryTerm(row["id"], row["glossary_id"], row["source_language"],
+                    row["target_language"], row["part_of_speech"], row["source"], row["translation"],
+                    tuple(variants), row["memo"], bool(row["case_sensitive"])))
+            return result
+
+    def restore_glossary(self, glossary: Glossary, terms: list[GlossaryTerm]) -> None:
+        """Restore an operation's deleted leaf and its terms in one transaction."""
+        with self._connection() as connection:
+            connection.execute("INSERT INTO glossaries VALUES (?, ?, ?, ?, ?)",
+                (glossary.id, glossary.name, glossary.adapter_id, glossary.game_id, glossary.parent_id))
+            for term in terms:
+                connection.execute("INSERT INTO glossary_terms VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (term.id, term.glossary_id, term.source_language, term.target_language, term.part_of_speech,
+                     term.source, term.translation, json.dumps(term.variants, ensure_ascii=False),
+                     term.memo, int(term.case_sensitive)))
+
     def effective_terms(self, glossaries: list[Glossary], glossary_id: str,
                         source_language: str, target_language: str) -> list[GlossaryTerm]:
         chain = glossary_chain(glossaries, glossary_id)
@@ -141,7 +164,7 @@ class GlossaryStore:
                 raise ValueError("別の用語集の用語を変更できません。")
             try:
                 connection.execute("""INSERT INTO glossary_terms VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET part_of_speech = excluded.part_of_speech,
+                    ON CONFLICT(id) DO UPDATE SET source = excluded.source, part_of_speech = excluded.part_of_speech,
                     source = excluded.source, translation = excluded.translation,
                     variants = excluded.variants, memo = excluded.memo, case_sensitive = excluded.case_sensitive""",
                     (saved.id, saved.glossary_id, saved.source_language, saved.target_language,

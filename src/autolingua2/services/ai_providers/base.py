@@ -63,15 +63,6 @@ class AiProviderPlugin(Protocol):
 
     def create(self, api_key: str, model: str) -> TextTranslator: ...
 
-    def create_settings_widget(
-        self,
-        parent: Any = None,
-        *,
-        current_api_key: str = "",
-        on_api_key_changed: Any = None,
-    ) -> Any | None: ...
-
-
 MASTER_SYSTEM_PROMPT = (
     "あなたはゲーム翻訳者です。与えられたテキストを{source_language}から{target_language}に翻訳してください。\n"
     "翻訳結果のみを出力してください。\n"
@@ -349,12 +340,3 @@ class BaseAiProvider(AiProviderPlugin, ABC):
     def create(self, api_key: str, model: str) -> TextTranslator:
         return self.translator_class(api_key=api_key, model=model)
 
-    def create_settings_widget(
-        self,
-        parent: Any = None,
-        *,
-        current_api_key: str = "",
-        on_api_key_changed: Any = None,
-    ) -> Any | None:
-        """設定ダイアログのスタックに表示するプロバイダー固有ウィジェット（None の場合は標準APIキー画面）。"""
-        return None

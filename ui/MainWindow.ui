@@ -1216,7 +1216,7 @@ QFrame#frameSegmentMode QToolButton:checked {
               <number>0</number>
              </property>
              <item>
-              <widget class="QTableWidget" name="tableTranslations">
+              <widget class="ChatReferenceTable" name="tableTranslations">
                <property name="styleSheet">
                 <string notr="true">QTableWidget {
     background-color: palette(window);
@@ -1900,7 +1900,7 @@ QTableCornerButton::section {
     <number>2</number>
    </attribute>
    <widget class="QWidget" name="dockAiChatContents">
-    <layout class="QVBoxLayout" name="layoutAiChat" stretch="0,1,0,0,0,0">
+    <layout class="QVBoxLayout" name="layoutAiChat" stretch="0,1,0,0">
      <property name="leftMargin">
       <number>12</number>
      </property>
@@ -1935,71 +1935,30 @@ QTableCornerButton::section {
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QPushButton" name="buttonChatOptions">
+         <property name="text">
+          <string notr="true">⋯</string>
+         </property>
+         <property name="toolTip">
+          <string>操作対象・実行方法</string>
+         </property>
+         <property name="accessibleName">
+          <string>操作対象・実行方法</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </item>
      <item>
-      <widget class="QScrollArea" name="scrollChatHistory">
+      <widget class="ChatWebView" name="scrollChatHistory">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Ignored" vsizetype="Expanding">
          <horstretch>0</horstretch>
          <verstretch>1</verstretch>
         </sizepolicy>
        </property>
-       <property name="horizontalScrollBarPolicy">
-        <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
-       </property>
-       <property name="widgetResizable">
-        <bool>true</bool>
-       </property>
       </widget>
-     </item>
-     <item>
-      <layout class="QHBoxLayout" name="layoutChatReferences">
-       <item>
-        <widget class="QLabel" name="labelChatReferences">
-         <property name="text">
-          <string>参照：なし</string>
-         </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="buttonChatClearReferences">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>解除</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <layout class="QHBoxLayout" name="layoutChatReferenceActions">
-       <item>
-        <widget class="QPushButton" name="buttonChatAddReferences">
-         <property name="toolTip">
-          <string>選択した文章を参照に追加</string>
-         </property>
-         <property name="text">
-          <string>＋参照を追加</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="buttonChatViewReferences">
-         <property name="text">
-          <string>参照を見る</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
      </item>
      <item>
       <widget class="QLabel" name="labelChatStatus">
@@ -2020,7 +1979,7 @@ QTableCornerButton::section {
     border-radius: 8px;
     padding: 0px;
 }
-QPlainTextEdit#editChatMessage {
+QTextEdit#editChatMessage {
     background-color: transparent;
     border: none;
 }
@@ -2054,7 +2013,7 @@ QPushButton#buttonChatSend:hover:enabled {
          <number>6</number>
         </property>
         <item>
-         <widget class="QPlainTextEdit" name="editChatMessage">
+         <widget class="ChatComposer" name="editChatMessage">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
             <horstretch>0</horstretch>
@@ -2309,6 +2268,18 @@ QPushButton#buttonChatModel::menu-indicator {
   </action>
  </widget>
  <customwidgets>
+  <customwidget>
+   <class>ChatReferenceTable</class><extends>QTableWidget</extends>
+   <header>autolingua2.ui.components.chat_composer</header>
+  </customwidget>
+  <customwidget>
+   <class>ChatComposer</class><extends>QTextEdit</extends>
+   <header>autolingua2.ui.components.chat_composer</header>
+  </customwidget>
+  <customwidget>
+   <class>ChatWebView</class><extends>QWidget</extends>
+   <header>autolingua2.ui.components.chat_web_view</header>
+  </customwidget>
   <customwidget>
    <class>ComboMenuButton</class>
    <extends>QPushButton</extends>

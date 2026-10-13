@@ -349,6 +349,8 @@ class TranslationTableController(QObject):
         unit = self.host.filtered_units[row]
         self.host.translation_controller.cancel_deferred_confirmation(unit)
         menu = QMenu(self.host.table)
+        chat = menu.addAction(tr("AiChat", "チャットへ挿入"))
+        chat.setEnabled(not self.host.chat_dock.session.busy and not self.host.chat_dock.voice_input.active)
         revert = menu.addAction(tr("MainWindow", "元に戻す"))
         revert.setEnabled(is_pending_translation(unit))
         viewport = self.host.table.viewport()
@@ -356,7 +358,10 @@ class TranslationTableController(QObject):
             raise RuntimeError("翻訳一覧の表示領域がありません。")
         self.row_menu_open = True
         try:
-            if menu.exec(viewport.mapToGlobal(position)) is revert:
+            chosen = menu.exec(viewport.mapToGlobal(position))
+            if chosen is chat:
+                self.host.chat_dock.insert_selected_reference()
+            elif chosen is revert:
                 self.host.translation_controller.discard_draft(unit)
         finally:
             self.row_menu_open = False

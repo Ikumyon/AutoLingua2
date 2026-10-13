@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QMessageBox, QPushButton, QSizePolicy, QSpacerItem, QWidget,
 )
 
-from autolingua2.plugins.api import AiModel, AiSetupCallbacks, AiSetupPanel, AiSetupValues
+from autolingua2.plugins.api import AiModel, AiSetupCallbacks, AiSetupValues
 from .auth import ChatGptAuthManager
 from .chatgpt import ChatGptModelFetcher
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class ChatGptSetupPanel(QObject):
-    """初期設定ウィザード（AiSetupPanel プロトコル）用の ChatGPT 認証＆モデル管理パネル。"""
+    """AiSetupPanel 契約を通じてホスト画面へ提供する認証＆モデル管理パネル。"""
 
     def __init__(
         self,

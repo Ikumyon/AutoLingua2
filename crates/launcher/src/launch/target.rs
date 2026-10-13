@@ -18,7 +18,8 @@ impl Target {
         while let Some(arg) = args.next() {
             if arg == "--development-root" {
                 if development.is_some() { return Err(error("Duplicate development root")); }
-                development = Some(PathBuf::from(args.next().ok_or_else(|| error("Missing development root"))?).canonicalize()?);
+                let root = PathBuf::from(args.next().ok_or_else(|| error("Missing development root"))?);
+                development = Some(platform::canonicalize_path(&root)?);
             } else if arg.to_str().is_some_and(|value| value.starts_with("autolingua2:")) {
                 let uri = arg.to_str().ok_or_else(|| error("Invalid notification URI"))?;
                 if source_update.is_some() { return Err(error("Duplicate source update request")); }

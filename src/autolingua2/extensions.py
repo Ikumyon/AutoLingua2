@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 import json
 import logging
 from pathlib import Path
@@ -9,6 +10,7 @@ from typing import Literal
 
 from .ir.validation import record, required, text
 from .plugins.manager import PluginManager
+from .services.operation_contract import PluginInformation
 from .ui.i18n import LocalizationManager, current_ui_language, language_events
 from .ui.icons import IconManager
 from .ui.theme import ThemeManager
@@ -27,12 +29,18 @@ class ExtensionEntrance:
         self._localization = LocalizationManager()
         self._themes = ThemeManager()
         self._errors: list[str] = []
+        self._plugin_information: dict[Path, PluginInformation] = {}
         self._closed = False
         language_events().changed.connect(self._plugins.change_language)
 
     @property
     def plugins(self) -> PluginManager:
         return self._plugins
+
+    def plugin_inventory(self) -> tuple[PluginInformation, ...]:
+        """Manifest admission receipts; no second scan or persisted registry."""
+        self._ensure_open()
+        return tuple(self._plugin_information.values())
 
     @property
     def localization(self) -> LocalizationAPI:
@@ -83,10 +91,19 @@ class ExtensionEntrance:
             return
         if check is not None:
             check()
+        directory = folder.resolve()
+        information = PluginInformation(None, folder.name, None, "", None,
+            "builtin" if builtin else "external", str(directory), "failed")
         try:
             manifest = record(json.loads(manifest_file.read_text(encoding="utf-8")))
             plugin_id = text(required(manifest, "id"), nonempty=True)
             kind = text(manifest.get("kind", "python"), nonempty=True)
+            information = replace(information, id=plugin_id, kind=kind)
+            version = manifest.get("version")
+            information = replace(information,
+                name=text(manifest.get("name", plugin_id), nonempty=True),
+                version=text(version, nonempty=True) if version is not None else None,
+                description=text(manifest.get("description", "")))
             config_item: dict[str, object] = {
                 "id": plugin_id,
                 "kind": kind,
@@ -107,9 +124,17 @@ class ExtensionEntrance:
                     config_item["path"] = str(entry_path)
             else:
                 raise ValueError(f"Unknown plugin kind: {kind}")
-            self._plugins._load_configured(config_item, folder.resolve())
+            error_start = len(self._plugins.errors)
+            if self._plugins._load_configured(config_item, directory):
+                information = replace(information, status="loaded",
+                    capabilities=self._plugins.capabilities(plugin_id))
+            else:
+                information = replace(information, error="\n".join(self._plugins.errors[error_start:]))
         except Exception as exc:
+            information = replace(information, error=f"{type(exc).__name__}: {exc}")
             self._report_error(f"plugin:{folder.name}", exc)
+        finally:
+            self._plugin_information[directory] = information
 
     def load_all(
         self, root_dir: Path, check: Callable[[], None] | None = None,

@@ -30,6 +30,7 @@ class TranslationProject:
     units: list[TranslationUnit] = field(default_factory=list)
     sources: list[TranslationSource] = field(default_factory=list)
     memory_id: str = field(default_factory=lambda: uuid4().hex)
+    language_generation: int = 0
 
     def extend(self, other: TranslationProject) -> None:
         self.units.extend(other.units)

@@ -297,7 +297,6 @@ class ChatGptProvider(BaseAiProvider):
     api_key_env = "CHATGPT_AUTH_TOKEN"
     auth_type = "oauth"
     translator_class = ChatGptTranslator
-    auth_label = "アカウント"
 
     def __init__(self, auth: ChatGptAuthManager) -> None:
         self._auth = auth

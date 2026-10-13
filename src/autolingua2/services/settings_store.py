@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 import json
 import logging
 import os
@@ -15,6 +15,7 @@ from autolingua2.infrastructure.filesystem import PROJECT_ROOT
 from autolingua2.infrastructure.platform import qt_file_path
 from autolingua2.infrastructure import source_watch
 from autolingua2.services.language_tags import normalize_language
+from autolingua2.services.operation_contract import ExternalMcpConnection, McpSettings, PERMISSIONS, Permission
 
 if TYPE_CHECKING:
     from autolingua2.services.ai_providers.registry import ProviderRegistry
@@ -24,6 +25,7 @@ GROUP_TRANSLATION_TABLE = "translation_table"
 GROUP_UI = "ui"
 GROUP_AI = "ai"
 GROUP_VOICE_INPUT = "voice_input"
+GROUP_MCP = "mcp"
 DEFAULT_VOICE_INPUT_PROVIDER = "system_voice_input"
 GROUP_FILTER_RULES = "filter_rules"
 KEY_COLUMN_ORDER = "column_order"
@@ -266,16 +268,23 @@ def save_voice_input_provider(provider_id: str) -> None:
     _write_settings_file(settings)
 
 
-def load_ui_language(default: str = DEFAULT_UI_LANGUAGE) -> str:
+def load_ui_language_revision(default: str = DEFAULT_UI_LANGUAGE) -> tuple[str, int]:
     settings = _read_settings_file()
     ui_settings = settings.get(GROUP_UI, {})
     if not isinstance(ui_settings, dict):
-        return default
+        return default, 0
+    generation = ui_settings.get("language_generation", 0)
+    if type(generation) is not int or generation < 0:
+        raise ValueError("表示言語の更新世代が不正です。")
     language = ui_settings.get(KEY_UI_LANGUAGE)
     if not language:
-        return default
+        return default, generation
     value = str(language)
-    return DEFAULT_UI_LANGUAGE if value.lower() == DEFAULT_UI_LANGUAGE else normalize_language(value)
+    return (DEFAULT_UI_LANGUAGE if value.lower() == DEFAULT_UI_LANGUAGE else normalize_language(value)), generation
+
+
+def load_ui_language(default: str = DEFAULT_UI_LANGUAGE) -> str:
+    return load_ui_language_revision(default)[0]
 
 
 def save_ui_language(language: str) -> None:
@@ -284,6 +293,11 @@ def save_ui_language(language: str) -> None:
     ui_settings = settings.get(GROUP_UI, {})
     if not isinstance(ui_settings, dict):
         ui_settings = {}
+    generation = ui_settings.get("language_generation", 0)
+    if type(generation) is not int or generation < 0:
+        raise ValueError("表示言語の更新世代が不正です。")
+    if ui_settings.get(KEY_UI_LANGUAGE, DEFAULT_UI_LANGUAGE) != language:
+        ui_settings["language_generation"] = generation + 1
     ui_settings[KEY_UI_LANGUAGE] = language
     settings[GROUP_UI] = ui_settings
     _write_settings_file(settings)
@@ -438,6 +452,37 @@ def save_plugin_settings(plugin_id: str, data: dict[str, object]) -> None:
         plugins_group = {}
     plugins_group[plugin_id] = data
     settings[GROUP_PLUGINS] = plugins_group
+    _write_settings_file(settings)
+
+
+def load_mcp_settings() -> McpSettings:
+    from autolingua2.ir.validation import array, boolean
+    data = record(_read_settings_file().get(GROUP_MCP, {}))
+    port = data.get("port", 0)
+    if type(port) is not int or not 0 <= port <= 65535:
+        raise ValueError("MCPポート番号が不正です。")
+    permissions: list[Permission] = [permission for permission in PERMISSIONS
+                   if permission in array(data.get("permissions", list(PERMISSIONS)))]
+    connections: list[ExternalMcpConnection] = []
+    for value in array(data.get("connections", [])):
+        item = record(value)
+        transport = text(item.get("transport"))
+        if transport not in {"stdio", "http"}:
+            raise ValueError("MCP接続方式が不正です。")
+        connections.append(ExternalMcpConnection(
+            text(item.get("id"), nonempty=True), text(item.get("name"), nonempty=True),
+            "stdio" if transport == "stdio" else "http", text(item.get("address"), nonempty=True),
+            [text(arg) for arg in array(item.get("arguments", []))], text(item.get("token", "")),
+        ))
+    if len({connection.id for connection in connections}) != len(connections):
+        raise ValueError("MCP接続IDが重複しています。")
+    return McpSettings(boolean(data.get("enabled", False)), port,
+                       text(data.get("token", "")), permissions, connections)
+
+
+def save_mcp_settings(value: McpSettings) -> None:
+    settings = _read_settings_file()
+    settings[GROUP_MCP] = asdict(value)
     _write_settings_file(settings)
 
 

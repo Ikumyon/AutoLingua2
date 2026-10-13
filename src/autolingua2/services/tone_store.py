@@ -67,6 +67,15 @@ def _block(value: object) -> ToneBlock:
     return ToneBlock(branches)
 
 
+def tone_from_document(value: object) -> Tone:
+    item = record(value)
+    tone_id = text(required(item, "id"), nonempty=True)
+    name = text(required(item, "name"), nonempty=True)
+    if "block" in item:
+        return ConditionalTone(tone_id, name, _block(item["block"]))
+    return ToneItem(tone_id, name, text(required(item, "prompt"), nonempty=True))
+
+
 class ToneStore:
     def __init__(self, path: Path = TONE_PATH) -> None:
         self.path = path
@@ -81,13 +90,7 @@ class ToneStore:
             raise ValueError("対応していない口調データのバージョンです。")
         tones = []
         for value in array(required(data, "tones")):
-            item = record(value)
-            tone_id = text(required(item, "id"), nonempty=True)
-            name = text(required(item, "name"), nonempty=True)
-            if "block" in item:
-                tones.append(ConditionalTone(tone_id, name, _block(item["block"])))
-            else:
-                tones.append(ToneItem(tone_id, name, text(required(item, "prompt"), nonempty=True)))
+            tones.append(tone_from_document(value))
         validate_tones(tones)
         return tones
 

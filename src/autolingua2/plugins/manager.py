@@ -1,5 +1,6 @@
 """Host-side plugin management: explicit loading, validation, routing and lifecycle."""
 from __future__ import annotations
+from autolingua2.services.operation_contract import OperationContribution
 
 from collections.abc import Callable, Mapping
 import hashlib
@@ -80,6 +81,7 @@ class PluginManager:
         self._export_settings: dict[str, ExportSettingsPanel] = {}
         self._providers: dict[str, AiProviderPlugin] = {}
         self._voice_inputs: dict[str, VoiceInputProvider] = {}
+        self._operations: dict[str, tuple[OperationContribution, ...]] = {}
         self._ui: dict[str, CreationAdapter] = {}
         self._ui_contributions: dict[str, UIContribution] = {}
         self._errors: list[str] = []
@@ -105,6 +107,10 @@ class PluginManager:
     @property
     def voice_inputs(self) -> Mapping[str, VoiceInputProvider]:
         return MappingProxyType(self._voice_inputs)
+
+    @property
+    def operations(self) -> Mapping[str, tuple[OperationContribution, ...]]:
+        return MappingProxyType(self._operations)
 
     @property
     def exporters(self) -> Mapping[str, TranslationExporter]:
@@ -160,6 +166,19 @@ class PluginManager:
     def errors(self) -> tuple[str, ...]:
         return tuple(self._errors)
 
+    def capabilities(self, plugin_id: str) -> tuple[str, ...]:
+        """Describe successfully registered capabilities without exposing objects."""
+        if plugin_id not in self._contexts:
+            return ()
+        return tuple(name for name, registered in (
+            ("parser", plugin_id in self._parsers),
+            ("ai_provider", plugin_id in self._providers),
+            ("ui", plugin_id in self._ui_contributions),
+            ("exporter", any(key.startswith(f"{plugin_id}:") for key in self._exporters)),
+            ("voice_input", plugin_id in self._voice_inputs),
+            ("operations", plugin_id in self._operations),
+        ) if registered)
+
     def report_error(self, label: str, error: Exception) -> None:
         message = f"{label}: {type(error).__name__}: {error}"
         self._errors.append(message)
@@ -182,8 +201,16 @@ class PluginManager:
             parser, provider, ui = contribution.parser, contribution.provider, contribution.ui
             voice_input = contribution.voice_input
             if (parser is None and provider is None and ui is None
-                    and voice_input is None and not contribution.exporters):
+                    and voice_input is None and not contribution.exporters and not contribution.operations):
                 raise ValueError("Plugin has no capabilities")
+            operation_names: set[str] = set()
+            for operation in contribution.operations:
+                if (not isinstance(operation, OperationContribution) or not operation.tool.name
+                        or operation.tool.name in operation_names or not callable(operation.execute)
+                        or operation.tool.permission not in {"read", "edit", "translate", "export"}
+                        or operation.tool.input_schema.get("type") != "object"):
+                    raise ValueError("Invalid or duplicate public operation")
+                operation_names.add(operation.tool.name)
             exporter_ids: set[str] = set()
             for exporter in contribution.exporters:
                 if (not isinstance(exporter, TranslationExporter) or not exporter.id.strip()
@@ -276,6 +303,8 @@ class PluginManager:
                 self._providers[plugin_id] = provider
             if voice_input is not None:
                 self._voice_inputs[plugin_id] = voice_input
+            if contribution.operations:
+                self._operations[plugin_id] = contribution.operations
             if creation_adapter is not None:
                 self._ui[plugin_id] = creation_adapter
             if ui_contribution is not None:
@@ -316,6 +345,7 @@ class PluginManager:
         self._export_settings.clear()
         self._providers.clear()
         self._voice_inputs.clear()
+        self._operations.clear()
         self._ui.clear()
         self._ui_contributions.clear()
         self._display_callbacks.clear()

@@ -19,24 +19,11 @@ from autolingua2.services.settings_store import (
     mark_initial_setup_seen, save_initial_setup, save_ui_language,
 )
 from autolingua2.ui.components.ai_model_list import ModelListController
+from autolingua2.ui.components.ai_setup_panel import create_plugin_panel
 from autolingua2.ui.i18n import normalize_language, tr
 from autolingua2.ui.icons import IconManager
 from .base import load_ui, require_child
 from .self_translation import SelfTranslationController
-
-
-def create_plugin_panel(
-    option: AiSetupOption, parent: QWidget, initial: AiSetupValues, callbacks: AiSetupCallbacks,
-) -> AiSetupPanel:
-    factory = option.create_panel
-    if factory is None:
-        raise ValueError("設定画面が登録されていません。")
-    panel = factory(parent, deepcopy(initial), callbacks)
-    if (not isinstance(panel, AiSetupPanel) or not isinstance(panel.widget, QWidget)
-            or not isinstance(panel.ready, bool)):
-        raise TypeError("設定画面の公開契約が不正です。")
-    panel.widget.setParent(parent)
-    return panel
 
 
 class CommonSetupPanel(QObject):

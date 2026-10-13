@@ -15,6 +15,14 @@ class ConfirmedTranslation:
 
 
 @dataclass(slots=True)
+class TranslationNotes:
+    candidates: list[str] = field(default_factory=list)
+    rationale: str = ""
+    sources: list[str] = field(default_factory=list)
+    review: str = ""
+
+
+@dataclass(slots=True)
 class TranslationRecord:
     target_text: str = ""
     state: UnitState = UnitState.UNTRANSLATED
@@ -22,6 +30,8 @@ class TranslationRecord:
     tone: ToneItem | None = None
     pending_confirmation: ConfirmedTranslation | None = None
     translating: bool = False
+    notes: TranslationNotes = field(default_factory=TranslationNotes)
+    generation: int = 0
 
 
 @dataclass(slots=True)
@@ -29,6 +39,9 @@ class Workspace:
     language_code: str
     records: dict[str, TranslationRecord] = field(default_factory=dict)
     output_slot: str = ""
+    glossary_id: str = ""
+    tone_id: str = ""
+    generation: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +92,8 @@ class WorkspaceUnit:
 
     @target_text.setter
     def target_text(self, value: str) -> None:
+        if self.record.target_text != value:
+            self.record.generation += 1
         self.record.target_text = value
 
     @property
@@ -87,6 +102,8 @@ class WorkspaceUnit:
 
     @state.setter
     def state(self, value: UnitState) -> None:
+        if self.record.state != value:
+            self.record.generation += 1
         self.record.state = value
         if value in {UnitState.HUMAN_REVIEWED, UnitState.AI_REVIEWED}:
             self.record.source_changed = False

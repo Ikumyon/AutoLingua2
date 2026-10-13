@@ -7,7 +7,7 @@ mod security;
 
 pub use desktop::open_folder;
 pub use ipc::{Listener, Stream};
-pub use paths::{development_python, log_directory, runtime_root};
+pub use paths::{canonicalize_path, development_python, log_directory, runtime_root};
 pub use process::{configure_core_command, executable_name, ProcessWatch};
 pub use security::{identity, open_lock, private_directory, random};
 

@@ -10,7 +10,7 @@ pub(crate) use linux as os_impl;
 #[cfg(not(any(windows, target_os = "linux")))]
 compile_error!("AUTOlingua2 supports Windows and Linux only");
 
-pub use os_impl::{executable_name, development_python, configure_core_command, log_directory, open_folder};
+pub use os_impl::{canonicalize_path, executable_name, development_python, configure_core_command, log_directory, open_folder};
 
 #[cfg(feature = "python")]
 pub mod bindings;

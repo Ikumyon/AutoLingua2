@@ -1,26 +1,28 @@
+"""Cancellable service work on immutable snapshots, shared with UI operations."""
 import logging
+from collections.abc import Callable
 from threading import Event
 from typing import Any
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QObject, QThread, Signal
 from autolingua2.infrastructure.operations import operation_scope, OperationCancelled
 
 
 class OperationWorker(QThread):
     progress = Signal(str)
 
-    def __init__(self, operation, parent=None):
+    def __init__(self, operation: Callable[[], Any], parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.operation = operation
         self.cancel_event = Event()
         self.result: Any = None
         self.error: Exception | None = None
 
-    def requestInterruption(self):
+    def requestInterruption(self) -> None:
         self.cancel_event.set()
         super().requestInterruption()
 
-    def run(self):
+    def run(self) -> None:
         try:
             with operation_scope(self.cancel_event, self.progress.emit):
                 self.result = self.operation()

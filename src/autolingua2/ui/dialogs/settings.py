@@ -21,6 +21,8 @@ from .settings_filter_rules import FilterRulesPageController
 from .settings_general import GeneralSettingsPageController
 from .settings_tone import TonePageController
 from .source_watch import WatchPageController
+from .settings_mcp import McpSettingsPage
+from autolingua2.services.mcp_server import McpServer
 
 
 class SettingsDialogController(SimpleDialogController):
@@ -38,6 +40,7 @@ class SettingsDialogController(SimpleDialogController):
         glossary_id: str = "", glossary_source_language: str = "",
         glossary_target_language: str = "", tone_id: str = "",
         on_saved: Callable[[SettingsDialogController], None] | None = None,
+        mcp_server: McpServer | None = None,
     ) -> None:
         super().__init__("dialogs/settings/SettingsDialog.ui", parent)
         self.plugins = entrance.plugins
@@ -54,6 +57,10 @@ class SettingsDialogController(SimpleDialogController):
         self._category_items: dict[str, QTreeWidgetItem] = {}
 
         self._mount_pages()
+        self.mcp_page = McpSettingsPage(mcp_server, self._stack)
+        self._stack.addWidget(self.mcp_page)
+        self._add_category("mcp", tr("SettingsDialog", "MCP"), self.mcp_page, self._category_items["application"])
+        self.dialog.finished.connect(lambda result: self.mcp_page.tester.close())
         self.tone_page = TonePageController(
             require_child(self.dialog, QWidget, "SettingsTonePage"), self.icon_manager, tone_id,
         )
@@ -82,7 +89,9 @@ class SettingsDialogController(SimpleDialogController):
             self.dialog, self.plugins.providers, self.icon_manager, provider_id,
             models or {}, selected_models or {}, api_keys or {}, concurrency,
             high_model, low_model, low_model_range,
+            setup_options=self.plugins.ai_setup_options,
         )
+        self.dialog.finished.connect(lambda _result: self.ai_page.cancel())
         self.ai_page.save_ready.connect(self._finish_validation)
         self.ai_page.save_aborted.connect(self._save_aborted)
         self.ai_page.show_requested.connect(lambda: self.select_category("ai"))
@@ -269,6 +278,8 @@ class SettingsDialogController(SimpleDialogController):
             self.ai_page.save()
             self._saving_category = "application"
             self.general_page.save()
+            self._saving_category = "mcp"
+            self.mcp_page.save()
             self._saving_category = "filter_rules"
             self.filter_rules_page.save()
             for provider, widget in self._plugin_settings_widgets:

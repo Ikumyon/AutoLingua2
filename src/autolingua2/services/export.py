@@ -8,8 +8,8 @@ from autolingua2.ir.imported import ImportedTranslation
 from autolingua2.services.export_contract import TranslationExporter
 
 
-def export_translation(workspaces: list[ImportedTranslation], exporter: TranslationExporter,
-                       directory: Path, settings: dict[str, object]) -> list[Path]:
+def plan_export_translation(workspaces: list[ImportedTranslation], exporter: TranslationExporter,
+                            directory: Path, settings: dict[str, object]) -> list[tuple[Path, bytes]]:
     if not workspaces:
         raise ValueError("出力するワークスペースがありません。")
     if any(not workspace.project.sources for workspace in workspaces):
@@ -39,6 +39,12 @@ def export_translation(workspaces: list[ImportedTranslation], exporter: Translat
                for parent in path.parents if parent.is_relative_to(directory)):
             raise ValueError(f"出力ファイルとフォルダが競合しています: {path}")
 
+    return outputs
+
+
+def export_translation(workspaces: list[ImportedTranslation], exporter: TranslationExporter,
+                       directory: Path, settings: dict[str, object]) -> list[Path]:
+    outputs = plan_export_translation(workspaces, exporter, directory, settings)
     for path, content in outputs:
         check_cancelled()
         report_progress(f"保存しています: {path.name}")

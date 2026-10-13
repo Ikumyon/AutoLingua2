@@ -57,7 +57,6 @@ class AiNetworkClient(QObject):
                 reply.abort()
                 reply.deleteLater()
         self._active_replies.clear()
-        self.translation_slots.clear()
         self._validation_remaining = 0
 
     def validate_models(
@@ -255,6 +254,11 @@ class AiNetworkClient(QObject):
             if reply.isRunning():
                 reply.abort()
 
+    def cancel_request(self, request_id: str) -> None:
+        for reply in tuple(self._active_replies):
+            if reply.property("request_id") == request_id and reply.isRunning():
+                reply.abort()
+
     def _post_ai(
         self, request_id: str, translator: BaseHttpTranslator, payload: dict[str, Any],
         headers: dict[str, str], timeout_sec: float, *, chat: bool, structured: bool = False,
@@ -264,6 +268,7 @@ class AiNetworkClient(QObject):
             request.setRawHeader(key.encode("utf-8"), value.encode("utf-8"))
         request.setTransferTimeout(int(timeout_sec * 1000))
         reply = self._nam.post(request, QByteArray(json.dumps(payload).encode("utf-8")))
+        reply.setProperty("request_id", request_id)
         self._active_replies.append(reply)
         reply.finished.connect(lambda: self._handle_ai_reply(reply, request_id, translator, chat=chat, structured=structured))
 

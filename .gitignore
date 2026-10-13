@@ -45,3 +45,5 @@ scripts/
 fixtures/
 .gitignore
 AGENTS.md
+web/node_modules/
+assets/chat/

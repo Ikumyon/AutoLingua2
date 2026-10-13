@@ -1,5 +1,6 @@
 """Public registration context and UI-capable plugin API."""
 from __future__ import annotations
+from autolingua2.services.operation_contract import OperationContribution
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -177,6 +178,7 @@ class PluginContribution:
     ui: UIContribution | None = None
     exporters: list[TranslationExporter] = field(default_factory=list)
     voice_input: VoiceInputProvider | None = None
+    operations: tuple[OperationContribution, ...] = ()
 
 
 class PluginContext:

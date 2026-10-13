@@ -1,32 +1,31 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+import json
+from typing import Any
+from uuid import uuid4
 
-from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSize, Qt, QTimer, Slot
-from PySide6.QtGui import QAction, QActionGroup, QIcon, QInputMethodEvent, QKeyEvent, QPainter, QPaintEvent, QPalette
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSize, Qt, QTimer, QUrl, Slot
+from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QDockWidget, QHBoxLayout, QLabel, QMainWindow, QMenu, QPlainTextEdit,
-    QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
+    QApplication, QComboBox, QDockWidget, QFormLayout, QLabel, QMainWindow, QMenu,
+    QPushButton, QWidget, QWidgetAction,
 )
 
 from autolingua2.services.ai_chat import AiChatSession, ChatFile, ChatReference
+from autolingua2.services.application_operations import ApplicationOperations
+from autolingua2.services.chat_references import ChatAttachment
+from autolingua2.ui.components.chat_composer import ChatComposer
+from autolingua2.ui.components.chat_web_view import ChatWebView
 from autolingua2.services.ai_providers.base import BaseHttpTranslator
 from autolingua2.services.ai_providers.registry import ProviderRegistry
 from autolingua2.services.settings_store import AiSettings, load_voice_input_provider
 from autolingua2.services.voice_input import VoiceInputService
 from autolingua2.services.voice_input_contract import VoiceInputProvider
 from autolingua2.ui.components.combo_menu_button import ComboMenuButton
-from autolingua2.ui.dialogs.base import SimpleDialogController, require_child
+from autolingua2.ui.dialogs.base import require_child
 from autolingua2.ui.i18n import tr
-
-
-class ChatUserMessage(QWidget):
-    def paintEvent(self, event: QPaintEvent) -> None:
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(self.palette().brush(QPalette.ColorRole.AlternateBase))
-        painter.drawRoundedRect(self.rect(), 14, 14)
+from autolingua2.ui.operation_panel import show_details
 
 
 class AiChatDockController(QObject):
@@ -34,8 +33,9 @@ class AiChatDockController(QObject):
         self, window: QMainWindow, registry: ProviderRegistry, settings: Callable[[], AiSettings],
         current_file: Callable[[], ChatFile | None],
         selected_references: Callable[[], tuple[ChatReference, ...]],
-        select_units: Callable[[list[str]], None],
+        selection_origin: Callable[[], str],
         *, voice_input_providers: Mapping[str, VoiceInputProvider],
+        operations: ApplicationOperations,
         get_icon: Callable[[str], QIcon],
         chat_icon: Callable[[str], QIcon],
     ) -> None:
@@ -44,26 +44,24 @@ class AiChatDockController(QObject):
         self.registry = registry
         self.settings = settings
         self.selected_references = selected_references
-        self.select_units = select_units
+        self.selection_origin = selection_origin
         self._get_icon = get_icon
         self._chat_icon = chat_icon
-        self._answer_icons: list[tuple[str, QLabel, QPushButton]] = []
-        self.session = AiChatSession(current_file, self)
+        self._clear_on_completion = False
+        self.operations = operations
+        self.current_file = current_file
+        self.session = AiChatSession(operations, self)
         self.voice_input = VoiceInputService(voice_input_providers, self)
         self.dock = require_child(window, QDockWidget, "dockAiChat")
         self.action = require_child(window, QAction, "actionToggleAiChat")
-        self.history = require_child(window, QScrollArea, "scrollChatHistory")
-        self.history_content = QWidget()
-        self.history_content.setAutoFillBackground(True)
-        self.history_content.setBackgroundRole(QPalette.ColorRole.Base)
-        self.history_layout = QVBoxLayout(self.history_content)
-        self.history_layout.setContentsMargins(8, 8, 8, 8)
-        self.history_layout.setSpacing(24)
-        self.history_layout.addStretch()
-        self.history.setWidget(self.history_content)
-        self.history.verticalScrollBar().rangeChanged.connect(self._scroll_to_end)
-        self.input = require_child(window, QPlainTextEdit, "editChatMessage")
-        self._ime_placeholder: str | None = None
+        self.history = require_child(window, ChatWebView, "scrollChatHistory")
+        self.history.markdown_icon = self._icon_data(self._get_icon("markdown"))
+        self.input = require_child(window, ChatComposer, "editChatMessage")
+        self.input.send_requested.connect(self._send)
+        self.input.reference_requested.connect(self._view_reference)
+        self.input.reference_error.connect(lambda error: self._append("error", error))
+        self.history.ready.connect(self._web_ready)
+        self.history.action_requested.connect(self._web_action)
         self.model_button = require_child(window, ComboMenuButton, "buttonChatModel")
         control_height = require_child(window, QComboBox, "comboTargetLanguage").sizeHint().height()
         self.model_button.setFixedHeight(control_height)
@@ -75,11 +73,29 @@ class AiChatDockController(QObject):
         self.voice_button.setFixedSize(control_height, control_height)
         self.voice_button.setIconSize(QSize(send_icon_size, send_icon_size))
         self.new_button = require_child(window, QPushButton, "buttonChatNew")
-        self.add_button = require_child(window, QPushButton, "buttonChatAddReferences")
-        self.clear_button = require_child(window, QPushButton, "buttonChatClearReferences")
-        self.view_button = require_child(window, QPushButton, "buttonChatViewReferences")
-        self.reference_label = require_child(window, QLabel, "labelChatReferences")
         self.status = require_child(window, QLabel, "labelChatStatus")
+        self.scope_combo = QComboBox(window)
+        self.scope_combo.setToolTip(tr("AiChat", "操作の対象範囲"))
+        for label, value in (("プロジェクト全体", "project"), ("現在のファイル", "file"), ("選択行", "selection")):
+            self.scope_combo.addItem(tr("AiChat", label), value)
+        self.execution_combo = QComboBox(window)
+        self.execution_combo.addItem(tr("AiChat", "提案を確認"), True)
+        self.execution_combo.addItem(tr("AiChat", "依頼どおり実行"), False)
+        self.execution_combo.currentIndexChanged.connect(self._execution_changed)
+        options = require_child(window, QPushButton, "buttonChatOptions")
+        menu = QMenu(options)
+        form = QWidget(menu)
+        form_layout = QFormLayout(form)
+        self._scope_label = QLabel(tr("AiChat", "操作の対象範囲"), form)
+        self._execution_label = QLabel(tr("AiChat", "実行方法"), form)
+        form_layout.addRow(self._scope_label, self.scope_combo)
+        form_layout.addRow(self._execution_label, self.execution_combo)
+        form_action = QWidgetAction(menu)
+        form_action.setDefaultWidget(form)
+        menu.addAction(form_action)
+        options.setMenu(menu)
+        operations.operation_changed.connect(self._operation_changed)
+        operations.job_changed.connect(self._job_changed)
         self._visible = True
         self._changing_visibility = False
         self._choice: tuple[str, str] | None = None
@@ -88,29 +104,22 @@ class AiChatDockController(QObject):
         self._refresh_pending = False
         self.refresh_choices()
         self.model_button.installEventFilter(self)
-        self.send_button.clicked.connect(self._send)
+        self.send_button.clicked.connect(lambda: self._send())
         self.voice_button.clicked.connect(self._toggle_voice_input)
         self.new_button.clicked.connect(self.reset)
-        self.add_button.clicked.connect(self._add_references)
-        self.clear_button.clicked.connect(lambda: self.session.set_references(()))
-        self.view_button.clicked.connect(self._view_references)
         self.action.triggered.connect(self._toggle)
         self.dock.toggleViewAction().toggled.connect(self._dock_toggled)
         self.session.message.connect(self._append)
         self.session.busy_changed.connect(self._busy_changed)
-        self.session.references_changed.connect(self._references_changed)
-        self.session.selection_requested.connect(self._select)
         self.session.completed.connect(self._completed)
         self.voice_input.changed.connect(self._update_input_controls)
         self.voice_input.text_recognized.connect(self._insert_voice_text)
         self.voice_input.error.connect(self._voice_error)
-        self.input.installEventFilter(self)
         self.dock.installEventFilter(self)
         application = QCoreApplication.instance()
         if application is None:
             raise RuntimeError("AI chat requires an application instance")
         application.aboutToQuit.connect(self.close)
-        self._references_changed()
         self.refresh_voice_input()
 
     def refresh_voice_input(self) -> None:
@@ -143,7 +152,7 @@ class AiChatDockController(QObject):
         ai_busy = self.session.busy
         voice_busy = self.voice_input.active
         self.input.setReadOnly(ai_busy or voice_busy)
-        self.send_button.setEnabled(not voice_busy)
+        self.send_button.setEnabled(not voice_busy and self.history.is_ready)
         self.send_button.setIcon(self._get_icon("stop" if ai_busy else "send-24"))
         send_label = tr("AiChat", "停止") if ai_busy else tr("AiChat", "送信")
         self.send_button.setToolTip(send_label)
@@ -160,7 +169,7 @@ class AiChatDockController(QObject):
         else:
             voice_label = tr("AiChat", "音声入力を開く")
             status = (tr("AiChat", "AIが応答しています…") if ai_busy else
-                      tr("AiChat", "操作対象：現在のファイル（検索・選択のみ）"))
+                      "" if self.history.is_ready else tr("AiChat", "Web表示の準備を待っています…"))
         self.voice_button.setToolTip(voice_label)
         self.voice_button.setAccessibleName(voice_label)
         self.status.setText(status)
@@ -231,13 +240,15 @@ class AiChatDockController(QObject):
         self.model_button.setToolTip(f"{provider_name} / {model_name}\n" +
                                     tr("AiChat", "切り替え後の送信では過去の会話と参照も送信されます。"))
 
-    def _send(self) -> None:
+    def _send(self, submitted_text: str | None = None) -> None:
         if self.voice_input.active:
             return
         if self.session.busy:
             self.session.stop()
             return
-        text = self.input.toPlainText().strip()
+        if not self.history.is_ready:
+            return
+        text, attachments = self.input.message() if submitted_text is None else (submitted_text, ())
         if not text:
             return
         if self._choice is None:
@@ -253,12 +264,26 @@ class AiChatDockController(QObject):
             translator = provider.create(key, model)
             if not isinstance(translator, BaseHttpTranslator):
                 raise ValueError(tr("AiChat", "このプロバイダはチャットに対応していません。"))
-            self.session.send(text, translator)
+            current = self.current_file()
+            scope = self.scope_combo.currentData()
+            references = self.selected_references()
+            if scope == "file" and current is None:
+                raise ValueError(tr("AiChat", "対象ファイルを選択してください。"))
+            if scope == "selection" and not references:
+                raise ValueError(tr("AiChat", "参照に追加する文章を選択してください。"))
+            self.operations.scope_language = current.identity[1] if current is not None and scope != "project" else ""
+            self.operations.scope_file = (current.identity[2] if current is not None
+                                          and self.scope_combo.currentData() == "file" else "")
+            self.operations.scope_selection = ([reference.id for reference in self.selected_references()]
+                if self.scope_combo.currentData() == "selection" else [])
+            self._clear_on_completion = submitted_text is None
+            self.session.send(text, translator, attachments)
         except (ValueError, RuntimeError) as exc:
             self._append("error", str(exc))
 
     def _completed(self) -> None:
-        self.input.clear()
+        if self._clear_on_completion:
+            self.input.clear()
 
     def _busy_changed(self, busy: bool) -> None:
         if busy:
@@ -267,135 +292,163 @@ class AiChatDockController(QObject):
             self.refresh_choices()
         self.model_button.setEnabled(not busy and bool(self._choices))
         self.new_button.setEnabled(not busy)
-        self.add_button.setEnabled(not busy)
-        self.clear_button.setEnabled(not busy and bool(self.session.references))
+        self.scope_combo.setEnabled(not busy)
+        self.execution_combo.setEnabled(not busy)
+        self.history.busy = busy
+        self.history.publish()
         self._update_input_controls()
 
     def _append(self, role: str, text: str) -> None:
-        message = ChatUserMessage() if role == "user" else QWidget()
-        layout = QVBoxLayout(message)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(10)
-        provider_id: str | None = None
-        icon_label: QLabel | None = None
-        if role == "assistant":
-            if self._choice is not None:
-                provider_id = self._choice[0]
-                _, model_name = self._choices[self._choice]
-                header = QHBoxLayout()
-                icon_label = QLabel(message)
-                icon_label.setFixedSize(20, 20)
-                icon_label.setPixmap(self._chat_icon(provider_id).pixmap(QSize(20, 20)))
-                header.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
-                model = self._text_label(model_name, message)
-                font = model.font()
-                font.setPointSizeF(max(1.0, font.pointSizeF() - 1.0))
-                model.setFont(font)
-                header.addWidget(model, 1)
-                layout.addLayout(header)
-        elif role != "user":
-            label = tr("AiChat", "エラー") if role == "error" else tr("AiChat", "操作")
-            layout.addWidget(self._text_label(label, message))
-        layout.addWidget(self._text_label(text, message))
-        if role == "assistant":
-            actions = QHBoxLayout()
-            actions.addStretch()
-            copy_button = QPushButton(message)
-            copy_button.setFlat(True)
-            copy_button.setFixedSize(28, 28)
-            copy_button.setIcon(self._get_icon("copy"))
-            copy_label = tr("AiChat", "回答をコピー")
-            copy_button.setToolTip(copy_label)
-            copy_button.setAccessibleName(copy_label)
-            copy_timer = QTimer(copy_button)
-            copy_timer.setSingleShot(True)
-            copy_timer.setInterval(1500)
-            copy_timer.timeout.connect(lambda: self._reset_copy_button(copy_button))
-            copy_button.clicked.connect(lambda: self._copy_answer(text, copy_button, copy_timer))
-            actions.addWidget(copy_button)
-            layout.addLayout(actions)
-            if provider_id is not None and icon_label is not None:
-                self._answer_icons.append((provider_id, icon_label, copy_button))
-        self.history_layout.insertWidget(self.history_layout.count() - 1, message)
+        model = self._choices[self._choice][1] if role == "assistant" and self._choice is not None else ""
+        provider = self._choice[0] if role == "assistant" and self._choice is not None else ""
+        self.history.append(role, text, model, provider, self._icon_data(self._chat_icon(provider)) if provider else "")
 
     @staticmethod
-    def _text_label(text: str, parent: QWidget) -> QLabel:
-        label = QLabel(text, parent)
-        label.setTextFormat(Qt.TextFormat.PlainText)
-        label.setWordWrap(True)
-        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        return label
-
-    def _copy_answer(self, text: str, button: QPushButton, timer: QTimer) -> None:
-        clipboard = QApplication.clipboard()
-        if clipboard is None:
-            raise RuntimeError("Clipboard is unavailable")
-        clipboard.setText(text)
-        button.setProperty("answerCopied", True)
-        button.setIcon(self._get_icon("check"))
-        timer.start()
-
-    def _reset_copy_button(self, button: QPushButton) -> None:
-        button.setProperty("answerCopied", False)
-        button.setIcon(self._get_icon("copy"))
-
-    def _scroll_to_end(self, minimum: int, maximum: int) -> None:
-        self.history.verticalScrollBar().setValue(maximum)
+    def _icon_data(icon: QIcon) -> str:
+        from base64 import b64encode
+        from PySide6.QtCore import QBuffer, QByteArray, QIODeviceBase
+        data = QByteArray()
+        buffer = QBuffer(data)
+        if not buffer.open(QIODeviceBase.OpenModeFlag.WriteOnly):
+            raise RuntimeError("Cannot encode chat icon")
+        if not icon.pixmap(QSize(20, 20)).save(buffer, "PNG"):
+            raise RuntimeError("Cannot save chat icon")
+        buffer.close()
+        return "data:image/png;base64," + b64encode(bytes(data.data())).decode("ascii")
 
     def refresh_icons(self, provider_id: str | None = None) -> None:
-        for answer_provider, label, button in self._answer_icons:
-            if provider_id is None or provider_id == answer_provider:
-                label.setPixmap(self._chat_icon(answer_provider).pixmap(QSize(20, 20)))
-            button.setIcon(self._get_icon("check" if button.property("answerCopied") is True else "copy"))
+        for item in self.history.items.values():
+            provider = item.get("provider")
+            if isinstance(provider, str) and provider and (provider_id is None or provider == provider_id):
+                item["icon"] = self._icon_data(self._chat_icon(provider))
+        self.history.markdown_icon = self._icon_data(self._get_icon("markdown"))
+        self.history.publish()
         self.voice_button.setIcon(self._get_icon("microphone"))
         self._update_input_controls()
 
-    def _add_references(self) -> None:
+    def selected_attachment(self) -> ChatAttachment | None:
         references = self.selected_references()
         if not references:
-            self._append("operation", tr("AiChat", "参照に追加する文章を選択してください。"))
+            return None
+        origin = self.selection_origin()
+        name = tr("AiChat", "選択した{count}行").format(count=len(references))
+        return ChatAttachment(uuid4().hex, name, origin,
+                              json.dumps([reference.document() for reference in references], ensure_ascii=False, indent=2))
+
+    def insert_selected_reference(self) -> None:
+        if self.session.busy or self.voice_input.active:
             return
-        self.session.set_references(references)
+        attachment = self.selected_attachment()
+        if attachment is not None:
+            self._toggle(True)
+            self.input.insert_reference(attachment)
 
-    def _references_changed(self) -> None:
-        count = len(self.session.references)
-        self.reference_label.setText(tr("AiChat", "参照：選択した文章 {count}件").format(count=count)
-                                     if count else tr("AiChat", "参照：なし"))
-        self.view_button.setEnabled(count > 0)
-        self.clear_button.setEnabled(count > 0 and not self.session.busy)
+    @Slot(object)
+    def _view_reference(self, value: object) -> None:
+        if not isinstance(value, ChatAttachment):
+            raise TypeError("Invalid chat reference")
+        show_details(self.window, value.name, value.origin + "\n\n" + value.content)
 
-    def _view_references(self) -> None:
-        dialog = SimpleDialogController("ChatReferencesDialog.ui", self.window)
-        editor = require_child(dialog.dialog, QPlainTextEdit, "editReferences")
-        editor.setPlainText("\n\n".join(f"{r.key}\n原文：{r.source}\n訳文：{r.translation}"
-                                       for r in self.session.references))
-        dialog.exec()
+    @Slot(str)
+    def _web_ready(self, instructions: str) -> None:
+        self.session.rendering_instructions = instructions
+        self._update_input_controls()
 
-    def _select(self, value: object) -> None:
-        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-            raise TypeError("選択IDの形式が不正です。")
-        self.select_units([str(item) for item in value])
+    @Slot(str)
+    def _web_action(self, payload: str) -> None:
+        try:
+            value = json.loads(payload)
+            if not isinstance(value, dict) or not isinstance(value.get("type"), str):
+                raise ValueError("Invalid UI action")
+            action = value["type"]
+            if action == "copy":
+                text = value.get("text")
+                if not isinstance(text, str):
+                    raise ValueError("Invalid clipboard text")
+                clipboard = QApplication.clipboard()
+                if clipboard is None:
+                    raise RuntimeError("Clipboard is unavailable")
+                clipboard.setText(text)
+            elif action == "open_link":
+                url_text = value.get("url")
+                if not isinstance(url_text, str):
+                    raise ValueError("Invalid link")
+                url = QUrl(url_text)
+                if url.scheme() not in {"https", "http"}:
+                    raise ValueError("Unsupported link")
+                QDesktopServices.openUrl(url)
+            elif action == "submit":
+                source = self.history.items.get(value.get("itemId", ""))
+                text = value.get("text")
+                if source is None or source.get("role") != "assistant" or not isinstance(text, str):
+                    raise ValueError("Invalid UI submission")
+                if not self.session.busy:
+                    self._send(text)
+            elif action in {"apply_operation", "discard_operation", "undo_operation", "view_operation"}:
+                key = value.get("id")
+                if not isinstance(key, str):
+                    raise ValueError("Invalid operation id")
+                proposal = self.operations.proposals.get(key)
+                if proposal is None or proposal.project_id != self.operations.project_id:
+                    raise ValueError("操作の対象が終了しました")
+                document = proposal.document()
+                if action == "view_operation":
+                    rows = [row for row in document["changes"] if row.get("language")]
+                    if rows:
+                        self.operations.selection_requested.emit(rows[0]["language"], [row["id"] for row in rows])
+                else:
+                    arguments: dict[str, Any] = {"operation_id": key}
+                    if action == "apply_operation":
+                        ids = value.get("ids")
+                        available = {row["id"] for row in document["changes"]}
+                        if not isinstance(ids, list) or not all(isinstance(item, str) and item in available for item in ids):
+                            raise ValueError("Invalid selected changes")
+                        arguments["ids"] = ids
+                    self._operation_changed(self.operations.execute(action, arguments, trusted_ui=True))
+            elif action == "cancel_job":
+                key = value.get("id")
+                if not isinstance(key, str):
+                    raise ValueError("Invalid job id")
+                job = self.operations.jobs.get(key)
+                if job is None or job.project_id != self.operations.project_id:
+                    raise ValueError("処理の対象が終了しました")
+                self.operations.execute(action, {"job_id": key}, trusted_ui=True)
+            else:
+                raise ValueError("Unsupported UI action")
+        except (ValueError, RuntimeError, TypeError) as exc:
+            self._append("error", str(exc))
+
+    def _execution_changed(self, _index: int) -> None:
+        self.operations.confirm_changes = bool(self.execution_combo.currentData())
+
+    def _operation_changed(self, value: object) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("Invalid operation document")
+        document: dict[str, Any] = value
+        self.history.update_document("operation", document)
+
+    def _job_changed(self, value: object) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("Invalid job document")
+        document: dict[str, Any] = value
+        self.history.update_document("job", document)
 
     def reset(self) -> None:
         self.voice_input.cancel()
         self.session.reset()
-        self._answer_icons.clear()
-        while self.history_layout.count() > 1:
-            item = self.history_layout.takeAt(0)
-            if item is None:
-                raise RuntimeError("Missing chat layout item")
-            widget = item.widget()
-            if widget is None:
-                raise RuntimeError("Missing chat message widget")
-            widget.hide()
-            widget.deleteLater()
+        self.history.reset()
         self.input.clear()
+        for proposal in self.operations.proposals.values():
+            if proposal.project_id == self.operations.project_id and proposal.status == "awaiting_confirmation":
+                self._operation_changed(proposal.document())
+        for job in self.operations.jobs.values():
+            if job.project_id == self.operations.project_id:
+                from dataclasses import asdict
+                self._job_changed(asdict(job))
 
     def context_changed(self) -> None:
         self.voice_input.cancel()
         self.session.stop()
-        self.session.set_references(())
 
     def _toggle(self, visible: bool) -> None:
         if not visible:
@@ -432,21 +485,17 @@ class AiChatDockController(QObject):
         self.session.stop()
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if watched is self.dock and event.type() == QEvent.Type.LanguageChange:
+            for index, label in enumerate(("プロジェクト全体", "現在のファイル", "選択行")):
+                self.scope_combo.setItemText(index, tr("AiChat", label))
+            for index, label in enumerate(("提案を確認", "依頼どおり実行")):
+                self.execution_combo.setItemText(index, tr("AiChat", label))
+            self.scope_combo.setToolTip(tr("AiChat", "操作の対象範囲"))
+            self._scope_label.setText(tr("AiChat", "操作の対象範囲"))
+            self._execution_label.setText(tr("AiChat", "実行方法"))
+            self.history.publish()
         if watched is self.dock and event.type() == QEvent.Type.Close:
             self.voice_input.cancel()
-        if watched is self.input and isinstance(event, QInputMethodEvent):
-            if event.preeditString():
-                if self._ime_placeholder is None:
-                    self._ime_placeholder = self.input.placeholderText()
-                    self.input.setPlaceholderText("")
-            elif self._ime_placeholder is not None:
-                self.input.setPlaceholderText(self._ime_placeholder)
-                self._ime_placeholder = None
         if watched is self.model_button and event.type() == QEvent.Type.Resize:
             self._update_model_label()
-        if watched is self.input and isinstance(event, QKeyEvent) and event.type() == QEvent.Type.KeyPress:
-            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
-                if not self.session.busy:
-                    self._send()
-                return True
         return super().eventFilter(watched, event)

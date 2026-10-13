@@ -182,7 +182,12 @@ def prepare_update(service: WorkspaceService, target: WatchTarget, adapter: File
     return SourceUpdate(target, observed, imported, changes)
 
 
-def apply_update(service: WorkspaceService, update: SourceUpdate, path: Path | None) -> AppliedUpdate:
+def acknowledge_update(update: SourceUpdate) -> None:
+    source_watch.acknowledge(settings_path(), Path(update.target.source_root), update.observed)
+
+
+def apply_update(service: WorkspaceService, update: SourceUpdate, path: Path | None,
+                 *, acknowledge: bool = True) -> AppliedUpdate:
     root = Path(update.target.source_root)
     if source_watch.snapshot(settings_path(), root) != update.observed:
         raise ValueError("確認後に翻訳元が変更されました。差分を再確認してください。")
@@ -209,7 +214,8 @@ def apply_update(service: WorkspaceService, update: SourceUpdate, path: Path | N
         save_project(path, candidate)
     error = ""
     try:
-        source_watch.acknowledge(settings_path(), root, update.observed)
+        if acknowledge:
+            acknowledge_update(update)
     except OSError as exc:
         # The project is already saved; retain it even if acknowledgment fails.
         error = str(exc)

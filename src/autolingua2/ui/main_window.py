@@ -67,7 +67,13 @@ from autolingua2.ui.dialogs.glossary import STORAGE_ERRORS
 from autolingua2.ui.dialogs.workspace_language import WorkspaceLanguageDialog
 from autolingua2.services.ai_network import AiNetworkClient
 from autolingua2.services.ai_chat import ChatFile, ChatReference
+from autolingua2.services.application_operations import ApplicationOperations
+from autolingua2.services.mcp_server import McpServer
+from autolingua2.services.mcp_client import McpClient
+from autolingua2.services.settings_store import load_mcp_settings
+from autolingua2.ir.validation import array as json_array, text as json_text
 from autolingua2.ui.ai_chat_dock import AiChatDockController
+from autolingua2.ui.components.chat_composer import ChatReferenceTable
 from autolingua2.services.filter_rules import get_filter_config
 from autolingua2.services.source_classification import classify_sources
 from autolingua2.ir.classification import ClassificationResult
@@ -112,7 +118,7 @@ from autolingua2.ui.dialogs.multi_model_dialog import MultiModelTranslationDialo
 from autolingua2.ui.i18n import current_ui_language, language_events, tr
 from autolingua2.ui.language_names import workspace_language_name
 from autolingua2.ui.import_worker import ImportWorker
-from autolingua2.ui.operation_worker import OperationWorker
+from autolingua2.services.operation_worker import OperationWorker
 from autolingua2.plugins.api import GameTextPresentation
 from autolingua2.ui.main_window_focus import FocusEditorController
 from autolingua2.ui.main_window_table import TranslationTableController
@@ -291,13 +297,42 @@ class MainWindowController(QObject):
 
         self._setup_widgets()
         self.overview_controller = OverviewController(self)
+        self.operations = ApplicationOperations(
+            lambda: self.workspace_service, lambda: self.project_path, lambda: self._saved_project,
+            self._chat_settings, self.plugins.parsers, self.plugins.providers.providers, self.plugins.exporters,
+            self.ai_client, self,
+            plugin_inventory=self.entrance.plugin_inventory,
+            ui_languages=lambda: tuple(self.entrance.localization.available_languages.values()),
+            resolve_ui_language=self.entrance.localization.resolve_language,
+            apply_ui_language=self._operation_apply_ui_language,
+        )
+        for plugin_id, contributions in self.plugins.operations.items():
+            for contribution in contributions:
+                self.operations.register_plugin(plugin_id, contribution)
+        self.mcp_server = McpServer(self.operations, self)
+        self.mcp_client = McpClient(self)
+        self.operations.external_request = self.mcp_client.request
+        self.operations.external_cancel = self.mcp_client.cancel_job
+        self.operations.external_inventory = self.mcp_client.inventory
+        self.operations.selection_requested.connect(self._operation_select)
+        self.operations.project_replaced.connect(self._operation_project_replaced)
+        self.operations.project_saved.connect(self._operation_project_saved)
+        self.operations.preferences_changed.connect(self._operation_preferences)
+        self.operations.translation_language_changed.connect(self._operation_translation_language_changed)
+        self.operations.changed.connect(self._operation_refresh)
+        self._close_after_operations = False
+        self.operations.workers_idle.connect(self._operations_idle)
+        self._configure_mcp()
         self.chat_dock = AiChatDockController(
             self.window, self.provider_registry, self._chat_settings,
-            self._chat_current_file, self._chat_selected_references, self._chat_select_units,
+            self._chat_current_file, self._chat_selected_references,
+            self._chat_selection_origin,
             voice_input_providers=self.plugins.voice_inputs,
+            operations=self.operations,
             get_icon=self.icon_manager.get_icon, chat_icon=self._chat_icon,
         )
         self.chat_dock.send_button.setIcon(self.icon_manager.get_icon("send-24"))
+        require_child(self.window, ChatReferenceTable, "tableTranslations").reference_supplier = self.chat_dock.selected_attachment
         self.chat_dock.voice_button.setIcon(self.icon_manager.get_icon("microphone"))
         self.window.tabifyDockWidget(self.dock_ai_settings, self.chat_dock.dock)
         self.plugins.on_display_changed(self._on_plugin_display_changed)
@@ -332,6 +367,11 @@ class MainWindowController(QObject):
                 event.accept()
                 return True
         if watched is self.window and isinstance(event, QCloseEvent):
+            if self.operations.has_workers:
+                event.ignore()
+                self._close_after_operations = True
+                self.operations.cancel_active_jobs()
+                return True
             if self.io_worker is not None:
                 event.ignore()
                 self._close_after_io = True
@@ -361,6 +401,9 @@ class MainWindowController(QObject):
                 self._save_window_layout()
             self.plugins.remove_display_listener(self._on_plugin_display_changed)
             self.chat_dock.close()
+            self.mcp_server.close()
+            self.mcp_client.close()
+            self.operations.close()
             self._dispose_highlighters()
             if self.creation_context:
                 self.creation_context.active = False
@@ -1158,6 +1201,7 @@ class MainWindowController(QObject):
             glossary_target_language=self.project.target_language,
             tone_id=self.selected_tone_id,
             on_saved=self._apply_settings,
+            mcp_server=self.mcp_server,
         )
         controller.watch_page.update_requested.connect(self.request_source_update)
         if initial_category is not None:
@@ -1222,6 +1266,7 @@ class MainWindowController(QObject):
         self.icon_manager.set_current_iconset(icon_theme)
         self.chat_dock.refresh_icons()
         self.chat_dock.refresh_voice_input()
+        self._configure_mcp()
         if self.active_creation_panel:
             from PySide6.QtCore import QCoreApplication
             QCoreApplication.sendEvent(self.active_creation_panel, QEvent(QEvent.Type.LanguageChange))
@@ -1250,6 +1295,10 @@ class MainWindowController(QObject):
 
     def _on_tone_changed(self, _index: int = 0) -> None:
         self.selected_tone_id = str(self.combo_tone.currentData() or "")
+        if self.active_workspace is not None:
+            if self.active_workspace.tone_id != self.selected_tone_id:
+                self.active_workspace.generation += 1
+            self.active_workspace.tone_id = self.selected_tone_id
 
     def _refresh_glossary_choices(self) -> None:
         self.glossary_choices = []
@@ -1275,6 +1324,10 @@ class MainWindowController(QObject):
 
     def _on_glossary_changed(self, _index: int = 0) -> None:
         self.selected_glossary_id = str(self.combo_glossary.currentData() or "")
+        if self.active_workspace is not None:
+            if self.active_workspace.glossary_id != self.selected_glossary_id:
+                self.active_workspace.generation += 1
+            self.active_workspace.glossary_id = self.selected_glossary_id
         self.label_glossary_chain.setText(self.combo_glossary.currentText())
 
     def _refresh_ai_choices(self) -> None:
@@ -1300,6 +1353,60 @@ class MainWindowController(QObject):
             concurrency=self.ai_concurrency,
             high_model=self.ai_high_model, low_model=self.ai_low_model, low_model_range=self.ai_low_model_range,
         ))
+
+    def _configure_mcp(self) -> None:
+        settings = load_mcp_settings()
+        self.mcp_server.configure(settings)
+        self.mcp_client.configure(settings.connections)
+
+    def _operations_idle(self) -> None:
+        if self._close_after_operations:
+            self._close_after_operations = False
+            self.window.close()
+
+    def _operation_select(self, language: str, value: object) -> None:
+        ids = [json_text(item) for item in json_array(value)]
+        if self.active_workspace is None or self.active_workspace.language_code != language:
+            self._select_workspace(language, preserve_chat=True)
+        self._chat_select_units(ids)
+
+    def _operation_project_replaced(self, value: object) -> None:
+        if not isinstance(value, WorkspaceService):
+            raise TypeError("Invalid updated project")
+        path, saved = self.project_path, self._saved_project
+        self.load_import(value.imported, value)
+        self.project_path, self._saved_project = path, saved
+
+    def _operation_project_saved(self, path: str, snapshot: object) -> None:
+        if not isinstance(snapshot, bytes):
+            raise TypeError("Invalid saved project snapshot")
+        self.project_path = Path(path)
+        self._saved_project = snapshot
+        self._refresh_project_notification()
+
+    def _operation_preferences(self, language: str, glossary_id: str, tone_id: str) -> None:
+        if self.active_workspace is not None and self.active_workspace.language_code == language:
+            self.selected_glossary_id, self.selected_tone_id = glossary_id, tone_id
+
+    def _operation_apply_ui_language(self, language: str) -> None:
+        app = QApplication.instance()
+        if app is None:
+            raise RuntimeError("QApplication インスタンスが存在しません。")
+        self.entrance.localization.apply_language(app, language)
+
+    def _operation_translation_language_changed(self, language: str) -> None:
+        ids = [reference.id for reference in self._chat_selected_references()]
+        self._select_workspace(language or None, preserve_chat=True)
+        self._refresh_workspace_selection()
+        self.overview_controller.invalidate()
+        if ids and language:
+            self._chat_select_units(ids)
+        self.operations.scope_language = language if self.chat_dock.scope_combo.currentData() != "project" else ""
+
+    def _operation_refresh(self) -> None:
+        self._refresh_glossary_choices()
+        self._refresh_tone_choices()
+        self.refresh_all()
 
     def _chat_settings(self) -> AiSettings:
         return AiSettings(provider_id=self.ai_provider_id, models=self.ai_models,
@@ -1361,6 +1468,12 @@ class MainWindowController(QObject):
             self.focus_controller.current_unit = self.filtered_units[first_row]
             self.table.scrollTo(model.index(first_row, 0))
             self.focus_controller.refresh_focus()
+
+    def _chat_selection_origin(self) -> str:
+        selected_ids = {reference.id for reference in self._chat_selected_references()}
+        files = sorted({self.source_name_for_unit(unit) for unit in self.units if unit.id in selected_ids})
+        language = self.active_workspace.language_code if self.active_workspace is not None else ""
+        return " / ".join([language, *files])
 
     def _on_ui_language_changed(self, language_code: str) -> None:
         self._configure_text_presentation()
@@ -2004,11 +2117,15 @@ class MainWindowController(QObject):
         self.output_path = None
         self.imported = imported
         self.project = imported.project
-        self.selected_glossary_id = ""
-        self._refresh_glossary_choices()
         self.workspace_service = service if service is not None else WorkspaceService(imported)
-        self.active_workspace = None
-        self.units = list(self.workspace_service.source_units())
+        self.operations.project_changed()
+        self.active_workspace = self.workspace_service.workspaces.get(self.project.target_language)
+        self.workspace_service.set_active_language(self.active_workspace.language_code if self.active_workspace else None)
+        self.selected_glossary_id = self.active_workspace.glossary_id if self.active_workspace is not None else ""
+        self.selected_tone_id = self.active_workspace.tone_id if self.active_workspace is not None else ""
+        self._refresh_glossary_choices()
+        self._refresh_tone_choices()
+        self.units = list(self.workspace_service.units(self.active_workspace)) if self.active_workspace is not None else list(self.workspace_service.source_units())
         self.project_path = None
         self._saved_project = None
         self._refresh_project_notification()
@@ -2067,7 +2184,7 @@ class MainWindowController(QObject):
             return
         data = self.combo_target_slot.currentData()
         val = str(data) if data else ""
-        workspace.output_slot = val
+        self.workspace_service.set_output_slot(workspace, val)
 
     def _open_workspace_languages(self) -> None:
         WorkspaceLanguageDialog(self.workspace_service, self._workspaces_changed, self.window).exec()
@@ -2095,12 +2212,17 @@ class MainWindowController(QObject):
         code = self.combo_target_language.currentData()
         self._select_workspace(str(code) if code else None)
 
-    def _select_workspace(self, code: str | None) -> None:
+    def _select_workspace(self, code: str | None, *, preserve_chat: bool = False) -> None:
         keep_overview = self.stack.currentWidget() is self.page_dashboard
-        self.chat_dock.context_changed()
+        if not preserve_chat:
+            self.chat_dock.context_changed()
         workspace = self.workspace_service.workspaces.get(code) if code is not None else None
         self.active_workspace = workspace
-        self.project.target_language = workspace.language_code if workspace is not None else ""
+        if workspace is not None:
+            self.selected_glossary_id, self.selected_tone_id = workspace.glossary_id, workspace.tone_id
+            self._refresh_glossary_choices()
+            self._refresh_tone_choices()
+        self.workspace_service.set_active_language(workspace.language_code if workspace is not None else None)
         self.units = list(self.workspace_service.units(workspace)) if workspace is not None else list(self.workspace_service.source_units())
         self._sync_workspace_language_ui()
         self.focus_controller.current_unit = None

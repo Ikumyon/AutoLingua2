@@ -2,17 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from PySide6.QtCore import QLocale
-
 from autolingua2.ir import UnitState
 from autolingua2.ir.classification import SourceCategory
 from autolingua2.ir.tone import ToneItem
 from autolingua2.ir.filter_rules import TagRules
 from autolingua2.ir.translation import protect_group, protect_edited_group
 from autolingua2.ir.imported import ImportedTranslation
-from autolingua2.ir.workspace import ConfirmedTranslation, TranslationRecord, UnitView, Workspace, WorkspaceSummary, WorkspaceUnit, is_pending_translation
+from autolingua2.ir.workspace import ConfirmedTranslation, TranslationRecord, Workspace, WorkspaceSummary, WorkspaceUnit, is_pending_translation
 from autolingua2.services.settings_store import load_custom_languages, save_custom_languages
-from autolingua2.services.language_tags import normalize_language
+from autolingua2.services.language_tags import normalize_language_code, qt_language_options
 TranslationPair = tuple[str, str, ToneItem | None]
 
 
@@ -22,26 +20,13 @@ class Language:
     name: str
 
 
-def normalize_language_code(value: str) -> str:
-    return normalize_language(value)
-
-
 class WorkspaceService:
     def __init__(self, imported: ImportedTranslation) -> None:
         self.imported = imported
         self.workspaces: dict[str, Workspace] = {}
-        self.languages: dict[str, Language] = {}
-        for locale in QLocale.matchingLocales(QLocale.Language.AnyLanguage,
-                                             QLocale.Script.AnyScript,
-                                             QLocale.Country.AnyCountry):
-            if locale.language() == QLocale.Language.C or locale.country() == QLocale.Country.AnyCountry:
-                continue
-            try:
-                code = normalize_language_code(locale.name().replace("_", "-"))
-            except ValueError:
-                continue
-            name = f"{locale.nativeLanguageName()}（{locale.nativeCountryName()}）"
-            self.languages.setdefault(code, Language(code, name))
+        self.languages: dict[str, Language] = {
+            code: Language(code, name) for code, name in qt_language_options()
+        }
         self.custom_languages = load_custom_languages()
         for code, name in self.custom_languages.items():
             self.languages[code] = Language(code, name)
@@ -79,6 +64,22 @@ class WorkspaceService:
     def source_units(self) -> list[WorkspaceUnit]:
         return [WorkspaceUnit(unit, TranslationRecord(state=unit.state), self.imported.excluded_unit_ids)
                 for unit in self.imported.project.units]
+
+    def set_active_language(self, code: str | None) -> None:
+        if code is not None and code not in self.workspaces:
+            raise ValueError("対象言語のワークスペースがありません。")
+        project = self.imported.project
+        selected = code or ""
+        if project.target_language != selected:
+            project.target_language = selected
+            project.language_generation += 1
+
+    def set_output_slot(self, workspace: Workspace, slot: str) -> None:
+        if self.workspaces.get(workspace.language_code) is not workspace:
+            raise ValueError("対象言語のワークスペースがありません。")
+        if workspace.output_slot != slot:
+            workspace.output_slot = slot
+            workspace.generation += 1
 
     def remove(self, code: str) -> None:
         del self.workspaces[code]
@@ -190,6 +191,7 @@ class WorkspaceService:
                 record.target_text, replace(record.tone) if record.tone is not None else None,
             )
         record.target_text = target_text
+        record.generation += 1
         return True
 
     def discard_translation_draft(self, workspace: Workspace, unit_id: str) -> bool:
@@ -202,6 +204,7 @@ class WorkspaceService:
         record.target_text = confirmed.target_text
         record.tone = replace(confirmed.tone) if confirmed.tone is not None else None
         record.pending_confirmation = None
+        record.generation += 1
         return True
 
     def confirm_translation(self, workspace: Workspace, unit_id: str,
@@ -215,6 +218,7 @@ class WorkspaceService:
         record.state = state
         record.tone = replace(tone)
         record.pending_confirmation = None
+        record.generation += 1
         if state in {UnitState.HUMAN_REVIEWED, UnitState.AI_REVIEWED}:
             record.source_changed = False
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 import json
 import sqlite3
@@ -14,6 +15,16 @@ from autolingua2.ir.translation import text_hash
 
 class TranslationMemoryError(RuntimeError):
     """Shared memory is unavailable; project translations remain intact."""
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryWrite:
+    language_a: str
+    text_a: str
+    language_b: str
+    text_b: str
+    conditions: str
+    updated_at: int
 
 
 class TranslationMemoryStore:
@@ -69,7 +80,8 @@ class TranslationMemoryStore:
         return None
 
     def store(self, adapter_id: str, game_id: str, source_language: str, target_language: str,
-              pairs: Sequence[tuple[str, str]], conditions: str, *, user_confirmed: bool) -> None:
+              pairs: Sequence[tuple[str, str]], conditions: str, *, user_confirmed: bool) -> list[MemoryWrite]:
+        created: list[MemoryWrite] = []
         with self._connection(adapter_id, game_id) as connection:
             for source, target in pairs:
                 if not source.strip() or not target.strip():
@@ -77,10 +89,28 @@ class TranslationMemoryStore:
                 (language_a, text_a), (language_b, text_b) = sorted((
                     (self.language(source_language), source), (self.language(target_language), target),
                 ))
+                existed = connection.execute("""SELECT 1 FROM sentence_pairs WHERE language_a = ? AND text_a = ?
+                    AND language_b = ? AND text_b = ? AND conditions = ?""",
+                    (language_a, text_a, language_b, text_b, conditions)).fetchone() is not None
+                timestamp = time.time_ns()
                 connection.execute("""INSERT INTO sentence_pairs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (language_a, text_a, language_b, text_b, conditions) DO UPDATE SET
                     user_confirmed = MAX(sentence_pairs.user_confirmed, excluded.user_confirmed),
                     updated_at = CASE WHEN excluded.user_confirmed >= sentence_pairs.user_confirmed
                         THEN excluded.updated_at ELSE sentence_pairs.updated_at END""",
                     (language_a, text_a, text_hash(text_a), language_b, text_b, text_hash(text_b),
-                     conditions, text_hash(conditions), int(user_confirmed), time.time_ns()))
+                     conditions, text_hash(conditions), int(user_confirmed), timestamp))
+                if not existed and not user_confirmed:
+                    created.append(MemoryWrite(language_a, text_a, language_b, text_b, conditions, timestamp))
+        return created
+
+    def undo_writes(self, adapter_id: str, game_id: str, writes: Sequence[MemoryWrite]) -> None:
+        """Remove only new AI pairs still owned by this operation's write."""
+        if not writes:
+            return
+        with self._connection(adapter_id, game_id) as connection:
+            for entry in writes:
+                connection.execute("""DELETE FROM sentence_pairs WHERE language_a = ? AND text_a = ?
+                    AND language_b = ? AND text_b = ? AND conditions = ?
+                    AND user_confirmed = 0 AND updated_at = ?""",
+                    (entry.language_a, entry.text_a, entry.language_b, entry.text_b, entry.conditions, entry.updated_at))

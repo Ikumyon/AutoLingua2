@@ -7,6 +7,8 @@ from PySide6.QtWidgets import QDialog, QMessageBox, QPushButton, QWidget
 
 from autolingua2.infrastructure.filesystem import UI_DIR
 from autolingua2.ui.components.combo_menu_button import ComboMenuButton
+from autolingua2.ui.components.chat_composer import ChatComposer, ChatReferenceTable
+from autolingua2.ui.components.chat_web_view import ChatWebView
 from autolingua2.ui.i18n import tr
 
 
@@ -33,6 +35,9 @@ def load_ui(name: str, parent: QWidget | None = None) -> QWidget:
     try:
         loader = QUiLoader()
         loader.registerCustomWidget(ComboMenuButton)
+        loader.registerCustomWidget(ChatComposer)
+        loader.registerCustomWidget(ChatReferenceTable)
+        loader.registerCustomWidget(ChatWebView)
         loader.setLanguageChangeEnabled(True)
         widget = loader.load(file, parent)
     finally:

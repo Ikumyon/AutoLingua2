@@ -25,6 +25,94 @@
   </context>
   <context>
     <name>AiChat</name>
+    <message><source>AIへの依頼を入力してください。ファイルや選択行を文中に挿入できます。</source><translation>AIへの依頼を入力してください。ファイルや選択行を文中に挿入できます。</translation></message>
+    <message><source>Markdown原文</source><translation>Markdown原文</translation></message>
+    <message><source>すべて選択</source><translation>すべて選択</translation></message>
+    <message><source>コピー</source><translation>コピー</translation></message>
+    <message><source>コピーしました</source><translation>コピーしました</translation></message>
+    <message><source>コード</source><translation>コード</translation></message>
+    <message><source>プレビュー</source><translation>プレビュー</translation></message>
+    <message><source>拡大</source><translation>拡大</translation></message>
+    <message><source>操作結果をAIへ送信</source><translation>操作結果をAIへ送信</translation></message>
+    <message><source>数式をコピー</source><translation>数式をコピー</translation></message>
+    <message><source>最新へ</source><translation>最新へ</translation></message>
+    <message><source>構造化UIの形式が不正です</source><translation>構造化UIの形式が不正です</translation></message>
+    <message><source>表をコピー</source><translation>表をコピー</translation></message>
+    <message><source>選択</source><translation>選択</translation></message>
+    <message><source>選択した変更を適用</source><translation>選択した変更を適用</translation></message>
+    <message><source>閉じる</source><translation>閉じる</translation></message>
+    <message><source>チャットへ挿入</source><translation>チャットへ挿入</translation></message>
+    <message><source>選択した{count}行</source><translation>選択した{count}行</translation></message>
+    <message><source>実行方法</source><translation>実行方法</translation></message>
+    <message><source>Web表示の準備を待っています…</source><translation>Web表示の準備を待っています…</translation></message>
+    <message><source>言語設定の変更</source><translation>言語設定の変更</translation></message>
+    <message><source>翻訳先言語</source><translation>翻訳先言語</translation></message>
+    <message><source>表示言語</source><translation>表示言語</translation></message>
+    <message><source>出力先言語枠</source><translation>出力先言語枠</translation></message>
+    <message><source>ワークスペースの追加</source><translation>ワークスペースの追加</translation></message>
+    <message><source>対象ファイルを選択してください。</source><translation>対象ファイルを選択してください。</translation></message>
+    <message><source>AIレビュー・候補比較</source><translation>AIレビュー・候補比較</translation></message>
+    <message><source>プロジェクト保存</source><translation>プロジェクト保存</translation></message>
+    <message><source>プロジェクト全体</source><translation>プロジェクト全体</translation></message>
+    <message><source>メモ</source><translation>メモ</translation></message>
+    <message><source>レビュー</source><translation>レビュー</translation></message>
+    <message><source>中止</source><translation>中止</translation></message>
+    <message><source>依頼どおり実行</source><translation>依頼どおり実行</translation></message>
+    <message><source>保存先</source><translation>保存先</translation></message>
+    <message><source>候補</source><translation>候補</translation></message>
+    <message><source>出典</source><translation>出典</translation></message>
+    <message><source>出力ファイル</source><translation>出力ファイル</translation></message>
+    <message><source>原文の取り込み</source><translation>原文の取り込み</translation></message>
+    <message><source>原文の差分確認</source><translation>原文の差分確認</translation></message>
+    <message><source>原文・用語</source><translation>原文・用語</translation></message>
+    <message><source>取り消し済み</source><translation>取り消し済み</translation></message>
+    <message><source>口調</source><translation>口調</translation></message>
+    <message><source>口調の変更</source><translation>口調の変更</translation></message>
+    <message><source>名称</source><translation>名称</translation></message>
+    <message><source>変更</source><translation>変更</translation></message>
+    <message><source>変更を取り消す</source><translation>変更を取り消す</translation></message>
+    <message><source>変更内容</source><translation>変更内容</translation></message>
+    <message><source>変更前</source><translation>変更前</translation></message>
+    <message><source>変更後</source><translation>変更後</translation></message>
+    <message><source>変更提案</source><translation>変更提案</translation></message>
+    <message><source>外部資料の一覧</source><translation>外部資料の一覧</translation></message>
+    <message><source>外部資料の取得</source><translation>外部資料の取得</translation></message>
+    <message><source>外部資料テンプレートの一覧</source><translation>外部資料テンプレートの一覧</translation></message>
+    <message><source>失敗</source><translation>失敗</translation></message>
+    <message><source>完了</source><translation>完了</translation></message>
+    <message><source>実行中</source><translation>実行中</translation></message>
+    <message><source>対象が終了しました</source><translation>対象が終了しました</translation></message>
+    <message><source>対象を表示</source><translation>対象を表示</translation></message>
+    <message><source>対象・採用</source><translation>対象・採用</translation></message>
+    <message><source>対象範囲</source><translation>対象範囲</translation></message>
+    <message><source>差分を確認</source><translation>差分を確認</translation></message>
+    <message><source>待機中</source><translation>待機中</translation></message>
+    <message><source>採用理由</source><translation>採用理由</translation></message>
+    <message><source>提案</source><translation>提案</translation></message>
+    <message><source>提案を確認</source><translation>提案を確認</translation></message>
+    <message><source>操作の対象範囲</source><translation>操作の対象範囲</translation></message>
+    <message><source>操作結果</source><translation>操作結果</translation></message>
+    <message><source>旧訳</source><translation>旧訳</translation></message>
+    <message><source>書き出し</source><translation>書き出し</translation></message>
+    <message><source>書き出し内容の確認</source><translation>書き出し内容の確認</translation></message>
+    <message><source>現在</source><translation>現在</translation></message>
+    <message><source>現在のファイル</source><translation>現在のファイル</translation></message>
+    <message><source>用語の変更</source><translation>用語の変更</translation></message>
+    <message><source>用語候補</source><translation>用語候補</translation></message>
+    <message><source>用語集の変更</source><translation>用語集の変更</translation></message>
+    <message><source>用語集・口調の適用</source><translation>用語集・口調の適用</translation></message>
+    <message><source>破棄</source><translation>破棄</translation></message>
+    <message><source>破棄済み</source><translation>破棄済み</translation></message>
+    <message><source>確認待ち</source><translation>確認待ち</translation></message>
+    <message><source>結果</source><translation>結果</translation></message>
+    <message><source>結果を表示</source><translation>結果を表示</translation></message>
+    <message><source>翻訳</source><translation>翻訳</translation></message>
+    <message><source>翻訳メモ</source><translation>翻訳メモ</translation></message>
+    <message><source>訳文</source><translation>訳文</translation></message>
+    <message><source>訳文・翻訳メモの変更</source><translation>訳文・翻訳メモの変更</translation></message>
+    <message><source>適用</source><translation>適用</translation></message>
+    <message><source>適用済み</source><translation>適用済み</translation></message>
+    <message><source>選択行</source><translation>選択行</translation></message>
     <message>
       <source>AIが応答しています…</source>
       <translation>AIが応答しています…</translation>
@@ -143,17 +231,6 @@
     <message>
       <source>＋ モデルを追加</source>
       <translation>＋ モデルを追加</translation>
-    </message>
-  </context>
-  <context>
-    <name>ChatReferencesDialog</name>
-    <message>
-      <source>チャットの参照</source>
-      <translation>チャットの参照</translation>
-    </message>
-    <message>
-      <source>閉じる</source>
-      <translation>閉じる</translation>
     </message>
   </context>
   <context>
@@ -4417,6 +4494,35 @@ DnD / 選択</translation>
   </context>
   <context>
     <name>SettingsDialog</name>
+    <message><source>MCP</source><translation>MCP</translation></message>
+    <message><source>ポート</source><translation>ポート</translation></message>
+    <message><source>ローカルプロセス</source><translation>ローカルプロセス</translation></message>
+    <message><source>公開する操作</source><translation>公開する操作</translation></message>
+    <message><source>再生成</source><translation>再生成</translation></message>
+    <message><source>参照</source><translation>参照</translation></message>
+    <message><source>名前</source><translation>名前</translation></message>
+    <message><source>名前と接続先を入力してください。</source><translation>名前と接続先を入力してください。</translation></message>
+    <message><source>外部MCP接続</source><translation>外部MCP接続</translation></message>
+    <message><source>外部資料への接続</source><translation>外部資料への接続</translation></message>
+    <message><source>実行ファイルまたはMCPのURL</source><translation>実行ファイルまたはMCPのURL</translation></message>
+    <message><source>接続を確認しています…</source><translation>接続を確認しています…</translation></message>
+    <message><source>接続トークン</source><translation>接続トークン</translation></message>
+    <message><source>接続トークンを入力してください。</source><translation>接続トークンを入力してください。</translation></message>
+    <message><source>接続情報をコピー</source><translation>接続情報をコピー</translation></message>
+    <message><source>接続情報をコピーしました。</source><translation>接続情報をコピーしました。</translation></message>
+    <message><source>接続方式</source><translation>接続方式</translation></message>
+    <message><source>接続状態</source><translation>接続状態</translation></message>
+    <message><source>接続確認</source><translation>接続確認</translation></message>
+    <message><source>書き出し</source><translation>書き出し</translation></message>
+    <message><source>有効にして設定を適用してください。</source><translation>有効にして設定を適用してください。</translation></message>
+    <message><source>未確認</source><translation>未確認</translation></message>
+    <message><source>本体へのMCP接続を有効にする</source><translation>本体へのMCP接続を有効にする</translation></message>
+    <message><source>無効</source><translation>無効</translation></message>
+    <message><source>状態</source><translation>状態</translation></message>
+    <message><source>自動</source><translation>自動</translation></message>
+    <message><source>資料の読み取りに接続できました。</source><translation>資料の読み取りに接続できました。</translation></message>
+    <message><source>起動引数（1行に1つ）</source><translation>起動引数（1行に1つ）</translation></message>
+    <message><source>追加</source><translation>追加</translation></message>
     <message>
       <source>AI</source>
       <translation>AI</translation>

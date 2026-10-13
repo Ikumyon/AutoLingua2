@@ -4,16 +4,18 @@ import json
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QLabel, QLineEdit,
-    QMessageBox, QPushButton, QScrollArea, QSlider, QSpinBox, QStackedWidget,
+    QMessageBox, QPushButton, QScrollArea, QSlider, QSpinBox,
     QVBoxLayout, QWidget,
 )
 
 from autolingua2.services.ai_network import AiNetworkClient
 from autolingua2.services.ai_providers import ProviderRegistry
+from autolingua2.plugins.api import AiSetupCallbacks, AiSetupOption, AiSetupPanel, AiSetupValues
 from autolingua2.services.settings_store import AiModel, AiSettings, save_ai_settings
 from autolingua2.ir.translation import LowModelRange, ModelSelection
 from autolingua2.ui.components.ai_model_row import ModelRowWidget
 from autolingua2.ui.components.ai_model_list import ModelListController
+from autolingua2.ui.components.ai_setup_panel import create_plugin_panel
 from autolingua2.ui.i18n import tr
 from autolingua2.ui.icons import IconManager
 from .base import require_child
@@ -32,10 +34,15 @@ class AiSettingsPageController(QObject):
         selected_models: dict[str, str], api_keys: dict[str, str], concurrency: int,
         high_model: ModelSelection | None = None, low_model: ModelSelection | None = None,
         low_model_range: LowModelRange = LowModelRange.STANDARD,
+        *, setup_options: tuple[AiSetupOption, ...] = (),
     ) -> None:
         super().__init__(dialog)
         self.dialog = dialog
         self.icon_manager = icon_manager
+        self._setup_options = {option.provider_id: option for option in setup_options}
+        self._plugin_panels: dict[str, AiSetupPanel] = {}
+        self._panel_values: dict[str, AiSetupValues] = {}
+        self._ui_ready = False
         self.ai_client = AiNetworkClient(self)
         self.ai_client.model_validated.connect(self._on_model_validated)
         self.ai_client.all_validated.connect(self._on_all_models_validated)
@@ -54,6 +61,7 @@ class AiSettingsPageController(QObject):
         self._update_low_description()
         self._translation_refresh_pending = False
         self.model_list.changed.connect(self._queue_translation_models_refresh)
+        self._ui_ready = True
 
     def settings(self) -> AiSettings:
         self._save_current_ai_fields()
@@ -112,13 +120,24 @@ class AiSettingsPageController(QObject):
             a=a, b=b, s=round(similarity * 100)))
 
     def save(self) -> None:
-        save_ai_settings(self.settings())
+        settings = self.settings()
+        for panel in self._plugin_panels.values():
+            panel.save_settings()
+        save_ai_settings(settings)
 
     def cancel(self) -> None:
+        self._stop_connection_test()
+        for panel in self._plugin_panels.values():
+            panel.cancel()
+
+    def _stop_connection_test(self) -> None:
         testing_for_save = self._testing_for_save
         self._testing_for_save = False
         self._validation_cancelled = True
         self.ai_client.cancel_all()
+        if self.button_test_connection is not None:
+            self.button_test_connection.setEnabled(True)
+            self.button_test_connection.setText(tr("SettingsDialog", "接続テスト"))
         if testing_for_save:
             self.save_aborted.emit()
 
@@ -156,27 +175,30 @@ class AiSettingsPageController(QObject):
 
         self.error_label = require_child(self.dialog, QLabel, "labelProviderErrors")
         self._refresh_provider_errors()
-        self.label_api_key = self.dialog.findChild(QLabel, "labelApiKey")
-        self.stack_auth = self.dialog.findChild(QStackedWidget, "stackAuth")
-        self.page_default_auth = self.dialog.findChild(QWidget, "pageDefaultAuth")
-        self._custom_auth_widgets: dict[str, QWidget] = {}
+        self.label_api_key = require_child(self.dialog, QLabel, "labelApiKey")
+        self.auth_container = require_child(self.dialog, QWidget, "authContainer")
+        self.layout_auth = require_child(self.dialog, QVBoxLayout, "layoutAuth")
+        self.button_test_connection = self.dialog.findChild(QPushButton, "buttonTestConnection")
 
         self.combo_provider.currentIndexChanged.connect(self._on_provider_changed)
         self._update_auth_ui()
         self.button_add_model.clicked.connect(self._add_model)
         self.button_reset_models.clicked.connect(self._reset_models)
-        self.button_test_connection = self.dialog.findChild(QPushButton, "buttonTestConnection")
         if self.button_test_connection is not None:
             self.button_test_connection.setEnabled(True)
             self.button_test_connection.clicked.connect(self._on_test_connection)
 
     def _on_test_connection(self) -> None:
-        api_key = self.ai_api_keys.get(self._current_provider_id, "").strip() or self.edit_api_key.text().strip()
+        self._save_current_ai_fields()
+        self._validation_cancelled = False
+        api_key = self.ai_api_keys.get(self._current_provider_id, "").strip()
         if not api_key:
             QMessageBox.warning(
                 self.dialog,
                 tr("SettingsDialog", "接続テスト"),
-                tr("SettingsDialog", "認証情報（APIキーまたはトークン）が設定されていません。"),
+                tr("SettingsDialog", "アカウントにサインインしてください。")
+                if self._current_provider_id in self._plugin_panels else
+                tr("SettingsDialog", "APIキーが設定されていません。"),
             )
             return
 
@@ -214,6 +236,8 @@ class AiSettingsPageController(QObject):
         self.ai_client.validate_models(provider, api_key, models, timeout_sec=8.0)
 
     def _on_model_validated(self, model: str, is_valid: bool, message: str) -> None:
+        if self._validation_cancelled:
+            return
         self._test_results[model] = (is_valid, message)
         for r in self._row_widgets:
             if r.field_model.text().strip() == model:
@@ -237,7 +261,7 @@ class AiSettingsPageController(QObject):
                 tr("SettingsDialog", "接続テスト"),
                 tr(
                     "SettingsDialog",
-                    f"接続テストに成功しました。\n\nAPIキーおよび対象モデル（{success_count} 件）のすべてが正常に利用可能です。",
+                    f"接続テストに成功しました。\n\n認証情報および対象モデル（{success_count} 件）のすべてが正常に利用可能です。",
                 ),
             )
             return
@@ -252,15 +276,20 @@ class AiSettingsPageController(QObject):
 
         if all_auth_errors:
             first_msg = error_items[0][1]
+            auth_message = (
+                "【アカウント認証に失敗しました】\n\n"
+                "アカウントに再度サインインしてください。\n\n"
+                if self._current_provider_id in self._plugin_panels else
+                "【APIキーが無効です】\n\n"
+                "入力されたAPIキーがプロバイダに認証されませんでした。\n"
+                "正しいAPIキーを入力してください。\n\n"
+            )
             QMessageBox.critical(
                 self.dialog,
                 tr("SettingsDialog", "接続テスト"),
                 tr(
                     "SettingsDialog",
-                    f"【APIキーが無効です】\n\n"
-                    f"入力されたAPIキーがプロバイダに認証されませんでした。\n"
-                    f"正しいAPIキーを入力してください。\n\n"
-                    f"詳細: {first_msg}",
+                    auth_message + f"詳細: {first_msg}",
                 ),
             )
         else:
@@ -294,9 +323,12 @@ class AiSettingsPageController(QObject):
             )
 
     def validate_for_save(self) -> None:
-        self._validation_cancelled = False
         self._save_current_ai_fields()
-        api_key = self.ai_api_keys.get(self._current_provider_id, "").strip() or self.edit_api_key.text().strip()
+        self._validation_cancelled = False
+        for provider_id, panel in self._plugin_panels.items():
+            if self._setup_options[provider_id].mode == "custom" and not panel.ready:
+                raise ValueError(f"{self._setup_options[provider_id].title} の設定を完了してください。")
+        api_key = self.ai_api_keys.get(self._current_provider_id, "").strip()
         provider = self.registry.get(self._current_provider_id)
 
         # 未検証の有効モデルがあるかチェック（有効かつモデル名あり、かつ status != "valid"）
@@ -372,11 +404,18 @@ class AiSettingsPageController(QObject):
         self.error_label.setText("\n".join(messages))
 
     def _save_current_ai_fields(self) -> None:
-        self.ai_models[self._current_provider_id] = self._read_model_list()
-        if self._current_provider_id not in self._custom_auth_widgets:
-            self.ai_api_keys[self._current_provider_id] = self.edit_api_key.text().strip()
+        provider_id = self._current_provider_id
+        if self._setup_options.get(provider_id) is None or self._setup_options[provider_id].mode != "custom":
+            self.ai_models[provider_id] = self._read_model_list()
+        if provider_id in self._plugin_panels:
+            self._sync_plugin_panel(provider_id)
+        else:
+            self.ai_api_keys[provider_id] = self.edit_api_key.text().strip()
 
     def _ensure_provider_api_key(self, p_id: str) -> None:
+        option = self._setup_options.get(p_id)
+        if option is not None and option.mode != "common":
+            return
         if not self.ai_api_keys.get(p_id):
             env_key = self.registry.get_env_api_key(p_id)
             if env_key:
@@ -389,6 +428,8 @@ class AiSettingsPageController(QObject):
 
     def _on_provider_changed(self, index: int) -> None:
         self._save_current_ai_fields()
+        self._stop_connection_test()
+        self._test_results.clear()
         self._current_provider_id = str(self.combo_provider.itemData(index) or "")
         self._ensure_provider_api_key(self._current_provider_id)
         self._populate_models()
@@ -397,33 +438,60 @@ class AiSettingsPageController(QObject):
         self._refresh_provider_errors()
 
     def _update_auth_ui(self) -> None:
-        provider = self.registry.get(self._current_provider_id)
-        if provider is None or self.stack_auth is None:
+        provider_id = self._current_provider_id
+        option = self._setup_options.get(provider_id)
+        plugin_ui = option is not None and option.mode != "common"
+        custom_ui = option is not None and option.mode == "custom"
+        self.edit_api_key.setVisible(not plugin_ui)
+        self.label_api_key.setVisible(not custom_ui)
+        self.label_api_key.setText(tr("SettingsDialog", "アカウント" if plugin_ui else "APIキー"))
+        for name in ("labelModel", "scrollAreaModels", "buttonAddModel", "buttonResetModels", "buttonTestConnection"):
+            require_child(self.dialog, QWidget, name).setVisible(not custom_ui)
+        for panel in self._plugin_panels.values():
+            panel.widget.hide()
+        if not plugin_ui or option is None:
             return
-
-        if self._current_provider_id not in self._custom_auth_widgets:
-            custom_widget = provider.create_settings_widget(
-                self.stack_auth,
-                current_api_key=self.ai_api_keys.get(self._current_provider_id, ""),
-                on_api_key_changed=lambda key: self._on_plugin_api_key_changed(self._current_provider_id, key),
+        panel = self._plugin_panels.get(provider_id)
+        if panel is None:
+            initial = AiSetupValues(
+                self.ai_api_keys.get(provider_id, ""), tuple(self.ai_models.get(provider_id, [])),
             )
-            if custom_widget is not None:
-                self.stack_auth.addWidget(custom_widget)
-                self._custom_auth_widgets[self._current_provider_id] = custom_widget
+            panel = create_plugin_panel(
+                option, self.auth_container, initial,
+                AiSetupCallbacks(
+                    lambda: self._sync_plugin_panel(provider_id),
+                    lambda _ready: self._sync_plugin_panel(provider_id),
+                ),
+            )
+            self._plugin_panels[provider_id] = panel
+            self._panel_values[provider_id] = initial
+            self.layout_auth.addWidget(panel.widget)
+        panel.widget.show()
+        self._sync_plugin_panel(provider_id)
 
-        custom_widget = self._custom_auth_widgets.get(self._current_provider_id)
-        if custom_widget is not None:
-            self.stack_auth.setCurrentWidget(custom_widget)
-            if self.label_api_key is not None:
-                self.label_api_key.setText(getattr(provider, "auth_label", tr("SettingsDialog", "アカウント")))
-        else:
-            if self.page_default_auth is not None:
-                self.stack_auth.setCurrentWidget(self.page_default_auth)
-            if self.label_api_key is not None:
-                self.label_api_key.setText(tr("SettingsDialog", "APIキー"))
-
-    def _on_plugin_api_key_changed(self, provider_id: str, new_key: str) -> None:
-        self.ai_api_keys[provider_id] = new_key
+    def _sync_plugin_panel(self, provider_id: str) -> None:
+        panel = self._plugin_panels.get(provider_id)
+        if panel is None:
+            return
+        values = panel.read_settings()
+        if not isinstance(values, AiSetupValues):
+            raise TypeError("設定値の公開契約が不正です。")
+        previous = self._panel_values[provider_id]
+        self._panel_values[provider_id] = values
+        self.ai_api_keys[provider_id] = values.api_key
+        custom_ui = self._setup_options[provider_id].mode == "custom"
+        models_changed = values.models != previous.models
+        if custom_ui or models_changed:
+            self.ai_models[provider_id] = list(values.models)
+        if provider_id == self._current_provider_id:
+            if models_changed and not custom_ui:
+                self._populate_models()
+            if values.api_key != previous.api_key or models_changed:
+                self._stop_connection_test()
+                self._test_results.clear()
+                self.model_list.invalidate()
+        if models_changed and self._ui_ready:
+            self._queue_translation_models_refresh()
 
     @property
     def selected_provider_id(self) -> str:
