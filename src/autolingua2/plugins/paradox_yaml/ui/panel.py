@@ -74,7 +74,7 @@ class ParadoxCreationPanel(QWidget):
 
         # 案内ラベル
         self.label_prompt = QLabel(
-            tr("ParadoxPlugin", "MODフォルダ、.mod、または翻訳ファイルをここにドロップ"),
+            tr("ParadoxPlugin", "MODフォルダ・.mod・画像・翻訳ファイルをここにドロップ"),
             self,
         )
         self.label_prompt.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -112,7 +112,7 @@ class ParadoxCreationPanel(QWidget):
 
     def retranslate_ui(self) -> None:
         """UIテキストを現在の翻訳言語に再設定する。"""
-        self.label_prompt.setText(tr("ParadoxPlugin", "MODフォルダ、.mod、または翻訳ファイルをここにドロップ"))
+        self.label_prompt.setText(tr("ParadoxPlugin", "MODフォルダ・.mod・画像・翻訳ファイルをここにドロップ"))
         self.btn_import_mod.setText(tr("ParadoxPlugin", ".modから自動入力..."))
         self.btn_import_mod.setToolTip(tr("ParadoxPlugin", "ParadoxゲームのMOD定義ファイル（.mod / descriptor.mod）から自動設定"))
         self.btn_browse_folder.setText(tr("ParadoxPlugin", "フォルダ追加"))
@@ -165,6 +165,9 @@ def import_mod_file(path: Path, context: PluginContext) -> None:
 
     if info.name:
         context.creation.set_project_name(info.name)
+
+    if info.picture_path is not None:
+        context.creation.set_project_icon(info.picture_path)
 
     if info.target_path and (info.target_path.is_dir() or info.target_path.is_file()):
         context.creation.add_target_path(info.target_path)

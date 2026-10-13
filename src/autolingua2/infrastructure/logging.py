@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 import logging
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 import re
 import sys
 from types import TracebackType
@@ -9,6 +11,7 @@ from types import TracebackType
 from .platform import log_directory
 
 _SECRET = re.compile(r"(?i)(authorization|api[_-]?key|token|password)(\s*[:=]\s*)([^\s,;]+)")
+_current_log_file: Path | None = None
 
 
 class DiagnosticFormatter(logging.Formatter):
@@ -30,7 +33,21 @@ class ApplicationConsoleHandler(logging.StreamHandler):
     _console = True
 
 
+def _clean_old_logs(folder: Path, keep: int = 20) -> None:
+    try:
+        logs = sorted(folder.glob("app_*.log"))
+        if len(logs) > keep:
+            for old_log in logs[:-keep]:
+                try:
+                    old_log.unlink(missing_ok=True)
+                except OSError:
+                    pass
+    except Exception:
+        pass
+
+
 def configure_logging() -> None:
+    global _current_log_file
     folder = log_directory()
     folder.mkdir(parents=True, exist_ok=True)
     root = logging.getLogger()
@@ -39,8 +56,18 @@ def configure_logging() -> None:
         if getattr(handler, "_autolingua", False):
             root.removeHandler(handler)
             handler.close()
-    handler = ApplicationFileHandler(folder / "application.log", maxBytes=2_000_000,
-                                 backupCount=3, encoding="utf-8")
+
+    if _current_log_file is None:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        _current_log_file = folder / f"app_{timestamp}.log"
+        _clean_old_logs(folder, keep=20)
+
+    handler = ApplicationFileHandler(
+        _current_log_file,
+        maxBytes=5_000_000,
+        backupCount=2,
+        encoding="utf-8",
+    )
     handler.setFormatter(DiagnosticFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
     root.addHandler(handler)
 

@@ -2,7 +2,7 @@
 <ui version="4.0">
  <class>InitialSetupDialog</class>
  <widget class="QDialog" name="InitialSetupDialog">
-  <property name="windowTitle"><string>AUTOlingua2 初期設定</string></property>
+  <property name="windowTitle"><string>初期設定</string></property>
   <property name="minimumSize"><size><width>620</width><height>480</height></size></property>
   <layout class="QVBoxLayout" name="layoutWizard">
    <item><widget class="QLabel" name="labelSteps"><property name="text"><string/></property></widget></item>

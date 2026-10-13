@@ -1,17 +1,20 @@
 /* 共通 DropZone & アイコン枠 スタイル */
 QFrame#frameDropZone,
+QFrame#frameInheritDropZone,
 QFrame#frameIconDrop {
     border-color: #777777;
     background-color: rgba(255, 255, 255, 0.04);
 }
 
 QFrame#frameDropZone:hover,
+QFrame#frameInheritDropZone:hover,
 QFrame#frameIconDrop:hover {
     border-color: #3b82f6;
     background-color: rgba(59, 130, 246, 0.08);
 }
 
 QFrame#frameDropZone[dragOver="true"],
+QFrame#frameInheritDropZone[dragOver="true"],
 QFrame#frameIconDrop[dragOver="true"] {
     border-color: #3b82f6;
     background-color: rgba(59, 130, 246, 0.16);

@@ -11,7 +11,7 @@ from autolingua2.ir.tone import ToneItem
 from autolingua2.ir.filter_rules import TagRules
 from autolingua2.ir.translation import protect_group, protect_edited_group
 from autolingua2.ir.imported import ImportedTranslation
-from autolingua2.ir.workspace import ConfirmedTranslation, TranslationRecord, UnitView, Workspace, WorkspaceUnit, is_pending_translation
+from autolingua2.ir.workspace import ConfirmedTranslation, TranslationRecord, UnitView, Workspace, WorkspaceSummary, WorkspaceUnit, is_pending_translation
 from autolingua2.services.settings_store import load_custom_languages, save_custom_languages
 TranslationPair = tuple[str, str, ToneItem | None]
 
@@ -89,6 +89,27 @@ class WorkspaceService:
     def units(self, workspace: Workspace) -> list[WorkspaceUnit]:
         return [WorkspaceUnit(unit, workspace.records[unit.id], self.imported.excluded_unit_ids)
                 for unit in self.imported.project.units]
+
+    def summaries(self) -> list[WorkspaceSummary]:
+        """Snapshot every language independently of the editor's active filters."""
+        unit_ids = tuple(unit.id for unit in self.imported.project.units
+                         if unit.id not in self.imported.excluded_unit_ids)
+        summaries: list[WorkspaceSummary] = []
+        for workspace in self.workspaces.values():
+            counts = dict.fromkeys(UnitState, 0)
+            source_changed = 0
+            for unit_id in unit_ids:
+                record = workspace.records[unit_id]
+                counts[record.state] += 1
+                source_changed += int(record.source_changed)
+            reviewed = counts[UnitState.AI_REVIEWED] + counts[UnitState.HUMAN_REVIEWED]
+            translated = reviewed + counts[UnitState.AI_TRANSLATED] + counts[UnitState.HUMAN_TRANSLATED]
+            eligible = len(unit_ids) - counts[UnitState.LOCKED] - counts[UnitState.HIDDEN]
+            summaries.append(WorkspaceSummary(
+                workspace.language_code, counts, len(unit_ids), reviewed,
+                translated / eligible if eligible else 0.0, source_changed,
+            ))
+        return summaries
 
     def exact_peers(self, workspace: Workspace, unit_id: str) -> list[WorkspaceUnit]:
         """Return exact-group peers, including differing display-control tags."""

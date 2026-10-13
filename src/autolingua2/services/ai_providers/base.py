@@ -320,11 +320,15 @@ class BaseHttpTranslator(TextTranslator, ABC):
             return f"APIサーバー側で一時的なエラーが発生しました (HTTP {status_code})。"
         return f"APIリクエストエラー (HTTP {status_code})"
 
+    def decode_response(self, response_body: str) -> dict[str, Any]:
+        data = json.loads(response_body)
+        if not isinstance(data, dict):
+            raise ValueError("Response root is not a JSON object")
+        return data
+
     def _parse_response(self, response_body: str) -> str:
         try:
-            data = json.loads(response_body)
-            if not isinstance(data, dict):
-                raise ValueError("Response root is not a JSON object")
+            data = self.decode_response(response_body)
             return self.extract_translation(data)
         except TranslationProviderError:
             raise

@@ -143,6 +143,7 @@ class MainWindowTranslationController(QObject):
     def _unit_translated(self, workspace: Workspace, unit: TranslationUnit, batch: bool,
                          *, eligible_ids: set[str] | None = None) -> None:
         host = self.host
+        host.overview_controller.invalidate()
         if host.active_workspace is not workspace:
             return
         row = host.filtered_units.index(unit) if unit in host.filtered_units else -1
@@ -213,6 +214,7 @@ class MainWindowTranslationController(QObject):
             self._deferred_confirmations.pop((workspace.language_code, unit.id), None)
 
     def refresh_after_edit(self, workspace: Workspace) -> None:
+        self.host.overview_controller.invalidate()
         if (self.host.active_workspace is workspace and self.host._workspace_is_alive(workspace)
                 and not self._deferred_confirmations and not self._confirming_units
                 and not self.host.target_text_delegate.has_editor and not self.host.status_delegate.has_editor

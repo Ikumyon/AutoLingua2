@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from typing import Any
 
 from PySide6.QtCore import QObject, QUrl, Signal
@@ -11,8 +12,52 @@ from autolingua2.plugins.contracts import (
     BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
     object_value, string_value,
 )
+from .auth import ChatGptAuthManager
 
 logger = logging.getLogger(__name__)
+
+
+def _response_events(body: str) -> Iterator[dict[str, Any]]:
+    """Decode SSE records, including multiline data and CRLF line endings."""
+    data_lines: list[str] = []
+    for line in [*body.splitlines(), ""]:
+        if not line:
+            if data_lines:
+                payload = "\n".join(data_lines)
+                data_lines.clear()
+                if payload != "[DONE]":
+                    yield object_value(json.loads(payload), "Responses event")
+        elif line.startswith("data:"):
+            value = line[5:]
+            data_lines.append(value[1:] if value.startswith(" ") else value)
+
+
+def _event_index(event: dict[str, Any], name: str) -> int:
+    value = event.get(name)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"ChatGPT: ストリームの{name}が不正です。")
+    return value
+
+
+def _output_items(data: dict[str, Any]) -> list[dict[str, Any]]:
+    output = data.get("output")
+    if not isinstance(output, list):
+        raise ValueError("ChatGPT: 応答のoutput配列がありません。")
+    return [object_value(item, "Response output item") for item in output]
+
+
+def _message_text(output: dict[str, Any]) -> str:
+    content = output.get("content")
+    if not isinstance(content, list):
+        raise ValueError("ChatGPT: メッセージのcontent配列がありません。")
+    texts: list[str] = []
+    for part in content:
+        block = object_value(part, "Response content block")
+        if block.get("type") == "output_text":
+            texts.append(string_value(block.get("text"), "Output text"))
+        elif block.get("type") == "refusal":
+            raise ValueError("ChatGPT: 応答が拒否されました。")
+    return "".join(texts)
 
 
 class ChatGptTranslator(BaseHttpTranslator):
@@ -27,6 +72,7 @@ class ChatGptTranslator(BaseHttpTranslator):
     def build_headers(self) -> dict[str, str]:
         return {
             "Content-Type": "application/json",
+            "Accept": "text/event-stream",
             "Authorization": f"Bearer {self.api_key}",
             "User-Agent": "Autolingua Desktop/0.1.0",
         }
@@ -40,110 +86,125 @@ class ChatGptTranslator(BaseHttpTranslator):
     ) -> dict[str, Any]:
         return {
             "model": self.model,
-            "input": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text},
-            ],
-            "stream": False,
+            "instructions": system_prompt,
+            "input": [{"role": "user", "content": text}],
+            "stream": True,
             "store": False,
         }
 
     def extract_translation(self, response_data: dict[str, Any]) -> str:
-        # Responses API: output 配列のテキストを抽出
-        outputs = response_data.get("output")
-        if isinstance(outputs, list):
-            texts = [
-                str(item.get("text", "")).strip()
-                for item in outputs
-                if isinstance(item, dict) and item.get("text")
-            ]
-            if texts:
-                return "\n".join(texts)
-
-        # フォールバック (Chat Completions 形式も互換対応)
-        choices = response_data.get("choices")
-        if isinstance(choices, list) and choices:
-            first_choice = choices[0]
-            if isinstance(first_choice, dict):
-                message = first_choice.get("message")
-                if isinstance(message, dict):
-                    content = message.get("content")
-                    if isinstance(content, str):
-                        return content.strip()
-
-        raise ValueError("ChatGPT: 翻訳出力が見つかりませんでした。")
+        outputs = _output_items(response_data)
+        translated = "".join(
+            _message_text(item) for item in outputs if item.get("type") == "message"
+        ).strip()
+        if translated:
+            return translated
+        output_types = ", ".join(str(item.get("type")) for item in outputs) or "なし"
+        raise ValueError(f"ChatGPT: 応答は完了しましたが本文が空です (output: {output_types})。")
 
     def build_chat_payload(
         self, messages: list[ChatMessage], system_prompt: str,
         tools: list[dict[str, Any]], continuation: list[dict[str, Any]],
     ) -> dict[str, Any]:
-        formatted_messages = (
-            [{"role": "system", "content": system_prompt}]
-            + [{"role": m.role, "content": m.content} for m in messages]
-            + continuation
-        )
+        formatted_messages: list[dict[str, Any]] = [
+            {"role": m.role, "content": m.content} for m in messages
+        ]
+        for item in continuation:
+            if item.get("type") == "function_call_output":
+                formatted_messages.append(item)
+            else:
+                formatted_messages.extend(_output_items(item))
         payload: dict[str, Any] = {
             "model": self.model,
+            "instructions": system_prompt,
             "input": formatted_messages,
-            "stream": False,
+            "stream": True,
             "store": False,
         }
         if tools:
             payload["tools"] = [{
                 "type": "function",
-                "function": {
-                    "name": t["name"],
-                    "description": t["description"],
-                    "parameters": t["inputSchema"],
-                },
+                "name": t["name"],
+                "description": t["description"],
+                "parameters": t["inputSchema"],
             } for t in tools]
         return payload
 
+    def decode_response(self, response_body: str) -> dict[str, Any]:
+        completed: dict[str, Any] | None = None
+        items: dict[int, dict[str, Any]] = {}
+        texts: dict[tuple[int, int], str] = {}
+        event_count = 0
+        for event in _response_events(response_body):
+            event_count += 1
+            event_type = event.get("type")
+            if event_type in {"response.output_text.delta", "response.output_text.done"}:
+                key = (_event_index(event, "output_index"), _event_index(event, "content_index"))
+                if event_type == "response.output_text.delta":
+                    texts[key] = texts.get(key, "") + string_value(event.get("delta"), "Text delta")
+                else:
+                    texts[key] = string_value(event.get("text"), "Final text")
+            elif event_type == "response.output_item.done":
+                items[_event_index(event, "output_index")] = object_value(event.get("item"), "Final output item")
+            elif event_type == "response.refusal.done":
+                raise ValueError("ChatGPT: 応答が拒否されました。")
+            elif event_type == "response.completed":
+                completed = object_value(event.get("response"), "Responses completion")
+                if completed.get("status") != "completed":
+                    raise ValueError("ChatGPT: 完了イベントのstatusが不正です。")
+            elif event_type in {"response.failed", "response.incomplete", "error"}:
+                response = event if event_type == "error" else object_value(event.get("response"), "Failed response")
+                details = response.get("incomplete_details" if event_type == "response.incomplete" else "error")
+                error = response if event_type == "error" else (
+                    {} if details is None else object_value(details, "Response error")
+                )
+                reason = error.get("reason") or error.get("code") or "unknown_error"
+                message = error.get("message") or ""
+                raise ValueError(f"ChatGPT: {event_type} ({reason}) {message}".strip())
+        if completed is None:
+            raise ValueError(f"ChatGPT: ストリームが完了せず終了しました ({event_count}イベント)。")
+
+        # Assemble streamed items and text blocks before exposing a completed response.
+        output = {index: item for index, item in enumerate(_output_items(completed))}
+        output.update(items)
+        blocks: dict[int, dict[int, dict[str, Any]]] = {}
+        for (output_index, content_index), text in texts.items():
+            blocks.setdefault(output_index, {})[content_index] = {"type": "output_text", "text": text}
+        for output_index, text_blocks in blocks.items():
+            item = output.setdefault(output_index, {"type": "message", "role": "assistant", "content": []})
+            if item.get("type") != "message":
+                raise ValueError("ChatGPT: 本文イベントと出力項目のtypeが一致しません。")
+            content = item.get("content")
+            if not isinstance(content, list):
+                raise ValueError("ChatGPT: メッセージのcontent配列が不正です。")
+            merged = {index: object_value(part, "Content block") for index, part in enumerate(content)}
+            merged.update(text_blocks)
+            item["content"] = [merged[index] for index in sorted(merged)]
+        completed["output"] = [output[index] for index in sorted(output)]
+        logger.info("ChatGPT response model=%s events=%d output_items=%d text_blocks=%d status=completed",
+                    self.model, event_count, len(output), len(texts))
+        return completed
+
     def extract_chat_reply(self, data: dict[str, Any]) -> ChatReply:
-        outputs = data.get("output")
-        if isinstance(outputs, list):
-            texts: list[str] = []
-            calls: list[ChatToolCall] = []
-            for item in outputs:
-                if not isinstance(item, dict):
-                    continue
-                item_type = item.get("type")
-                if item_type == "output_text" or "text" in item:
-                    text_val = str(item.get("text", "")).strip()
-                    if text_val:
-                        texts.append(text_val)
-                elif item_type == "function_call" or "function" in item:
-                    fn = item.get("function", {})
-                    fn_name = string_value(fn.get("name"), "name")
-                    fn_args = object_value(json.loads(string_value(fn.get("arguments"), "arguments")), "arguments")
-                    call_id = string_value(item.get("id", fn_name), "id")
-                    calls.append(ChatToolCall(call_id, fn_name, fn_args))
-            combined_text = "\n".join(texts)
-            if combined_text or calls:
-                return ChatReply(combined_text, calls, data)
-
-        # フォールバック (Chat Completions 形式)
-        choices = data.get("choices")
-        if isinstance(choices, list) and choices:
-            choice = object_value(choices[0], "choice")
-            message = object_value(choice.get("message"), "message")
-            calls = []
-            for item in message.get("tool_calls", []):
-                entry = object_value(item, "tool_call")
-                function = object_value(entry.get("function"), "function")
+        texts: list[str] = []
+        calls: list[ChatToolCall] = []
+        for item in _output_items(data):
+            if item.get("type") == "message":
+                texts.append(_message_text(item))
+            elif item.get("type") == "function_call":
                 calls.append(ChatToolCall(
-                    string_value(entry.get("id"), "id"), string_value(function.get("name"), "name"),
-                    object_value(json.loads(string_value(function.get("arguments"), "arguments")), "arguments"),
+                    string_value(item.get("call_id"), "call_id"),
+                    string_value(item.get("name"), "name"),
+                    object_value(json.loads(string_value(item.get("arguments"), "arguments")), "arguments"),
                 ))
-            content = message.get("content")
-            text = "" if content is None else string_value(content, "content")
-            if text or calls:
-                return ChatReply(text, calls, message)
-
+        text = "".join(texts).strip()
+        if text or calls:
+            return ChatReply(text, calls, data)
         raise ValueError("ChatGPT: 有効な応答が得られませんでした。")
 
     def chat_tool_result(self, call: ChatToolCall, result: dict[str, Any]) -> dict[str, Any]:
-        return {"role": "tool", "tool_call_id": call.id, "content": json.dumps(result, ensure_ascii=False)}
+        return {"type": "function_call_output", "call_id": call.id,
+                "output": json.dumps(result, ensure_ascii=False)}
 
     def extract_custom_error(self, error_data: dict[str, Any] | None, status_code: int) -> str | None:
         if isinstance(error_data, dict):
@@ -207,21 +268,21 @@ class ChatGptModelFetcher(QObject):
 
         try:
             data = json.loads(bytes(reply.readAll().data()).decode("utf-8"))
-            model_items = data.get("data", [])
+            model_items = data.get("models")
+            if not isinstance(model_items, list):
+                raise ValueError("モデル一覧の応答にmodels配列がありません。")
             models: list[tuple[str, str]] = []
             for item in model_items:
                 if not isinstance(item, dict):
                     continue
-                visibility = item.get("visibility", "list")
+                visibility = item.get("visibility")
                 if visibility != "list":
                     continue
-                slug = str(item.get("slug") or item.get("id") or "").strip()
-                name = str(item.get("name") or slug).strip()
-                if slug:
-                    models.append((name, slug))
-
-            if not models:
-                models = list(ChatGptProvider.default_models)
+                slug = item.get("slug")
+                name = item.get("display_name")
+                if isinstance(slug, str) and slug.strip():
+                    models.append((name.strip() if isinstance(name, str) and name.strip() else slug.strip(),
+                                   slug.strip()))
 
             self.models_fetched.emit(models)
         except Exception as exc:
@@ -235,12 +296,15 @@ class ChatGptProvider(BaseAiProvider):
     display_name = "ChatGPT"
     api_key_env = "CHATGPT_AUTH_TOKEN"
     auth_type = "oauth"
-    default_models = (
-        ("GPT-4o", "gpt-4o"),
-        ("GPT-4o mini", "gpt-4o-mini"),
-        ("o1", "o1"),
-        ("o3-mini", "o3-mini"),
-    )
     translator_class = ChatGptTranslator
     auth_label = "アカウント"
+
+    def __init__(self, auth: ChatGptAuthManager) -> None:
+        self._auth = auth
+
+    def create(self, api_key: str, model: str) -> ChatGptTranslator:
+        token = self._auth.access_token
+        if not token:
+            raise ValueError("ChatGPTにログインしてください。")
+        return ChatGptTranslator(api_key=token, model=model)
 

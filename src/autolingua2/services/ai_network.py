@@ -92,6 +92,10 @@ class AiNetworkClient(QObject):
                 system_prompt = translator.build_system_prompt("en", "ja")
                 payload = translator.build_payload("test", "en", "ja", system_prompt)
                 headers = translator.build_headers()
+                logger.info(
+                    "Model validation model=%s endpoint=%s input=test source=en target=ja stream=%s store=%s",
+                    model, translator.endpoint, payload.get("stream"), payload.get("store"),
+                )
 
                 body_bytes = json.dumps(payload).encode("utf-8")
                 request = QNetworkRequest(QUrl(translator.endpoint))
@@ -129,7 +133,7 @@ class AiNetworkClient(QObject):
 
             if reply.error() == QNetworkReply.NetworkError.NoError and 200 <= http_status < 300:
                 try:
-                    data = json.loads(raw_text)
+                    data = translator.decode_response(raw_text)
                     _ = translator.extract_translation(data)
                     self._on_single_validation_finished(model, True, "接続確認済み（利用可能）")
                 except Exception as exc:
@@ -144,6 +148,7 @@ class AiNetworkClient(QObject):
             self._on_single_validation_finished(model, False, f"応答処理エラー: {exc}")
 
     def _on_single_validation_finished(self, model: str, is_valid: bool, message: str) -> None:
+        logger.info("Model validation result model=%s valid=%s detail=%s", model, is_valid, message)
         if is_valid:
             self._validation_success += 1
         else:
@@ -276,7 +281,7 @@ class AiNetworkClient(QObject):
 
             if reply.error() == QNetworkReply.NetworkError.NoError and 200 <= http_status < 300:
                 try:
-                    data = json.loads(raw_text)
+                    data = translator.decode_response(raw_text)
                     if not isinstance(data, dict):
                         raise ValueError("レスポンスがJSONオブジェクトではありません。")
                     if not chat:

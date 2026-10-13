@@ -117,18 +117,20 @@ from autolingua2.plugins.api import GameTextPresentation
 from autolingua2.ui.main_window_focus import FocusEditorController
 from autolingua2.ui.main_window_table import TranslationTableController
 from autolingua2.ui.main_window_translation import MainWindowTranslationController
+from autolingua2.ui.main_window_overview import OverviewController
 
 STATUS_MATCHERS: dict[str, Callable[[TranslationUnit], bool]] = {
     "pending": is_pending_translation,
-    "hidden": lambda unit: not is_pending_translation(unit) and (unit.hidden or unit.state == UnitState.HIDDEN),
-    "locked": lambda unit: not is_pending_translation(unit) and (unit.locked or unit.state == UnitState.LOCKED),
+    "hidden": lambda unit: unit.state == UnitState.HIDDEN,
+    "locked": lambda unit: unit.state == UnitState.LOCKED,
     "has_issues": lambda unit: bool(unit.issues),
-    "doubtful": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.DOUBTFUL,
-    "ai_reviewed": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.AI_REVIEWED,
-    "human_reviewed": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.HUMAN_REVIEWED,
-    "ai_translated": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.AI_TRANSLATED,
-    "human_translated": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.HUMAN_TRANSLATED,
-    "untranslated": lambda unit: not is_pending_translation(unit) and unit.state == UnitState.UNTRANSLATED,
+    "source_changed": lambda unit: unit.source_changed,
+    "doubtful": lambda unit: unit.state == UnitState.DOUBTFUL,
+    "ai_reviewed": lambda unit: unit.state == UnitState.AI_REVIEWED,
+    "human_reviewed": lambda unit: unit.state == UnitState.HUMAN_REVIEWED,
+    "ai_translated": lambda unit: unit.state == UnitState.AI_TRANSLATED,
+    "human_translated": lambda unit: unit.state == UnitState.HUMAN_TRANSLATED,
+    "untranslated": lambda unit: unit.state == UnitState.UNTRANSLATED,
 }
 
 class MainWindowCreationContext:
@@ -158,6 +160,10 @@ class MainWindowCreationContext:
     def set_project_name(self, name: str) -> None:
         self._check()
         self.controller.edit_project_name.setText(name)
+
+    def set_project_icon(self, path: Path) -> None:
+        self._check()
+        self.controller.set_project_icon(path, manual=False)
 
     def select_game(self, game_id: str) -> None:
         self._check()
@@ -191,6 +197,7 @@ class MainWindowCreationContext:
         return CreationActions(
             cancel_operation=self.cancel_operation, add_target_path=self.add_target_path,
             remove_target_path=self.remove_target_path, set_project_name=self.set_project_name,
+            set_project_icon=self.set_project_icon,
             select_game=self.select_game, set_source_language=self.set_source_language,
             set_target_slot=self.set_target_slot,
         )
@@ -246,6 +253,7 @@ class MainWindowController(QObject):
         self.status_count_label: QLabel | None = None
 
         self.selected_icon_path: Path | None = None
+        self._project_icon_is_manual = False
         self.target_paths: list[Path] = []
         self.target_item_widgets: dict[Path, tuple[QLabel, QListWidgetItem]] = {}
         self.inherited_paths: list[Path] = []
@@ -265,7 +273,6 @@ class MainWindowController(QObject):
         self._panel_valid = False
         self._close_after_import = False
         self._ai_dock_workspace_visible: bool = True
-        self._focus_sidebar_visible: bool = True
         render_newlines, highlight_tags, apply_colors = load_ui_display_flags()
         self.render_literal_newlines: bool = render_newlines
         self.highlight_translation_tags: bool = highlight_tags
@@ -283,6 +290,7 @@ class MainWindowController(QObject):
         self._dock_tab_refresh_timer.timeout.connect(self._refresh_dock_tab_bars)
 
         self._setup_widgets()
+        self.overview_controller = OverviewController(self)
         self.chat_dock = AiChatDockController(
             self.window, self.provider_registry, self._chat_settings,
             self._chat_current_file, self._chat_selected_references, self._chat_select_units,
@@ -390,12 +398,7 @@ class MainWindowController(QObject):
 
                     # 左列アイコン枠: 画像ファイルのみを受け付け
                     if watched is frame_icon:
-                        image_exts = {".png", ".jpg", ".jpeg", ".webp", ".ico", ".bmp"}
-                        img_files = [p for p in paths if p.is_file() and p.suffix.lower() in image_exts]
-                        if img_files:
-                            self.set_project_icon(img_files[0])
-                        elif paths:
-                            self.set_project_icon(paths[0])
+                        self._set_dropped_project_icon(paths)
                         return True
 
                     # 既存訳ドロップ枠: 既存の翻訳ファイル・フォルダを追加
@@ -412,8 +415,9 @@ class MainWindowController(QObject):
                                 or adapter is None or context is None):
                             return True
                         try:
-                            remaining = adapter.on_paths_dropped(paths, self.plugins.context(context.adapter_id))
-                            if not isinstance(remaining, list) or any(p not in paths for p in remaining):
+                            source_paths = self._set_dropped_project_icon(paths)
+                            remaining = adapter.on_paths_dropped(source_paths, self.plugins.context(context.adapter_id))
+                            if not isinstance(remaining, list) or any(p not in source_paths for p in remaining):
                                 raise ValueError("Invalid unhandled drop paths")
                             for p in remaining:
                                 self.add_target_path(p)
@@ -459,20 +463,30 @@ class MainWindowController(QObject):
         self.search = require_child(self.window, QLineEdit, "editSearch")
         self.status_filter = require_child(self.window, QComboBox, "comboStatusFilter")
         self.stack = require_child(self.window, QStackedWidget, "stackTranslationView")
+        self.page_dashboard = require_child(self.window, QWidget, "pageDashboard")
+        self.page_list = require_child(self.window, QWidget, "pageList")
+        self.page_focus = require_child(self.window, QWidget, "pageFocus")
+        self.page_workspace = require_child(self.window, QWidget, "pageWorkspace")
+        self.stack_workspace_controls = require_child(self.window, QStackedWidget, "stackWorkspaceControls")
+        self.page_controls_dashboard = require_child(self.window, QWidget, "pageControlsDashboard")
+        self.page_controls_translation = require_child(self.window, QWidget, "pageControlsTranslation")
         self.frame_segment_mode = require_child(self.window, QFrame, "frameSegmentMode")
+        self.button_dashboard_mode = require_child(self.window, QToolButton, "buttonDashboardMode")
         self.button_list_mode = require_child(self.window, QToolButton, "buttonListMode")
         self.button_focus_mode = require_child(self.window, QToolButton, "buttonFocusMode")
         self.mode_group = QButtonGroup(self.window)
         self.mode_group.setExclusive(True)
+        self.mode_group.addButton(self.button_dashboard_mode)
         self.mode_group.addButton(self.button_list_mode)
         self.mode_group.addButton(self.button_focus_mode)
 
         self.segment_indicator = QFrame(self.frame_segment_mode)
         self.segment_indicator.setObjectName("segmentIndicator")
+        self.segment_indicator.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.segment_indicator.setStyleSheet(
             "background-color: palette(highlight); border-radius: 4px;"
         )
-        self.segment_indicator.stackUnder(self.button_list_mode)
+        self.segment_indicator.lower()
         self.segment_indicator.hide()
 
         self.segment_anim = QPropertyAnimation(self.segment_indicator, b"geometry")
@@ -571,8 +585,8 @@ class MainWindowController(QObject):
         self.action_problems = require_child(self.window, QAction, "actionProblems")
         self.action_about = require_child(self.window, QAction, "actionAbout")
         self.action_list_mode = require_child(self.window, QAction, "actionListMode")
+        self.action_dashboard_mode = require_child(self.window, QAction, "actionDashboardMode")
         self.action_focus_mode = require_child(self.window, QAction, "actionFocusMode")
-        self.action_toggle_file_sidebar = require_child(self.window, QAction, "actionToggleFileSidebar")
         self.dock_ai_settings = require_child(self.window, QDockWidget, "dockAiSettings")
         self.action_toggle_ai_panel = require_child(self.window, QAction, "actionToggleAiPanel")
         self.label_source_language_work = require_child(self.window, QLabel, "labelSourceLanguageWork")
@@ -730,8 +744,8 @@ class MainWindowController(QObject):
         self.action_about.triggered.connect(lambda: SimpleDialogController("AboutDialog.ui", self.window).exec())
 
         self.action_list_mode.triggered.connect(self.show_list_mode)
+        self.action_dashboard_mode.triggered.connect(self.show_dashboard_mode)
         self.action_focus_mode.triggered.connect(self.show_focus_mode)
-        self.action_toggle_file_sidebar.triggered.connect(self.toggle_file_sidebar)
         self.list_focus_units.currentRowChanged.connect(self.focus_controller._on_focus_unit_selected)
         self.action_toggle_ai_panel.triggered.connect(self._on_action_toggle_ai_panel_triggered)
         self.dock_ai_settings.visibilityChanged.connect(self._on_dock_ai_visibility_changed)
@@ -747,6 +761,7 @@ class MainWindowController(QObject):
         self.button_add_language.clicked.connect(self._open_workspace_languages)
 
         self.button_list_mode.clicked.connect(self.show_list_mode)
+        self.button_dashboard_mode.clicked.connect(self.show_dashboard_mode)
         self.button_focus_mode.clicked.connect(self.show_focus_mode)
         self.button_previous.clicked.connect(self.focus_controller.previous_entry)
         self.button_next.clicked.connect(self.focus_controller.next_entry)
@@ -1311,8 +1326,10 @@ class MainWindowController(QObject):
         return ChatFile((id(self.imported), language, ref.source_id), self.source_name_for_unit(unit), units)
 
     def _chat_selected_references(self) -> tuple[ChatReference, ...]:
-        if self.stack.currentIndex() != 0:
+        if self.stack.currentWidget() is self.page_focus:
             return (self._chat_reference(self.focus_controller.current_unit),) if self.focus_controller.current_unit is not None else ()
+        if self.stack.currentWidget() is not self.page_list:
+            return ()
         rows = sorted({index.row() for index in self.table.selectedIndexes()})
         return tuple(self._chat_reference(self.filtered_units[row]) for row in rows
                      if 0 <= row < len(self.filtered_units))
@@ -1360,7 +1377,6 @@ class MainWindowController(QObject):
             if selected:
                 _, game = selected
                 with QSignalBlocker(self.combo_source_language):
-                    self.combo_source_language.setItemText(0, tr("MainWindow", "自動検出 (Auto Detect)"))
                     for slot in game.slots:
                         index = self.combo_source_language.findData(slot.language_code)
                         if index >= 0:
@@ -1466,10 +1482,12 @@ class MainWindowController(QObject):
             with QSignalBlocker(self.combo_source_language):
                 current_src = self.combo_source_language.currentData()
                 self.combo_source_language.clear()
-                self.combo_source_language.addItem(tr("MainWindow", "自動検出 (Auto Detect)"), "auto")
                 for slot in game.slots:
                     self.combo_source_language.addItem(slot.name, slot.language_code)
                 idx = self.combo_source_language.findData(current_src)
+                if idx < 0 and game.slots:
+                    default_slot = next((s for s in game.slots if s.slot_id == game.default_slot_id), game.slots[0])
+                    idx = self.combo_source_language.findData(default_slot.language_code)
                 self.combo_source_language.setCurrentIndex(max(0, idx))
 
             # 出力言語スロット: 選択されたゲームのスロットに連動
@@ -1520,19 +1538,30 @@ class MainWindowController(QObject):
     def show_new_project_page(self) -> None:
         self.stack_main.setCurrentIndex(0)
 
-    def set_project_icon(self, path: Path) -> None:
+    def _set_dropped_project_icon(self, paths: list[Path]) -> list[Path]:
+        image_exts = {".png", ".jpg", ".jpeg", ".webp", ".ico", ".bmp"}
+        images = [path for path in paths if not path.is_dir() and path.suffix.lower() in image_exts]
+        for path in images:
+            if self.set_project_icon(path):
+                break
+        return [path for path in paths if path not in images]
+
+    def set_project_icon(self, path: Path, *, manual: bool = True) -> bool:
+        if not manual and self._project_icon_is_manual:
+            return False
         if not path.is_file():
-            return
+            return False
         pixmap = self.icon_manager.load_pixmap(path)
         if pixmap.isNull():
             QMessageBox.warning(self.window, tr("MainWindow", "エラー"), tr("MainWindow", "有効な画像ファイルではありません。"))
-            return
-        self.selected_icon_path = path
+            return False
+        self.selected_icon_path = path.resolve()
+        self._project_icon_is_manual = manual
         scaled = pixmap.scaled(90, 90, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.label_icon_preview.setPixmap(scaled)
-        self.label_icon_preview.setText("")
         self.edit_icon_path.setText(path.name)
-        self.edit_icon_path.setToolTip(str(path))
+        self.edit_icon_path.setToolTip(str(self.selected_icon_path))
+        return True
 
     def _browse_project_icon(self) -> None:
         file_filter = tr("MainWindow", "画像ファイル (*.png *.jpg *.jpeg *.webp *.ico *.bmp);;すべてのファイル (*.*)")
@@ -1542,13 +1571,14 @@ class MainWindowController(QObject):
 
     def clear_project_icon(self) -> None:
         self.selected_icon_path = None
+        self._project_icon_is_manual = False
         self.label_icon_preview.clear()
         self.label_icon_preview.setText(tr("MainWindow", "アイコン画像\nDnD / 選択"))
         self.edit_icon_path.clear()
         self.edit_icon_path.setToolTip("")
 
     def _update_path_label(self, path: Path, lbl: QLabel) -> None:
-        current_src = str(self.combo_source_language.currentData() or "auto")
+        current_src = str(self.combo_source_language.currentData() or "en-US")
         try:
             adapter = self.active_adapter
             if adapter is None:
@@ -1756,7 +1786,7 @@ class MainWindowController(QObject):
         worker = ImportWorker(
             adapter,
             self.target_paths,
-            str(self.combo_source_language.currentData() or "auto"),
+            str(self.combo_source_language.currentData() or "en-US"),
             self,
             game_id=game.id,
             inherited_paths=self.inherited_paths,
@@ -1853,14 +1883,7 @@ class MainWindowController(QObject):
             self.splitter_main.restoreState(QByteArray.fromHex(layout.splitter_main.encode("ascii")))
         if layout.splitter_focus:
             self.splitter_focus.restoreState(QByteArray.fromHex(layout.splitter_focus.encode("ascii")))
-        self._focus_sidebar_visible = layout.sidebar_visible
-        if self.stack.currentIndex() == 0:
-            self.frame_files.setVisible(False)
-            self.action_toggle_file_sidebar.setEnabled(False)
-        else:
-            self.frame_files.setVisible(self._focus_sidebar_visible)
-            self.action_toggle_file_sidebar.setEnabled(True)
-            self.action_toggle_file_sidebar.setChecked(self._focus_sidebar_visible)
+        self.frame_files.setVisible(self.stack.currentWidget() is self.page_focus)
         self._ai_dock_workspace_visible = layout.ai_panel_visible
         self._on_main_page_changed(self.stack_main.currentIndex())
 
@@ -1874,7 +1897,6 @@ class MainWindowController(QObject):
             state=state,
             splitter_main=sp_main,
             splitter_focus=sp_focus,
-            sidebar_visible=self._focus_sidebar_visible,
             ai_panel_visible=self._ai_dock_workspace_visible,
             dock_tab_position=self._dock_tab_position,
             dock_tab_vertical_text=self._dock_tab_vertical_text,
@@ -1963,6 +1985,10 @@ class MainWindowController(QObject):
             self.action_toggle_ai_panel.setChecked(visible)
 
     def _on_main_page_changed(self, index: int) -> None:
+        if self.stack_main.currentWidget() is self.page_workspace and self.stack.currentWidget() is self.page_dashboard:
+            self.overview_controller.enter()
+        else:
+            self.overview_controller.leave()
         self.chat_dock.set_workspace_page(index != 0)
         if index == 0:
             self.dock_ai_settings.setVisible(False)
@@ -2012,8 +2038,8 @@ class MainWindowController(QObject):
                     game = g
                     break
 
-        src_code = self.project.source_language or "auto"
-        src_label = tr("MainWindow", "自動検出") if src_code == "auto" else src_code
+        src_code = self.project.source_language or "en-US"
+        src_label = src_code
         if src_code in self.workspace_service.languages:
             src_label = workspace_language_name(self.workspace_service, src_code)
         self.label_source_language_work.setText(src_label)
@@ -2053,6 +2079,7 @@ class MainWindowController(QObject):
                 self.active_workspace.language_code) is not self.active_workspace:
             self._select_workspace(None)
         self._refresh_workspace_selection()
+        self.overview_controller.invalidate()
 
     def _refresh_workspace_selection(self) -> None:
         with QSignalBlocker(self.combo_target_language):
@@ -2069,6 +2096,7 @@ class MainWindowController(QObject):
         self._select_workspace(str(code) if code else None)
 
     def _select_workspace(self, code: str | None) -> None:
+        keep_overview = self.stack.currentWidget() is self.page_dashboard
         self.chat_dock.context_changed()
         workspace = self.workspace_service.workspaces.get(code) if code is not None else None
         self.active_workspace = workspace
@@ -2082,7 +2110,8 @@ class MainWindowController(QObject):
             self.status_filter.setCurrentText(tr("MainWindow", "未翻訳"))
         self._set_workspace_controls()
         self.apply_filters()
-        self.show_list_mode()
+        if not keep_overview:
+            self.show_list_mode()
 
     def _set_workspace_controls(self) -> None:
         enabled = self.active_workspace is not None
@@ -2206,6 +2235,7 @@ class MainWindowController(QObject):
         return text
 
     def _update_status_bar_counts(self) -> None:
+        self.overview_controller.invalidate()
         if self.status_count_label is None:
             return
         if not self.units:
@@ -2315,17 +2345,29 @@ class MainWindowController(QObject):
         unit = self.filtered_units[row]
         self._open_multi_model_dialog(unit, row)
 
+    def _show_translation_mode(self, page: QWidget, button: QToolButton) -> None:
+        if page is not self.page_dashboard:
+            self.overview_controller.leave()
+        self.stack.setCurrentWidget(page)
+        button.setChecked(True)
+        self.action_dashboard_mode.setChecked(page is self.page_dashboard)
+        self.action_list_mode.setChecked(page is self.page_list)
+        self.action_focus_mode.setChecked(page is self.page_focus)
+        self.stack_workspace_controls.setCurrentWidget(
+            self.page_controls_dashboard if page is self.page_dashboard else self.page_controls_translation)
+        self.stack_workspace_controls.setVisible(page is not self.page_dashboard)
+        focus = page is self.page_focus
+        self.frame_files.setVisible(focus)
+        self._animate_segment_indicator(button)
+        self.chat_dock.context_changed()
+
+    def show_dashboard_mode(self) -> None:
+        self._show_translation_mode(self.page_dashboard, self.button_dashboard_mode)
+        self.overview_controller.enter()
+
     def show_list_mode(self) -> None:
-        was_focus = self.stack.currentIndex() == 1
-        self.stack.setCurrentIndex(0)
-        self.button_list_mode.setChecked(True)
-        self.button_focus_mode.setChecked(False)
-        self.action_list_mode.setChecked(True)
-        self.action_focus_mode.setChecked(False)
-        self._animate_segment_indicator(self.button_list_mode)
-        # 一覧表示でのファイル表示廃止
-        self.frame_files.setVisible(False)
-        self.action_toggle_file_sidebar.setEnabled(False)
+        was_focus = self.stack.currentWidget() is self.page_focus
+        self._show_translation_mode(self.page_list, self.button_list_mode)
         if was_focus:
             self.apply_filters()
 
@@ -2336,7 +2378,7 @@ class MainWindowController(QObject):
         if not self.segment_indicator.isVisible():
             self.segment_indicator.setGeometry(geom)
             self.segment_indicator.show()
-            self.segment_indicator.stackUnder(self.button_list_mode)
+            self.segment_indicator.lower()
             return
         self.segment_anim.stop()
         self.segment_anim.setStartValue(self.segment_indicator.geometry())
@@ -2344,7 +2386,8 @@ class MainWindowController(QObject):
         self.segment_anim.start()
 
     def _sync_segment_indicator_pos(self, animate: bool = True) -> None:
-        target_btn = self.button_focus_mode if self.button_focus_mode.isChecked() else self.button_list_mode
+        target_btn = (self.button_dashboard_mode if self.button_dashboard_mode.isChecked() else
+                      self.button_focus_mode if self.button_focus_mode.isChecked() else self.button_list_mode)
         geom = target_btn.geometry()
         if geom.width() <= 0:
             return
@@ -2354,7 +2397,7 @@ class MainWindowController(QObject):
             self.segment_anim.stop()
             self.segment_indicator.setGeometry(geom)
             self.segment_indicator.show()
-            self.segment_indicator.stackUnder(self.button_list_mode)
+            self.segment_indicator.lower()
 
     def _save_display_flags(self) -> None:
         save_ui_display_flags(
@@ -2390,31 +2433,15 @@ class MainWindowController(QObject):
         self.display_settings_menu.exec(pos)
 
     def show_focus_mode(self) -> None:
-        was_list = self.stack.currentIndex() == 0
+        was_focus = self.stack.currentWidget() is self.page_focus
         if self.focus_controller.current_unit is None and self.filtered_units:
             self.focus_controller.current_unit = self.filtered_units[0]
-        self.stack.setCurrentIndex(1)
-        self.button_list_mode.setChecked(False)
-        self.button_focus_mode.setChecked(True)
-        self.action_list_mode.setChecked(False)
-        self.action_focus_mode.setChecked(True)
-        self._animate_segment_indicator(self.button_focus_mode)
-        # 集中表示時は文一覧サイドバーを設定に従って表示
-        self.action_toggle_file_sidebar.setEnabled(True)
-        self.action_toggle_file_sidebar.setChecked(self._focus_sidebar_visible)
-        self.frame_files.setVisible(self._focus_sidebar_visible)
-        if self._focus_sidebar_visible:
-            self.focus_controller._ensure_focus_sidebar_minimum_width()
-        if was_list:
+        self._show_translation_mode(self.page_focus, self.button_focus_mode)
+        self.focus_controller._ensure_focus_sidebar_minimum_width()
+        if not was_focus:
             self.apply_filters()
         else:
             self.focus_controller.refresh_focus()
-
-    def toggle_file_sidebar(self) -> None:
-        if self.stack.currentIndex() == 1:
-            visible = self.action_toggle_file_sidebar.isChecked()
-            self._focus_sidebar_visible = visible
-            self.frame_files.setVisible(visible)
 
     def open_problems_dialog(self) -> None:
         controller = SimpleDialogController("ProblemsDialog.ui", self.window)
@@ -2472,6 +2499,7 @@ class MainWindowController(QObject):
 
     def status_matchers_by_label(self) -> dict[str, Callable[[TranslationUnit], bool]]:
         return {
+            tr("MainWindow", "原文更新・要確認"): STATUS_MATCHERS["source_changed"],
             tr("MainWindow", "未確定"): STATUS_MATCHERS["pending"],
             tr("MainWindow", "非表示"): STATUS_MATCHERS["hidden"],
             tr("MainWindow", "ロック"): STATUS_MATCHERS["locked"],

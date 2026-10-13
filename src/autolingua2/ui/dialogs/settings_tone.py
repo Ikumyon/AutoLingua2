@@ -4,7 +4,8 @@ from __future__ import annotations
 from html import escape
 from uuid import uuid4
 
-from PySide6.QtCore import QBuffer, QIODevice, QSignalBlocker, Qt
+from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QSignalBlocker, Qt
+from PySide6.QtGui import QImageWriter
 from PySide6.QtWidgets import (
     QComboBox, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSplitter,
     QStackedWidget, QTreeWidget, QTreeWidgetItem, QWidget,
@@ -183,8 +184,9 @@ class TonePageController:
         buffer = QBuffer()
         if not buffer.open(QIODevice.OpenModeFlag.WriteOnly):
             raise RuntimeError("ツールチップ画像のバッファを開けません。")
-        if not image.save(buffer, b"PNG"):
-            raise RuntimeError("ツールチップのアイコンを変換できません。")
+        writer = QImageWriter(buffer, QByteArray(b"png"))
+        if not writer.write(image):
+            raise RuntimeError(f"ツールチップのアイコンを変換できません: {writer.errorString()}")
         encoded = bytes(buffer.data().toBase64().data()).decode("ascii")
         buffer.close()
         return f'<img src="data:image/png;base64,{encoded}" width="16" height="16" />'

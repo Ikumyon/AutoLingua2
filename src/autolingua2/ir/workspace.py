@@ -31,6 +31,16 @@ class Workspace:
     output_slot: str = ""
 
 
+@dataclass(frozen=True, slots=True)
+class WorkspaceSummary:
+    language_code: str
+    counts: dict[UnitState, int]
+    total: int
+    reviewed: int
+    progress: float
+    source_changed: int
+
+
 @dataclass(slots=True, eq=False)
 class WorkspaceUnit:
     """A reference to shared source data and one language's translation."""

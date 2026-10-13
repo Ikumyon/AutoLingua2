@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Callable
 
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QButtonGroup, QDialog, QLabel, QLineEdit, QPushButton, QRadioButton,
@@ -115,9 +115,9 @@ class CommonSetupPanel(QObject):
             values = self._auth.read_settings()
             if not isinstance(values, AiSetupValues):
                 raise TypeError("認証情報の公開契約が不正です。")
-            self._key_changed(values.api_key)
-            if values.models:
-                self.models.populate(list(values.models))
+            if values.api_key != self._api_key:
+                self._key_changed(values.api_key)
+            self.models.populate(list(values.models))
         except Exception as error:
             self._key_changed("")
             self.status.setText(str(error))
@@ -195,6 +195,7 @@ class InitialSetupController(QObject):
         if not isinstance(loaded, QDialog):
             raise TypeError("初期設定のUIはQDialogである必要があります。")
         self.dialog = loaded
+        self.dialog.setWindowTitle(f"{QCoreApplication.applicationName()} {tr('InitialSetupDialog', '初期設定')}")
         self.dialog.setModal(True)
         self.entrance = entrance
         self.registry = entrance.plugins.providers

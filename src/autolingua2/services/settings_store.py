@@ -45,7 +45,6 @@ KEY_WINDOW_GEOMETRY = "window_geometry"
 KEY_WINDOW_STATE = "window_state"
 KEY_SPLITTER_MAIN = "splitter_main"
 KEY_SPLITTER_FOCUS = "splitter_focus"
-KEY_SIDEBAR_VISIBLE = "sidebar_visible"
 KEY_AI_PANEL_VISIBLE = "ai_panel_visible"
 KEY_DOCK_TAB_POSITION = "dock_tab_position"
 KEY_DOCK_TAB_VERTICAL_TEXT = "dock_tab_vertical_text"
@@ -313,7 +312,6 @@ class WindowLayout:
     state: str = ""
     splitter_main: str = ""
     splitter_focus: str = ""
-    sidebar_visible: bool = True
     ai_panel_visible: bool = True
     dock_tab_position: DockTabPosition = "bottom"
     dock_tab_vertical_text: bool = True
@@ -337,7 +335,6 @@ def load_window_layout() -> WindowLayout:
         state=str(ui_settings.get(KEY_WINDOW_STATE) or ""),
         splitter_main=str(ui_settings.get(KEY_SPLITTER_MAIN) or ""),
         splitter_focus=str(ui_settings.get(KEY_SPLITTER_FOCUS) or ""),
-        sidebar_visible=bool(ui_settings.get(KEY_SIDEBAR_VISIBLE, True)),
         ai_panel_visible=bool(ui_settings.get(KEY_AI_PANEL_VISIBLE, True)),
         dock_tab_position=tab_position,
         dock_tab_vertical_text=bool(ui_settings.get(KEY_DOCK_TAB_VERTICAL_TEXT, True)),
@@ -353,7 +350,6 @@ def save_window_layout(layout: WindowLayout) -> None:
     ui_settings[KEY_WINDOW_STATE] = layout.state
     ui_settings[KEY_SPLITTER_MAIN] = layout.splitter_main
     ui_settings[KEY_SPLITTER_FOCUS] = layout.splitter_focus
-    ui_settings[KEY_SIDEBAR_VISIBLE] = layout.sidebar_visible
     ui_settings[KEY_AI_PANEL_VISIBLE] = layout.ai_panel_visible
     ui_settings[KEY_DOCK_TAB_POSITION] = layout.dock_tab_position
     ui_settings[KEY_DOCK_TAB_VERTICAL_TEXT] = layout.dock_tab_vertical_text

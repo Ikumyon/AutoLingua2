@@ -24,6 +24,10 @@ class CreationContext(Protocol):
     def set_project_name(self, name: str, /) -> None:
         ...
 
+    def set_project_icon(self, path: Path, /) -> None:
+        """Set an automatic project image, preserving any manually chosen image."""
+        ...
+
     def select_game(self, game_id: str, /) -> None:
         ...
 
@@ -42,6 +46,7 @@ class CreationActions:
         add_target_path: Callable[[Path], None],
         remove_target_path: Callable[[Path], None],
         set_project_name: Callable[[str], None],
+        set_project_icon: Callable[[Path], None],
         select_game: Callable[[str], None],
         set_source_language: Callable[[str], None],
         set_target_slot: Callable[[str], None],
@@ -50,6 +55,7 @@ class CreationActions:
         self._add_target_path = add_target_path
         self._remove_target_path = remove_target_path
         self._set_project_name = set_project_name
+        self._set_project_icon = set_project_icon
         self._select_game = select_game
         self._set_source_language = set_source_language
         self._set_target_slot = set_target_slot
@@ -65,6 +71,9 @@ class CreationActions:
 
     def set_project_name(self, name: str, /) -> None:
         self._set_project_name(name)
+
+    def set_project_icon(self, path: Path, /) -> None:
+        self._set_project_icon(path)
 
     def select_game(self, game_id: str, /) -> None:
         self._select_game(game_id)
