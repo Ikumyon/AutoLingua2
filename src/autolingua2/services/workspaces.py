@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-import re
 
 from PySide6.QtCore import QLocale
 
@@ -13,6 +12,7 @@ from autolingua2.ir.translation import protect_group, protect_edited_group
 from autolingua2.ir.imported import ImportedTranslation
 from autolingua2.ir.workspace import ConfirmedTranslation, TranslationRecord, UnitView, Workspace, WorkspaceSummary, WorkspaceUnit, is_pending_translation
 from autolingua2.services.settings_store import load_custom_languages, save_custom_languages
+from autolingua2.services.language_tags import normalize_language
 TranslationPair = tuple[str, str, ToneItem | None]
 
 
@@ -23,10 +23,7 @@ class Language:
 
 
 def normalize_language_code(value: str) -> str:
-    match = re.fullmatch(r"([A-Za-z]{2,3})-([A-Za-z]{2}|[0-9]{3})", value.strip())
-    if match is None:
-        raise ValueError("言語コードは ja-JP のような言語-地域形式で入力してください。")
-    return f"{match[1].lower()}-{match[2].upper()}"
+    return normalize_language(value)
 
 
 class WorkspaceService:

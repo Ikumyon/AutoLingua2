@@ -6,7 +6,7 @@ from typing import Callable
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
-    QButtonGroup, QDialog, QLabel, QLineEdit, QPushButton, QRadioButton,
+    QButtonGroup, QCheckBox, QComboBox, QDialog, QLabel, QLineEdit, QPushButton, QRadioButton,
     QStackedWidget, QVBoxLayout, QWidget,
 )
 
@@ -15,12 +15,14 @@ from autolingua2.plugins.api import AiSetupCallbacks, AiSetupOption, AiSetupPane
 from autolingua2.services.ai_network import AiNetworkClient
 from autolingua2.services.ai_providers.registry import ProviderRegistry
 from autolingua2.services.settings_store import (
-    AiSetupValues, load_ai_settings, mark_initial_setup_seen, save_initial_setup,
+    DEFAULT_UI_LANGUAGE, AiSetupValues, load_ai_settings, load_ui_language,
+    mark_initial_setup_seen, save_initial_setup, save_ui_language,
 )
 from autolingua2.ui.components.ai_model_list import ModelListController
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.i18n import normalize_language, tr
 from autolingua2.ui.icons import IconManager
 from .base import load_ui, require_child
+from .self_translation import SelfTranslationController
 
 
 def create_plugin_panel(
@@ -200,6 +202,10 @@ class InitialSetupController(QObject):
         self.entrance = entrance
         self.registry = entrance.plugins.providers
         self.stack = require_child(loaded, QStackedWidget, "stackPages")
+        self.language_page = load_ui("dialogs/setup/LanguagePage.ui", self.stack)
+        self.stack.insertWidget(0, self.language_page)
+        self.stack.setCurrentWidget(self.language_page)
+        self.combo_language = require_child(self.language_page, QComboBox, "comboLanguage")
         self.choose_page = require_child(loaded, QWidget, "pageChooseAi")
         self.configure_page = require_child(loaded, QWidget, "pageConfigureAi")
         self.container = require_child(loaded, QWidget, "setupContainer")
@@ -212,7 +218,16 @@ class InitialSetupController(QObject):
         self._epoch = 0
         self._allow_close = False
         self.saved = False
+        self.self_translation = SelfTranslationController(entrance, self.stack)
+        self.stack.addWidget(self.self_translation.widget)
+        self.check_self_translation = require_child(self.language_page, QCheckBox, "checkSelfTranslation")
+        self.check_self_translation.setChecked(self.self_translation.needs_os_translation())
+        self.check_self_translation.toggled.connect(self._navigation)
+        self.self_translation.running_changed.connect(self._navigation)
+        self.self_translation.applied.connect(self._language_created)
         self._group = QButtonGroup(loaded)
+        self._setup_language()
+        self.combo_language.currentIndexChanged.connect(self._navigation)
         self.back.clicked.connect(self._back)
         self.next.clicked.connect(self._next)
         self.finish.clicked.connect(self._finish)
@@ -237,15 +252,61 @@ class InitialSetupController(QObject):
         self.stack.currentChanged.connect(self._navigation)
         self._navigation()
 
+    def _setup_language(self) -> None:
+        self.combo_language.blockSignals(True)
+        self.combo_language.clear()
+        raw_language = load_ui_language()
+        is_system = not raw_language or raw_language.lower() == DEFAULT_UI_LANGUAGE
+        current_language = DEFAULT_UI_LANGUAGE if is_system else normalize_language(raw_language)
+        self.combo_language.addItem(tr("SettingsDialog", "システム規定"), DEFAULT_UI_LANGUAGE)
+        languages = self.entrance.localization.available_languages
+        if not is_system and current_language not in languages:
+            current_language = self.entrance.localization.resolve_language(current_language)
+        for code, info in languages.items():
+            if info.flag_path is not None and info.flag_path.is_file():
+                icon = self.entrance.icons.load_icon(info.flag_path, fixed_modes=True)
+                self.combo_language.addItem(icon, info.name, code)
+            else:
+                self.combo_language.addItem(info.name, code)
+        self.combo_language.setCurrentIndex(max(0, self.combo_language.findData(current_language)))
+        self.combo_language.blockSignals(False)
+
+    def _language_created(self, tag: str) -> None:
+        self._setup_language()
+        self._navigation()
+
+    def _wants_self_translation(self) -> bool:
+        return self.check_self_translation.isChecked()
+
+    def _save_language(self) -> None:
+        language = self.combo_language.currentData()
+        if not isinstance(language, str) or not language:
+            raise ValueError("表示言語を選択してください。")
+        app = QCoreApplication.instance()
+        if app is None:
+            raise RuntimeError("QCoreApplication インスタンスが存在しません")
+        if language != load_ui_language():
+            save_ui_language(language)
+            self.entrance.localization.apply_language(app, language)
+
     def _navigation(self) -> None:
+        choosing_language = self.stack.currentWidget() is self.language_page
         configuring = self.stack.currentWidget() is self.configure_page
-        self.back.setVisible(configuring)
-        self.next.setVisible(not configuring)
-        self.next.setEnabled(self._option is not None)
-        self.finish.setVisible(configuring)
-        self.finish.setEnabled(configuring and self._session is not None and self._session.ready)
+        translating = self.stack.currentWidget() is self.self_translation.widget
+        ready = self._session is not None and self._session.ready
+        busy = self.self_translation.busy
+        self.back.setVisible(not choosing_language)
+        self.back.setEnabled(not busy)
+        self.next.setVisible(not translating and (not configuring or self._wants_self_translation()))
+        self.next.setEnabled(not busy and (self.combo_language.currentIndex() >= 0 if choosing_language
+                                          else ready if configuring else self._option is not None))
+        self.finish.setVisible(translating or configuring and not self._wants_self_translation())
+        self.finish.setEnabled(not busy and (translating or configuring and ready))
+        self.dialog.setWindowTitle(f"{QCoreApplication.applicationName()} {tr('InitialSetupDialog', '初期設定')}")
+        self.combo_language.setItemText(0, tr("SettingsDialog", "システム規定"))
         # Derive labels from the page list so earlier/later pages can be inserted.
-        titles = [self.stack.widget(index) for index in range(self.stack.count())]
+        titles = [self.stack.widget(index) for index in range(self.stack.count())
+                  if self._wants_self_translation() or self.stack.widget(index) is not self.self_translation.widget]
         require_child(self.dialog, QLabel, "labelSteps").setText(" → ".join(
             page.accessibleName() for page in titles if page is not None
         ))
@@ -275,6 +336,23 @@ class InitialSetupController(QObject):
             self._navigation()
 
     def _next(self) -> None:
+        if self.stack.currentWidget() is self.configure_page:
+            try:
+                self._save_ai()
+                self.self_translation.refresh_ai()
+                self.stack.setCurrentWidget(self.self_translation.widget)
+                self.error.clear()
+            except Exception as error:
+                self.error.setText(str(error))
+            return
+        if self.stack.currentWidget() is self.language_page:
+            try:
+                self._save_language()
+                self.error.clear()
+                self.stack.setCurrentWidget(self.choose_page)
+            except Exception as error:
+                self.error.setText(str(error))
+            return
         option = self._option
         if option is None:
             return
@@ -310,24 +388,39 @@ class InitialSetupController(QObject):
 
     def _back(self) -> None:
         try:
-            if self._session is not None:
-                self._session.cancel()
-            self.stack.setCurrentWidget(self.choose_page)
+            if self.stack.currentWidget() is self.self_translation.widget:
+                self.self_translation.cancel()
+                self.stack.setCurrentWidget(self.choose_page)
+            elif self.stack.currentWidget() is self.configure_page:
+                if self._session is not None:
+                    self._session.cancel()
+                self.stack.setCurrentWidget(self.choose_page)
+            else:
+                self.stack.setCurrentWidget(self.language_page)
+            self.error.clear()
             self._navigation()
         except Exception as error:
             self.error.setText(str(error))
 
-    def _finish(self) -> None:
+    def _save_ai(self) -> None:
         session, option = self._session, self._option
         if session is None or option is None or not session.ready:
+            raise ValueError("AI設定の接続検証を完了してください。")
+        values = session.read_settings()
+        if not isinstance(values, AiSetupValues):
+            raise TypeError("設定値の公開契約が不正です。")
+        session.save_settings()
+        save_initial_setup(self.registry, option.provider_id, values)
+        self.saved = True
+        self._dispose()
+
+    def _finish(self) -> None:
+        if self.self_translation.busy:
             return
         try:
-            values = session.read_settings()
-            if not isinstance(values, AiSetupValues):
-                raise TypeError("設定値の公開契約が不正です。")
-            session.save_settings()
-            save_initial_setup(self.registry, option.provider_id, values)
-            self.saved = True
+            if self.stack.currentWidget() is self.configure_page:
+                self._save_ai()
+            mark_initial_setup_seen()
             self._allow_close = True
             self._dispose()
             self.dialog.accept()
@@ -336,8 +429,10 @@ class InitialSetupController(QObject):
 
     def _skip(self) -> None:
         try:
+            self.self_translation.cancel()
             if self._session is not None:
                 self._session.cancel()
+            self._save_language()
             mark_initial_setup_seen()
             self._allow_close = True
             self._dispose()

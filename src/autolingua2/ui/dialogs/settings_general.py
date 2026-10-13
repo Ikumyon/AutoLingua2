@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QCoreApplication, QObject, Qt
-from PySide6.QtWidgets import QComboBox, QDialog, QListWidget, QListWidgetItem
+from PySide6.QtWidgets import QComboBox, QDialog, QListWidget, QListWidgetItem, QPushButton, QVBoxLayout, QWidget
 
 from autolingua2.extensions import ExtensionEntrance
 from autolingua2.services.settings_store import (
@@ -11,6 +11,7 @@ from autolingua2.services.settings_store import (
 from autolingua2.services.voice_input import voice_input_available
 from autolingua2.ui.i18n import normalize_language, system_language, tr
 from .base import require_child
+from .self_translation import SelfTranslationController
 
 
 class GeneralSettingsPageController(QObject):
@@ -26,6 +27,15 @@ class GeneralSettingsPageController(QObject):
         self._setup_ui_language()
         self._setup_voice_input()
         self._setup_themes_and_icons()
+        self.self_translation = SelfTranslationController(entrance, dialog)
+        container = require_child(dialog, QWidget, "selfTranslationContainer")
+        require_child(container, QVBoxLayout, "layoutSelfTranslationContainer").addWidget(self.self_translation.widget)
+        self.self_translation_button = require_child(dialog, QPushButton, "buttonSelfTranslation")
+        self.self_translation_button.toggled.connect(container.setVisible)
+        automatic = self.self_translation.needs_os_translation()
+        self.self_translation_button.setChecked(automatic)
+        container.setVisible(automatic)
+        self.self_translation.applied.connect(self._language_created)
 
     def save(self) -> None:
         old_language = load_ui_language()
@@ -49,6 +59,11 @@ class GeneralSettingsPageController(QObject):
             if app is None:
                 raise RuntimeError("QCoreApplication インスタンスが存在しません")
             self.localization.apply_language(app, new_language)
+        self.self_translation.refresh_ai()
+
+    def _language_created(self, tag: str) -> None:
+        self._setup_ui_language()
+        self.combo_ui_language.setCurrentIndex(self.combo_ui_language.findData(tag))
 
     def _setup_ui_language(self) -> None:
         self.combo_ui_language = require_child(self.dialog, QComboBox, "comboUiLanguage")
@@ -64,7 +79,7 @@ class GeneralSettingsPageController(QObject):
 
         available_languages = self.localization.available_languages
         if not is_system and current_language not in available_languages:
-            self.combo_ui_language.addItem(current_language, current_language)
+            current_language = self.localization.resolve_language(current_language)
 
         for code, info in available_languages.items():
             if info.flag_path is not None and info.flag_path.is_file():

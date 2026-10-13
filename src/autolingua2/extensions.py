@@ -65,6 +65,10 @@ class ExtensionEntrance:
         else:
             raise ValueError(f"Unknown resource kind: {kind}")
 
+    def unregister_ui_translation(self, folder: Path) -> None:
+        self._ensure_open()
+        self._localization._unregister(folder)
+
     def _report_error(self, label: str, error: Exception) -> None:
         message = f"{label}: {type(error).__name__}: {error}"
         self._errors.append(message)

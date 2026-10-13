@@ -12,7 +12,7 @@ import urllib.request
 
 from autolingua2.infrastructure.filesystem import PROJECT_ROOT
 from autolingua2.services.ai_providers.chat import ChatMessage, ChatReply, ChatToolCall
-from autolingua2.ui.i18n import is_default_language, system_language
+from autolingua2.services.language_tags import is_default_language, system_language
 
 logger = logging.getLogger(__name__)
 

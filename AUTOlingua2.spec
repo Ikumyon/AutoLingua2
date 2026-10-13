@@ -3,6 +3,9 @@ import json
 import sys
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+import PySide6
+
+lrelease_binary = next(Path(PySide6.__file__).parent.glob('lrelease*'))
 
 sys.path.insert(0, str(Path('src').resolve()))
 plugin_datas = []
@@ -17,9 +20,9 @@ for manifest in sorted(Path('src/autolingua2/plugins').glob('*/manifest.json')):
 a = Analysis(
     ['main.py'],
     pathex=['src', '.', 'build/native'],
-    binaries=[],
+    binaries=[(str(lrelease_binary), 'PySide6')],
     datas=[('ui', 'ui'), ('assets/images/app.ico', 'assets/images'),
-           ('assets/images/app.png', 'assets/images')]
+           ('assets/images/app.png', 'assets/images'), ('assets/i18n', 'assets/i18n')]
           + plugin_datas,
     hiddenimports=['autolingua2_native'] + plugin_imports,
     hookspath=[],

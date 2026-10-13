@@ -11,6 +11,8 @@
    </rect>
   </property>
   <layout class="QFormLayout" name="formGeneral">
+   <item row="1" column="0" colspan="2"><widget class="QPushButton" name="buttonSelfTranslation"><property name="text"><string>自身の翻訳を開く</string></property><property name="checkable"><bool>true</bool></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+   <item row="2" column="0" colspan="2"><widget class="QWidget" name="selfTranslationContainer"><layout class="QVBoxLayout" name="layoutSelfTranslationContainer"/></widget></item>
    <item row="0" column="0">
     <widget class="QLabel" name="labelUiLanguage">
      <property name="text">

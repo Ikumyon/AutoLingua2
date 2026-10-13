@@ -14,6 +14,7 @@ from autolingua2.ir.validation import array, record, required, text
 from autolingua2.infrastructure.filesystem import PROJECT_ROOT
 from autolingua2.infrastructure.platform import qt_file_path
 from autolingua2.infrastructure import source_watch
+from autolingua2.services.language_tags import normalize_language
 
 if TYPE_CHECKING:
     from autolingua2.services.ai_providers.registry import ProviderRegistry
@@ -271,10 +272,14 @@ def load_ui_language(default: str = DEFAULT_UI_LANGUAGE) -> str:
     if not isinstance(ui_settings, dict):
         return default
     language = ui_settings.get(KEY_UI_LANGUAGE)
-    return str(language) if language else default
+    if not language:
+        return default
+    value = str(language)
+    return DEFAULT_UI_LANGUAGE if value.lower() == DEFAULT_UI_LANGUAGE else normalize_language(value)
 
 
 def save_ui_language(language: str) -> None:
+    language = DEFAULT_UI_LANGUAGE if language.lower() == DEFAULT_UI_LANGUAGE else normalize_language(language)
     settings = _read_settings_file()
     ui_settings = settings.get(GROUP_UI, {})
     if not isinstance(ui_settings, dict):

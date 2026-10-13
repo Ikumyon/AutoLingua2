@@ -5,7 +5,7 @@ from typing import Protocol
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
-from .i18n import LanguageInfo
+from autolingua2.ir.localization import LanguageInfo
 from .theme import ThemeInfo
 
 
@@ -13,6 +13,7 @@ class LocalizationAPI(Protocol):
     @property
     def available_languages(self) -> Mapping[str, LanguageInfo]: ...
     def apply_language(self, app: QCoreApplication, language: str) -> None: ...
+    def resolve_language(self, configured_language: str) -> str: ...
 
 
 class ThemeAPI(Protocol):

@@ -90,6 +90,8 @@ class SettingsDialogController(SimpleDialogController):
         self.apply_button.clicked.connect(lambda: self._validate_for_save(False))
         self.dialog.rejected.connect(self._cancel_save)
         self.general_page = GeneralSettingsPageController(self.dialog, entrance)
+        self.general_page.self_translation.running_changed.connect(self._self_translation_running)
+        self.dialog.rejected.connect(self.general_page.self_translation.cancel)
         self.filter_rules_page = FilterRulesPageController(
             self.dialog, self.plugins.parsers, glossary_adapter_id, glossary_game_id,
         )
@@ -200,6 +202,11 @@ class SettingsDialogController(SimpleDialogController):
             button = self.save_button if self._close_after_save else self.apply_button
             button.setText(tr("SettingsDialog", "保存中..."))
 
+    def _self_translation_running(self, running: bool) -> None:
+        self.save_button.setEnabled(not running and not self._saving)
+        self.apply_button.setEnabled(not running and not self._saving)
+        self._categories.setEnabled(not running and not self._saving)
+
     def _save_aborted(self) -> None:
         self._set_saving(False)
 
@@ -215,7 +222,7 @@ class SettingsDialogController(SimpleDialogController):
         QMessageBox.warning(self.dialog, tr("SettingsDialog", "保存エラー"), str(error))
 
     def _validate_for_save(self, close_after_save: bool = True) -> None:
-        if self._saving:
+        if self._saving or self.general_page.self_translation.busy:
             return
         self._close_after_save = close_after_save
         self._save_category = self._categories.currentItem()

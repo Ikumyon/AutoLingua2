@@ -10,6 +10,7 @@
     <item row="0" column="0"><widget class="QLabel" name="labelLanguage"><property name="text"><string>表示言語</string></property></widget></item>
     <item row="0" column="1"><widget class="QComboBox" name="comboLanguage"><property name="placeholderText"><string>言語を選択してください</string></property></widget></item>
    </layout></item>
+   <item><widget class="QCheckBox" name="checkSelfTranslation"><property name="text"><string>自身の翻訳で新しい言語を作る</string></property></widget></item>
    <item><spacer name="languageSpacer"><property name="orientation"><enum>Qt::Orientation::Vertical</enum></property><property name="sizeHint"><size><width>20</width><height>180</height></size></property></spacer></item>
   </layout>
  </widget>
