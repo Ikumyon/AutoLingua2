@@ -80,10 +80,6 @@ class IconManager:
             self._current_iconset_id = iconset_id
             self._icon_cache.clear()
 
-    @property
-    def current_iconset_id(self) -> str:
-        return self._current_iconset_id
-
     def get_icon(self, icon_name: str) -> QIcon:
         """指定されたアイコン名の QIcon を取得して返す（キャッシュ対応）。"""
         if not icon_name:

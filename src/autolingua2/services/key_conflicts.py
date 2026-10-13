@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import QIODevice, QSaveFile
@@ -17,6 +18,7 @@ ConflictConfirmation = Callable[[KeyConflict], tuple[int, ...] | None]
 def resolve_key_conflicts(
     adapter: FileAdapter, source_files: list[Path], translation_files: list[Path],
     confirm: ConflictConfirmation | None,
+    *, source_language: str = "", translation_language: str = "",
 ) -> None:
     if not isinstance(adapter, KeyConflictAdapter):
         return
@@ -33,6 +35,8 @@ def resolve_key_conflicts(
                     snapshot = adapter.inspect_key_file(path)
                     snapshots[path] = snapshot
                 for entry in snapshot.entries:
+                    language = translation_language if role == "translation" else (entry.language_code or source_language)
+                    entry = replace(entry, language_code=language)
                     grouped.setdefault(entry.key, {}).setdefault((role, entry.language_code), []).append(
                         KeyCandidate(snapshot, entry))
         conflicts = [key for key, sides in grouped.items() if any(len(items) > 1 for items in sides.values())]

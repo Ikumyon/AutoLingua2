@@ -64,6 +64,7 @@ class ChatGptTranslator(BaseHttpTranslator):
     """Sign in with ChatGPT 連携用トランスレーター（Responses API /v1/responses 準拠）。"""
 
     supports_chat = True
+    chat_image_types = ("image/png", "image/jpeg", "image/webp", "image/gif")
 
     @property
     def endpoint(self) -> str:
@@ -107,7 +108,9 @@ class ChatGptTranslator(BaseHttpTranslator):
         tools: list[dict[str, Any]], continuation: list[dict[str, Any]],
     ) -> dict[str, Any]:
         formatted_messages: list[dict[str, Any]] = [
-            {"role": m.role, "content": m.content} for m in messages
+            {"role": m.role, "content": ([{"type": "input_text", "text": m.content}]
+                + [{"type": "input_image", "image_url": image.data_url} for image in m.images]
+                if m.images else m.content)} for m in messages
         ]
         for item in continuation:
             if item.get("type") == "function_call_output":

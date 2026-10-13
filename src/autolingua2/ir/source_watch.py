@@ -13,6 +13,7 @@ class WatchTarget:
     sound_path: str = ""
     adapter_id: str = ""
     source_language: str = ""
+    source_slot: str = ""
 
 
 @dataclass(slots=True)

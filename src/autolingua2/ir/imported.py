@@ -22,6 +22,7 @@ class ImportedTranslation:
     classification: ClassificationResult | None = None
     excluded_unit_ids: set[str] = field(default_factory=set)
     inherited_workspaces: dict[str, Workspace] = field(default_factory=dict)
+    embedded_translations: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

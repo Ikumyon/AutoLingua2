@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Callable
+
 from PySide6.QtCore import (
     QCoreApplication, QEvent, QModelIndex, QObject, QPoint, QRectF,
     QSortFilterProxyModel, Qt, Signal,
@@ -20,43 +22,23 @@ def _search_editor(combo: QComboBox) -> QLineEdit:
     return editor
 
 
-def enable_combo_search(combo: QComboBox) -> None:
-    """Use an existing combo's editor to search without adding new items."""
-    editor = _search_editor(combo)
-
-    completer = QCompleter(combo.model(), combo)
-    completer.setCompletionColumn(combo.modelColumn())
-    completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-    completer.setFilterMode(Qt.MatchFlag.MatchContains)
-    completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
-    combo.setCompleter(completer)
-
-    def search(text: str) -> None:
-        completer.setCompletionPrefix(text)
-        completer.complete()
-
-    def restore_selection() -> None:
-        # Search text is temporary; only an existing item can be selected.
-        combo.setEditText(combo.itemText(combo.currentIndex()))
-
-    editor.textEdited.connect(search)
-    editor.editingFinished.connect(restore_selection)
-
-
-class SearchableActionComboBox(QComboBox):
-    """Search one source model, keeping an action above the scrolling results."""
+class SearchComboController(QObject):
+    """Search one source model, optionally displaying an action button above scrolling results."""
 
     actionRequested = Signal()
 
-    def __init__(self, action_text: str, empty_text: str, parent: QWidget,
-                 *, search_role: int = Qt.ItemDataRole.DisplayRole.value) -> None:
-        super().__init__(parent)
-        self.editor = _search_editor(self)
+    def __init__(self, combo: QComboBox, *,
+                 action_text: str = "", empty_text: str = "",
+                 search_role: int = Qt.ItemDataRole.DisplayRole.value,
+                 on_action: Callable[[], None] | None = None) -> None:
+        super().__init__(combo)
+        self.combo = combo
+        self.editor = _search_editor(combo)
         # Keep the native editor's completer empty; all results use our popup.
-        self.setCompleter(QCompleter([], self))
+        combo.setCompleter(QCompleter([], combo))
         self._searching = False
         self._composing = False
-        self._popup = QFrame(self, Qt.WindowType.Popup)
+        self._popup = QFrame(combo, Qt.WindowType.Popup)
         self._popup.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._popup.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled)
         self._popup.setAttribute(Qt.WidgetAttribute.WA_NoMouseReplay)
@@ -64,67 +46,76 @@ class SearchableActionComboBox(QComboBox):
         layout = QVBoxLayout(self._popup)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
+
         self._action = QPushButton(action_text, self._popup)
         self._action.setAutoDefault(False)
+        self._separator = QFrame(self._popup)
+        self._separator.setFrameShape(QFrame.Shape.HLine)
         layout.addWidget(self._action)
-        separator = QFrame(self._popup)
-        separator.setFrameShape(QFrame.Shape.HLine)
-        layout.addWidget(separator)
+        layout.addWidget(self._separator)
+        if not action_text:
+            self._action.hide()
+            self._separator.hide()
+
         self._results = QListView(self._popup)
         self._results.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled)
         self._results.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
         self._results.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._proxy = QSortFilterProxyModel(self)
-        self._proxy.setSourceModel(self.model())
+        self._proxy.setSourceModel(combo.model())
         self._proxy.setFilterRole(search_role)
-        self._proxy.setFilterKeyColumn(self.modelColumn())
+        self._proxy.setFilterKeyColumn(combo.modelColumn())
         self._proxy.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self._results.setModel(self._proxy)
         layout.addWidget(self._results)
+
         self._empty = QLabel(empty_text, self._popup)
         self._empty.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(self._empty)
-        for watched in (self.editor, self._popup, self._results, self._action):
+        if not empty_text:
+            self._empty.hide()
+
+        for watched in (combo, self.editor, self._popup, self._results, self._action):
             watched.installEventFilter(self)
+
         self.editor.textEdited.connect(self._search)
         self.editor.editingFinished.connect(self._editing_finished)
         self._results.clicked.connect(self._select_result)
         self._action.clicked.connect(self._request_action)
+        if on_action is not None:
+            self.actionRequested.connect(on_action)
 
-    def showPopup(self) -> None:
+    def set_action_text(self, text: str) -> None:
+        self._action.setText(text)
+        self._action.setVisible(bool(text))
+        self._separator.setVisible(bool(text))
+
+    def show_popup(self) -> None:
         if not self._searching:
             self._proxy.setFilterFixedString("")
         self._show_results(reset_selection=not self._popup.isVisible())
 
-    def hidePopup(self) -> None:
+    def hide_popup(self) -> None:
         self._popup.hide()
-        super().hidePopup()
         self._restore_selection()
 
-    def mousePressEvent(self, event: QMouseEvent) -> None:
-        # The native combo suppresses its popup when there are no items.
-        # Creation must remain available even for an empty collection.
-        if event.button() == Qt.MouseButton.LeftButton:
-            if self._popup.isVisible():
-                self.hidePopup()
-            else:
-                self.showPopup()
-            event.accept()
-        else:
-            super().mousePressEvent(event)
-
-    def wheelEvent(self, event: QWheelEvent) -> None:
-        event.ignore()
-
-    def keyPressEvent(self, event: QKeyEvent) -> None:
-        if not self._handle_key(event):
-            super().keyPressEvent(event)
-
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if watched is self._popup and event.type() == QEvent.Type.Hide:
+        if watched is self.combo:
+            if event.type() == QEvent.Type.MouseButtonPress and isinstance(event, QMouseEvent):
+                if event.button() == Qt.MouseButton.LeftButton:
+                    if self._popup.isVisible():
+                        self.hide_popup()
+                    else:
+                        self.show_popup()
+                    return True
+            elif event.type() == QEvent.Type.Wheel:
+                return True
+            elif event.type() == QEvent.Type.KeyPress and isinstance(event, QKeyEvent):
+                if self._handle_key(event):
+                    return True
+        elif watched is self._popup and event.type() == QEvent.Type.Hide:
             self._restore_selection()
-            super().hidePopup()
-        if watched in (self._popup, self._results):
+        elif watched in (self._popup, self._results):
             if isinstance(event, QInputMethodEvent):
                 self._composing = bool(event.preeditString())
                 QCoreApplication.sendEvent(self.editor, event)
@@ -137,7 +128,7 @@ class SearchableActionComboBox(QComboBox):
                     if isinstance(value, QRectF):
                         event.setValue(query, value.translated(offset.x(), offset.y()))
                 return True
-        if isinstance(event, QKeyEvent) and event.type() == QEvent.Type.KeyPress:
+        elif isinstance(event, QKeyEvent) and event.type() == QEvent.Type.KeyPress:
             if watched is self._action and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
                 self._request_action()
                 return True
@@ -156,16 +147,16 @@ class SearchableActionComboBox(QComboBox):
         key = event.key()
         if key in (Qt.Key.Key_Down, Qt.Key.Key_Up, Qt.Key.Key_F4):
             visible = self._popup.isVisible()
-            self.showPopup()
+            self.show_popup()
             if visible and key != Qt.Key.Key_F4:
                 row = self._results.currentIndex().row() + (1 if key == Qt.Key.Key_Down else -1)
                 row = max(0, min(self._proxy.rowCount() - 1, row))
-                index = self._proxy.index(row, self.modelColumn())
+                index = self._proxy.index(row, self.combo.modelColumn())
                 self._results.setCurrentIndex(index)
                 self._results.scrollTo(index)
             return True
         if key == Qt.Key.Key_Escape and (self._popup.isVisible() or self._searching):
-            self.hidePopup()
+            self.hide_popup()
             self.editor.setFocus()
             return True
         if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
@@ -184,24 +175,25 @@ class SearchableActionComboBox(QComboBox):
 
     def _show_results(self, *, reset_selection: bool) -> None:
         count = self._proxy.rowCount()
-        self._empty.setVisible(count == 0)
+        self._empty.setVisible(count == 0 and bool(self._empty.text()))
         self._results.setVisible(count > 0)
-        row_height = self.fontMetrics().height() + 12
+        row_height = self.combo.fontMetrics().height() + 12
         self._results.setFixedHeight(min(8, max(1, count)) * row_height + 4)
         current = self._results.currentIndex()
         if reset_selection or not current.isValid():
-            selected = self._proxy.mapFromSource(self.model().index(self.currentIndex(), self.modelColumn()))
+            selected = self._proxy.mapFromSource(self.combo.model().index(self.combo.currentIndex(), self.combo.modelColumn()))
             current = (selected if not self._searching and selected.isValid()
-                       else self._proxy.index(0, self.modelColumn()))
+                       else self._proxy.index(0, self.combo.modelColumn()))
             self._results.setCurrentIndex(current)
-        screen = self.screen().availableGeometry()
-        width = min(screen.width(), max(self.width(), self._action.sizeHint().width() + 16))
+        screen = self.combo.screen().availableGeometry()
+        action_width = self._action.sizeHint().width() + 16 if self._action.isVisible() else 0
+        width = min(screen.width(), max(self.combo.width(), action_width))
         height = min(screen.height(), self._popup.sizeHint().height())
-        position = self.mapToGlobal(self.rect().bottomLeft())
+        position = self.combo.mapToGlobal(self.combo.rect().bottomLeft())
         x = max(screen.left(), min(position.x(), screen.right() - width + 1))
         y = position.y() + 1
         if y + height > screen.bottom() + 1:
-            y = self.mapToGlobal(self.rect().topLeft()).y() - height
+            y = self.combo.mapToGlobal(self.combo.rect().topLeft()).y() - height
         y = max(screen.top(), y)
         self._popup.setGeometry(x, y, width, height)
         if not self._popup.isVisible():
@@ -217,14 +209,14 @@ class SearchableActionComboBox(QComboBox):
         if not source.isValid():
             return
         row = source.row()
-        self.hidePopup()
-        self.setCurrentIndex(row)
-        self.setEditText(self.itemText(row))
-        self.activated.emit(row)
+        self.hide_popup()
+        self.combo.setCurrentIndex(row)
+        self.combo.setEditText(self.combo.itemText(row))
+        self.combo.activated.emit(row)
         self.editor.setFocus()
 
     def _request_action(self) -> None:
-        self.hidePopup()
+        self.hide_popup()
         self.actionRequested.emit()
 
     def _editing_finished(self) -> None:
@@ -234,4 +226,51 @@ class SearchableActionComboBox(QComboBox):
     def _restore_selection(self) -> None:
         self._searching = False
         self._composing = False
-        self.setEditText(self.itemText(self.currentIndex()))
+        self.combo.setEditText(self.combo.itemText(self.combo.currentIndex()))
+
+
+def enable_combo_search(
+    combo: QComboBox,
+    *,
+    action_text: str = "",
+    empty_text: str = "",
+    search_role: int = Qt.ItemDataRole.DisplayRole.value,
+    on_action: Callable[[], None] | None = None,
+) -> SearchComboController:
+    """Enable searchable popup on an existing combo, optionally with an action button."""
+    controller = SearchComboController(
+        combo,
+        action_text=action_text,
+        empty_text=empty_text,
+        search_role=search_role,
+        on_action=on_action,
+    )
+    combo._search_controller = controller  # type: ignore[attr-defined]
+    return controller
+
+
+class SearchableActionComboBox(QComboBox):
+    """Search one source model, keeping an action above the scrolling results."""
+
+    actionRequested = Signal()
+
+    def __init__(self, action_text: str, empty_text: str, parent: QWidget,
+                 *, search_role: int = Qt.ItemDataRole.DisplayRole.value) -> None:
+        super().__init__(parent)
+        self.controller = enable_combo_search(
+            self,
+            action_text=action_text,
+            empty_text=empty_text,
+            search_role=search_role,
+            on_action=self.actionRequested.emit,
+        )
+
+    @property
+    def editor(self) -> QLineEdit:
+        return self.controller.editor
+
+    def showPopup(self) -> None:
+        self.controller.show_popup()
+
+    def hidePopup(self) -> None:
+        self.controller.hide_popup()

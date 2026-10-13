@@ -160,6 +160,9 @@
         </layout>
        </item>
        <item>
+        <widget class="DropZone" name="dropGlossaryImport"/>
+       </item>
+       <item>
         <layout class="QHBoxLayout" name="layoutTermTools">
          <item>
           <widget class="QLineEdit" name="editTermSearch">
@@ -251,6 +254,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>DropZone</class>
+   <extends>QWidget</extends>
+   <header>autolingua2.ui.components.drop_zone</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

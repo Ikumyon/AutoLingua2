@@ -113,50 +113,50 @@ class RangeScrubberWidget(QWidget):
     # ------------------------------------------------------------------
     # QSS スタイルプロパティ (qproperty-<name>)
     # ------------------------------------------------------------------
-    @Property(QColor)
-    def fillColor(self) -> QColor:
+    def _get_fill_color(self) -> QColor:
         return self.fill_color
 
-    @fillColor.setter
-    def fillColor(self, color: QColor) -> None:
+    def _set_fill_color(self, color: QColor) -> None:
         self.fill_color = color
         self.update()
 
-    @Property(QColor)
-    def hoverColor(self) -> QColor:
+    fillColor = Property(QColor, _get_fill_color, _set_fill_color)
+
+    def _get_hover_color(self) -> QColor:
         return self.hover_color
 
-    @hoverColor.setter
-    def hoverColor(self, color: QColor) -> None:
+    def _set_hover_color(self, color: QColor) -> None:
         self.hover_color = color
         self.update()
 
-    @Property(QColor)
-    def bgColor(self) -> QColor:
+    hoverColor = Property(QColor, _get_hover_color, _set_hover_color)
+
+    def _get_bg_color(self) -> QColor:
         return self.bg_color
 
-    @bgColor.setter
-    def bgColor(self, color: QColor) -> None:
+    def _set_bg_color(self, color: QColor) -> None:
         self.bg_color = color
         self.update()
 
-    @Property(QColor)
-    def borderColor(self) -> QColor:
+    bgColor = Property(QColor, _get_bg_color, _set_bg_color)
+
+    def _get_border_color(self) -> QColor:
         return self.border_color
 
-    @borderColor.setter
-    def borderColor(self, color: QColor) -> None:
+    def _set_border_color(self, color: QColor) -> None:
         self.border_color = color
         self.update()
 
-    @Property(QColor)
-    def textColor(self) -> QColor:
+    borderColor = Property(QColor, _get_border_color, _set_border_color)
+
+    def _get_text_color(self) -> QColor:
         return self.text_color
 
-    @textColor.setter
-    def textColor(self, color: QColor) -> None:
+    def _set_text_color(self, color: QColor) -> None:
         self.text_color = color
         self.update()
+
+    textColor = Property(QColor, _get_text_color, _set_text_color)
 
     # ------------------------------------------------------------------
     # プロパティ
@@ -181,9 +181,6 @@ class RangeScrubberWidget(QWidget):
             if self._input_edit.isVisible():
                 self._cancel_inline_edit()
             self.update()
-
-    def set_current_page(self, current_page: int) -> None:
-        self.set_pages(current_page, self._max_value)
 
     def _update_minimum_width(self) -> None:
         """桁数に応じた最小幅を自動計算して設定。"""

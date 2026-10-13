@@ -42,10 +42,12 @@ pub fn run(ui: &Ui, cancel: &AtomicBool) -> io::Result<()> {
     } else if context.core_running()? {
         return target.activate(&context).map_err(|err| error(format!("既存の本体が応答しません: {err}")));
     }
-    let _ = bootstrap::update_status();
+    let update_info = bootstrap::update_status();
+    let has_update = update_info.contains("\"state\":\"available\"") || update_info.contains("\"state\": \"available\"");
+    let update_info_opt = if has_update { Some(update_info.as_str()) } else { None };
     let credential = bootstrap::token()?;
     let mut listener = Listener::bind(&context.endpoint(&format!("boot-{}", &credential[..16])))?;
-    let mut child = target.spawn(&credential)?;
+    let mut child = target.spawn(&credential, update_info_opt)?;
     ui.phase("本体の初期化を待っています…".into());
     let result = monitor(ui, cancel, &mut child, &mut listener, &credential);
     if result.is_err() {

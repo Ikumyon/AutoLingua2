@@ -6,7 +6,7 @@ QFrame#frameIconDrop {
     background-color: rgba(255, 255, 255, 0.04);
 }
 
-QFrame#frameDropZone:hover,
+QFrame#frameDropZone:hover:enabled,
 QFrame#frameInheritDropZone:hover,
 QFrame#frameIconDrop:hover {
     border-color: #3b82f6;

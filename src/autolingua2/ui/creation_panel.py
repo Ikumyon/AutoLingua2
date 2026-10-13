@@ -28,7 +28,7 @@ class CommonCreationAdapter:
     def on_game_selected(self, game_id: str, context: PluginContext) -> None:
         pass
 
-    def format_target_path_label(self, path: Path, current_source_lang: str) -> tuple[str, str, str]:
+    def format_target_path_label(self, path: Path, source_slot: str) -> tuple[str, str, str]:
         return path.name, "", str(path)
 
     def dispose_creation_panel(self, panel: QWidget) -> None:

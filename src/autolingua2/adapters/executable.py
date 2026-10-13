@@ -100,17 +100,17 @@ class ExecutableAdapter:
     def can_load(self, path: Path) -> bool:
         return path.is_file() and path.suffix.lower() in self.suffixes
 
-    def filter_source_files(self, paths: list[Path], current_source_lang: str) -> list[Path]:
+    def filter_source_files(self, paths: list[Path], source_slot: str) -> list[Path]:
         self._operation.languages.clear()
         self.suggestions = {}
         result = record(self.rpc.call("inspect_paths", {
-            "paths": [str(p.resolve()) for p in paths], "source_language": current_source_lang,
+            "paths": [str(p.resolve()) for p in paths], "source_slot": source_slot,
         }))
         files = [Path(text(p, nonempty=True)).resolve() for p in array(required(result, "files"))]
         if any(not self.can_load(p) for p in files):
             raise ValueError("解析結果に非対応または存在しないファイルが含まれています。")
         language = text(required(result, "source_language"), nonempty=True)
-        if language not in dict(self.supported_languages) or (current_source_lang != "auto" and language != current_source_lang):
+        if language not in dict(self.supported_languages):
             raise ValueError("解析結果の翻訳元言語が不正です。")
         suggestions = {
             key: text(value) for key, value in record(result.get("suggestions", {})).items()

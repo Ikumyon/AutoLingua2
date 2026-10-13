@@ -87,40 +87,14 @@
                   <number>6</number>
                  </property>
                  <item>
-                  <widget class="QFrame" name="frameIconDrop">
-                   <property name="minimumSize">
+                  <widget class="DropZone" name="frameIconDrop">
+<property name="minimumSize">
                     <size>
                      <width>0</width>
                      <height>84</height>
                     </size>
                    </property>
-                   <property name="acceptDrops">
-                    <bool>true</bool>
-                   </property>
-                   <property name="styleSheet">
-                    <string notr="true">QFrame#frameIconDrop { border-width: 1.5px; border-style: dashed; border-radius: 6px; }</string>
-                   </property>
-                   <property name="frameShape">
-                    <enum>QFrame::Shape::StyledPanel</enum>
-                   </property>
-                   <layout class="QVBoxLayout" name="layoutIconDrop">
-                    <property name="spacing">
-                     <number>6</number>
-                    </property>
-                    <property name="leftMargin">
-                     <number>9</number>
-                    </property>
-                    <property name="topMargin">
-                     <number>9</number>
-                    </property>
-                    <property name="rightMargin">
-                     <number>9</number>
-                    </property>
-                    <property name="bottomMargin">
-                     <number>9</number>
-                    </property>
-                    <item>
-                     <widget class="QLabel" name="labelIconPreview">
+<widget class="QLabel" name="labelIconPreview">
                       <property name="styleSheet">
                        <string notr="true">font-size: 11px; color: palette(placeholder-text);</string>
                       </property>
@@ -135,42 +109,7 @@
                        <bool>true</bool>
                       </property>
                      </widget>
-                    </item>
-                   </layout>
                   </widget>
-                 </item>
-                 <item>
-                  <layout class="QHBoxLayout" name="layoutIconButtons">
-                   <property name="spacing">
-                    <number>6</number>
-                   </property>
-                   <item>
-                    <widget class="QPushButton" name="buttonBrowseIcon">
-                     <property name="toolTip">
-                      <string>アイコン画像ファイルを選択</string>
-                     </property>
-                     <property name="text">
-                      <string>選択...</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item>
-                    <widget class="QPushButton" name="buttonClearIcon">
-                     <property name="maximumSize">
-                      <size>
-                       <width>24</width>
-                       <height>24</height>
-                      </size>
-                     </property>
-                     <property name="toolTip">
-                      <string>アイコンを解除</string>
-                     </property>
-                     <property name="text">
-                      <string>✕</string>
-                     </property>
-                    </widget>
-                   </item>
-                  </layout>
                  </item>
                  <item>
                   <widget class="QLineEdit" name="editIconPath">
@@ -289,26 +228,6 @@
                     </layout>
                    </item>
                    <item>
-                    <layout class="QVBoxLayout" name="layoutSourceLanguage">
-                     <property name="spacing">
-                      <number>4</number>
-                     </property>
-                     <item>
-                      <widget class="QLabel" name="labelSourceLanguage">
-                       <property name="styleSheet">
-                        <string notr="true">font-weight: 600;</string>
-                       </property>
-                       <property name="text">
-                        <string>翻訳元言語 (原文):</string>
-                       </property>
-                      </widget>
-                     </item>
-                     <item>
-                      <widget class="QComboBox" name="comboSourceLanguage"/>
-                     </item>
-                    </layout>
-                   </item>
-                   <item>
                     <layout class="QVBoxLayout" name="layoutOutputSection">
                      <property name="spacing">
                       <number>4</number>
@@ -369,30 +288,23 @@
                         <number>6</number>
                        </property>
                        <item>
-                        <widget class="QFrame" name="frameDropZone">
-                         <property name="acceptDrops">
-                          <bool>true</bool>
-                         </property>
-                         <property name="styleSheet">
-                          <string notr="true">QFrame#frameDropZone { border-width: 1.5px; border-style: dashed; border-radius: 6px; padding: 10px; }</string>
-                         </property>
-                         <property name="frameShape">
-                          <enum>QFrame::Shape::StyledPanel</enum>
-                         </property>
-                         <layout class="QVBoxLayout" name="layoutTargetDropInner">
-                          <property name="leftMargin">
-                           <number>0</number>
-                          </property>
-                          <property name="topMargin">
-                           <number>0</number>
-                          </property>
-                          <property name="rightMargin">
-                           <number>0</number>
-                          </property>
-                          <property name="bottomMargin">
-                           <number>0</number>
-                          </property>
-                         </layout>
+                        <layout class="QFormLayout" name="layoutSourceLanguages">
+                         <item row="0" column="0">
+                          <widget class="QLabel" name="labelSourceSlot">
+                           <property name="text"><string>ファイルの絞り込み:</string></property>
+                          </widget>
+                         </item>
+                         <item row="0" column="1"><widget class="QComboBox" name="comboSourceSlot"/></item>
+                         <item row="1" column="0">
+                          <widget class="QLabel" name="labelSourceLanguage">
+                           <property name="text"><string>原文の言語:</string></property>
+                          </widget>
+                         </item>
+                         <item row="1" column="1"><widget class="QComboBox" name="comboSourceLanguage"/></item>
+                        </layout>
+                       </item>
+                       <item>
+                        <widget class="DropZone" name="frameDropZone">
                         </widget>
                        </item>
                        <item>
@@ -439,22 +351,36 @@
                         <number>6</number>
                        </property>
                        <item>
-                        <widget class="QFrame" name="frameInheritDropZone">
-                         <property name="acceptDrops">
-                          <bool>true</bool>
-                         </property>
-                         <property name="styleSheet">
-                          <string notr="true">QFrame#frameInheritDropZone { border-width: 1.5px; border-style: dashed; border-radius: 6px; padding: 10px; }</string>
-                         </property>
-                         <property name="frameShape">
-                          <enum>QFrame::Shape::StyledPanel</enum>
-                         </property>
-                         <layout class="QVBoxLayout" name="layoutInheritDropInner">
-                          <property name="spacing">
-                           <number>8</number>
-                          </property>
-                          <item>
-                           <widget class="QLabel" name="labelInheritDropPrompt">
+                        <layout class="QHBoxLayout" name="layoutInheritSlot">
+                         <item>
+                          <widget class="QLabel" name="labelInheritSlot">
+                           <property name="text"><string>ファイルの絞り込み:</string></property>
+                          </widget>
+                         </item>
+                         <item><widget class="QComboBox" name="comboInheritSlot"/></item>
+                        </layout>
+                       </item>
+                       <item>
+                        <layout class="QHBoxLayout" name="layoutInheritLanguage">
+                         <item>
+                          <widget class="QLabel" name="labelInheritLanguage">
+                           <property name="text"><string>訳文の言語:</string></property>
+                          </widget>
+                         </item>
+                         <item>
+                          <widget class="QComboBox" name="comboInheritLanguage"/>
+                         </item>
+                        </layout>
+                       </item>
+                       <item>
+                        <widget class="QLabel" name="labelEmbeddedTranslations">
+                         <property name="text"><string>原文のParaTranz JSONに含まれる訳文も、この言語へ継承します。</string></property>
+                         <property name="wordWrap"><bool>true</bool></property>
+                        </widget>
+                       </item>
+                       <item>
+                        <widget class="DropZone" name="frameInheritDropZone">
+<widget class="QLabel" name="labelInheritDropPrompt">
                             <property name="styleSheet">
                              <string notr="true">font-weight: bold; font-size: 12px;</string>
                             </property>
@@ -465,55 +391,6 @@
                              <set>Qt::AlignmentFlag::AlignCenter</set>
                             </property>
                            </widget>
-                          </item>
-                          <item>
-                           <layout class="QHBoxLayout" name="layoutInheritButtons">
-                            <property name="spacing">
-                             <number>8</number>
-                            </property>
-                            <item>
-                             <spacer name="spacerInheritLeft">
-                              <property name="orientation">
-                               <enum>Qt::Orientation::Horizontal</enum>
-                              </property>
-                              <property name="sizeHint" stdset="0">
-                               <size>
-                                <width>40</width>
-                                <height>20</height>
-                               </size>
-                              </property>
-                             </spacer>
-                            </item>
-                            <item>
-                             <widget class="QPushButton" name="buttonInheritFolder">
-                              <property name="text">
-                               <string>フォルダ追加</string>
-                              </property>
-                             </widget>
-                            </item>
-                            <item>
-                             <widget class="QPushButton" name="buttonInheritFile">
-                              <property name="text">
-                               <string>ファイル追加</string>
-                              </property>
-                             </widget>
-                            </item>
-                            <item>
-                             <spacer name="spacerInheritRight">
-                              <property name="orientation">
-                               <enum>Qt::Orientation::Horizontal</enum>
-                              </property>
-                              <property name="sizeHint" stdset="0">
-                               <size>
-                                <width>40</width>
-                                <height>20</height>
-                               </size>
-                              </property>
-                             </spacer>
-                            </item>
-                           </layout>
-                          </item>
-                         </layout>
                         </widget>
                        </item>
                        <item>
@@ -2043,6 +1920,19 @@ QPushButton#buttonChatSend:hover:enabled {
            <number>0</number>
           </property>
           <item>
+           <widget class="QPushButton" name="buttonChatAttach">
+            <property name="toolTip">
+             <string>画像・ファイルを添付</string>
+            </property>
+            <property name="accessibleName">
+             <string>画像・ファイルを添付</string>
+            </property>
+            <property name="text">
+             <string notr="true">＋</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="ComboMenuButton" name="buttonChatModel">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
@@ -2284,6 +2174,11 @@ QPushButton#buttonChatModel::menu-indicator {
    <class>ComboMenuButton</class>
    <extends>QPushButton</extends>
    <header>autolingua2.ui.components.combo_menu_button</header>
+  </customwidget>
+  <customwidget>
+   <class>DropZone</class>
+   <extends>QWidget</extends>
+   <header>autolingua2.ui.components.drop_zone</header>
   </customwidget>
  </customwidgets>
  <resources/>

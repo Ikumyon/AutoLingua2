@@ -25,7 +25,8 @@ from .translations import tr
 class ParadoxCreationAdapter:
     """UI hooks supplied through the common plugin entrance."""
 
-    def __init__(self) -> None:
+    def __init__(self, adapter: reader.ParadoxYamlAdapter) -> None:
+        self._adapter = adapter
         self._panels: set[ParadoxCreationPanel] = set()
 
     def create_creation_panel(self, context: PluginContext) -> QWidget:
@@ -42,8 +43,8 @@ class ParadoxCreationAdapter:
                 context.creation.set_target_slot(game.default_slot_id)
                 break
 
-    def format_target_path_label(self, path: Path, current_source_lang: str) -> tuple[str, str, str]:
-        return format_target_label(path, current_source_lang)
+    def format_target_path_label(self, path: Path, source_slot: str) -> tuple[str, str, str]:
+        return format_target_label(path, source_slot, self._adapter)
 
     def dispose_creation_panel(self, panel: QWidget) -> None:
         if not isinstance(panel, ParadoxCreationPanel):
@@ -148,7 +149,7 @@ class ParadoxCreationPanel(QWidget):
 
     def _browse_file(self) -> None:
         parent = self
-        file_filter = tr("ParadoxPlugin", "Paradox YAML ファイル (*.yml *.yaml);;すべてのファイル (*.*)")
+        file_filter = tr("ParadoxPlugin", "Paradox YAML / ParaTranz JSON (*.yml *.yaml *.json);;すべてのファイル (*.*)")
         files, _ = QFileDialog.getOpenFileNames(parent, tr("ParadoxPlugin", "翻訳対象のYAMLファイルを選択"), "", file_filter)
         for f in files:
             self._run(lambda: self.context.creation.add_target_path(Path(f)))
@@ -189,48 +190,14 @@ def handle_paths_dropped(paths: list[Path], context: PluginContext) -> list[Path
     return other_paths
 
 
-def format_target_label(path: Path, current_source_lang: str) -> tuple[str, str, str]:
+def format_target_label(path: Path, source_slot: str, adapter: reader.ParadoxYamlAdapter) -> tuple[str, str, str]:
     """対象フォルダ/ファイルの表示ラベル、スタイル、ツールチップを生成する。"""
-    from ..parser.reader import detect_file_language_from_name
-
-
+    files = adapter.filter_source_files([path], source_slot)
+    if not files:
+        raise ValueError(tr("ParadoxPlugin", "選択した言語スロットの対象ファイルがありません"))
     if path.is_file():
         return path.name, "", str(path)
-
-    # フォルダ内の対象YAMLファイルをファイル名から瞬時に走査
-    yaml_files = [f for f in path.rglob("*") if f.is_file() and f.suffix.lower() in {".yml", ".yaml"}]
-    if not yaml_files:
-        raise ValueError(tr("ParadoxPlugin", "対象となるYAMLファイルが見つかりません"))
-
-    if current_source_lang and current_source_lang != "auto":
-        matching = [f for f in yaml_files if detect_file_language_from_name(f) == current_source_lang]
-        count = len(matching)
-        if count == 0:
-            raise ValueError(tr("ParadoxPlugin", f"選択言語（{current_source_lang}）の対象ファイルがありません"))
-        text = tr("ParadoxPlugin", "{name} ({count}件)").format(name=path.name, count=count)
-        tooltip = tr("ParadoxPlugin", "{path}\n対象ファイル数: {count}件").format(path=str(path), count=count)
-        return text, "", tooltip
-
-    # auto の場合
-    lang_counts: dict[str, int] = {}
-    for f in yaml_files:
-        lang = detect_file_language_from_name(f)
-        if lang:
-            lang_counts[lang] = lang_counts.get(lang, 0) + 1
-
-    if len(lang_counts) == 1:
-        count = next(iter(lang_counts.values()))
-        text = tr("ParadoxPlugin", "{name} ({count}件)").format(name=path.name, count=count)
-        tooltip = tr("ParadoxPlugin", "{path}\n対象ファイル数: {count}件").format(path=str(path), count=count)
-        return text, "", tooltip
-    elif len(lang_counts) > 1:
-        total = sum(lang_counts.values())
-        detail = ", ".join(f"{l}: {c}件" for l, c in lang_counts.items())
-        text = tr("ParadoxPlugin", "{name} ({count}件)").format(name=path.name, count=total)
-        tooltip = tr("ParadoxPlugin", "{path}\n合計: {count}件 ({detail})").format(path=str(path), count=total, detail=detail)
-        return text, "", tooltip
-    else:
-        count = len(yaml_files)
-        text = tr("ParadoxPlugin", "{name} ({count}件)").format(name=path.name, count=count)
-        tooltip = tr("ParadoxPlugin", "{path}\n対象ファイル数: {count}件").format(path=str(path), count=count)
-        return text, "", tooltip
+    count = len(files)
+    text = tr("ParadoxPlugin", "{name} ({count}件)").format(name=path.name, count=count)
+    tooltip = tr("ParadoxPlugin", "{path}\n対象ファイル数: {count}件").format(path=str(path), count=count)
+    return text, "", tooltip

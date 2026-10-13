@@ -27,7 +27,15 @@ class FileAdapter(Protocol):
     def detect_source_language(self, path: Path) -> str | None:
         ...
 
-    def filter_source_files(self, paths: list[Path], current_source_lang: str) -> list[Path]:
+    def filter_source_files(self, paths: list[Path], source_slot: str) -> list[Path]:
+        ...
+
+
+@runtime_checkable
+class EmbeddedTranslationAdapter(Protocol):
+    """Optional capability for input files containing both source and translation."""
+
+    def contains_translations(self, path: Path) -> bool:
         ...
 
 

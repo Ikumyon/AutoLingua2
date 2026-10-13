@@ -33,7 +33,7 @@ class ApplicationConsoleHandler(logging.StreamHandler):
     _console = True
 
 
-def _clean_old_logs(folder: Path, keep: int = 20) -> None:
+def _clean_old_logs(folder: Path, keep: int = 10) -> None:
     try:
         logs = sorted(folder.glob("app_*.log"))
         if len(logs) > keep:
@@ -60,7 +60,7 @@ def configure_logging() -> None:
     if _current_log_file is None:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
         _current_log_file = folder / f"app_{timestamp}.log"
-        _clean_old_logs(folder, keep=20)
+        _clean_old_logs(folder, keep=10)
 
     handler = ApplicationFileHandler(
         _current_log_file,

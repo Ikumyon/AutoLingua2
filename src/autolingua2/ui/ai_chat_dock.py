@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 import json
+from base64 import b64decode
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSize, Qt, QTimer, QUrl, Slot
-from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon
+from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QPixmap
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QDockWidget, QFormLayout, QLabel, QMainWindow, QMenu,
-    QPushButton, QWidget, QWidgetAction,
+    QApplication, QComboBox, QDialog, QDockWidget, QFileDialog, QFormLayout, QLabel, QMainWindow, QMenu,
+    QPushButton, QVBoxLayout, QWidget, QWidgetAction,
 )
 
 from autolingua2.services.ai_chat import AiChatSession, ChatFile, ChatReference
@@ -64,6 +66,9 @@ class AiChatDockController(QObject):
         self.history.action_requested.connect(self._web_action)
         self.model_button = require_child(window, ComboMenuButton, "buttonChatModel")
         control_height = require_child(window, QComboBox, "comboTargetLanguage").sizeHint().height()
+        self.attach_button = require_child(window, QPushButton, "buttonChatAttach")
+        self.attach_button.setFixedSize(control_height, control_height)
+        self.attach_button.clicked.connect(self._attach_files)
         self.model_button.setFixedHeight(control_height)
         self.send_button = require_child(window, QPushButton, "buttonChatSend")
         self.send_button.setFixedSize(control_height, control_height)
@@ -152,6 +157,10 @@ class AiChatDockController(QObject):
         ai_busy = self.session.busy
         voice_busy = self.voice_input.active
         self.input.setReadOnly(ai_busy or voice_busy)
+        self.attach_button.setEnabled(not ai_busy and not voice_busy)
+        attach_label = tr("AiChat", "画像・ファイルを添付")
+        self.attach_button.setToolTip(attach_label)
+        self.attach_button.setAccessibleName(attach_label)
         self.send_button.setEnabled(not voice_busy and self.history.is_ready)
         self.send_button.setIcon(self._get_icon("stop" if ai_busy else "send-24"))
         send_label = tr("AiChat", "停止") if ai_busy else tr("AiChat", "送信")
@@ -347,7 +356,32 @@ class AiChatDockController(QObject):
     def _view_reference(self, value: object) -> None:
         if not isinstance(value, ChatAttachment):
             raise TypeError("Invalid chat reference")
+        if value.image is not None:
+            pixmap = QPixmap()
+            if not pixmap.loadFromData(b64decode(value.image.data)):
+                self._append("error", tr("AiChat", "画像を表示できません。"))
+                return
+            dialog = QDialog(self.window)
+            dialog.setWindowTitle(value.name)
+            layout = QVBoxLayout(dialog)
+            label = QLabel(dialog)
+            label.setPixmap(pixmap.scaled(QSize(800, 600), Qt.AspectRatioMode.KeepAspectRatio,
+                                          Qt.TransformationMode.SmoothTransformation))
+            layout.addWidget(label)
+            dialog.exec()
+            dialog.deleteLater()
+            return
         show_details(self.window, value.name, value.origin + "\n\n" + value.content)
+
+    @Slot()
+    def _attach_files(self) -> None:
+        if self.input.isReadOnly():
+            return
+        paths, _ = QFileDialog.getOpenFileNames(
+            self.window, tr("AiChat", "画像・ファイルを添付"), "",
+            tr("AiChat", "画像 (*.png *.jpg *.jpeg *.webp *.gif);;テキスト・その他のファイル (*)"),
+        )
+        self.input.insert_files([Path(path) for path in paths])
 
     @Slot(str)
     def _web_ready(self, instructions: str) -> None:

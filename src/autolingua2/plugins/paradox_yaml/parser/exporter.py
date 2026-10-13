@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 from pathlib import Path
 import re
 
@@ -51,6 +52,8 @@ class ParadoxYamlExporter:
             path = Path(source.id)
             if path.is_absolute() or ".." in path.parts:
                 raise ValueError("原文の相対パスが不正です。")
+            if path.suffix.lower() == ".json":
+                path = path.with_suffix("")
             folders = list(path.parent.parts)
             root_index = next((index for index, part in enumerate(folders)
                                if part.lower() in {"localisation", "localization"}), None)
@@ -78,4 +81,41 @@ class ParadoxYamlExporter:
             else:
                 content = rendered.encode("utf-8")
             outputs.append(ExportFile(destination, b"\xef\xbb\xbf" + content))
+        return outputs
+
+
+class ParaTranzJsonExporter:
+    id = "paratranz_json"
+    name = "ParaTranz JSON (*.json)"
+
+    def plan(self, workspaces: list[ImportedTranslation], settings: dict[str, object]) -> list[ExportFile]:
+        outputs: list[ExportFile] = []
+        for imported in workspaces:
+            if not imported.project.target_language:
+                raise ValueError("出力する訳文の言語を選択してください。")
+            source_ids = {source.id for source in imported.project.sources}
+            if any(ref.source_id not in source_ids for ref in imported.source_refs.values()):
+                raise ValueError("存在しない原文への参照があります。")
+            for source in imported.project.sources:
+                path = Path(source.id)
+                if path.is_absolute() or ".." in path.parts:
+                    raise ValueError("原文の相対パスが不正です。")
+                if path.suffix.lower() != ".json":
+                    path = path.with_name(f"{path.name}.json")
+                entries: list[dict[str, object]] = []
+                for unit in imported.project.units:
+                    ref = imported.source_refs.get(unit.id)
+                    if ref is None:
+                        raise ValueError(f"キーの参照情報がありません: {unit.label}")
+                    if ref.source_id != source.id:
+                        continue
+                    saved = ref.data.get("paratranz_entry")
+                    entry = json.loads(saved) if saved is not None else {"key": f"{ref.external_id}:0 ", "stage": 0}
+                    if not isinstance(entry, dict):
+                        raise ValueError(f"ParaTranzの参照情報が不正です: {unit.label}")
+                    entry["original"] = unit.source_text
+                    entry["translation"] = unit.target_text
+                    entries.append(entry)
+                content = (json.dumps(entries, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+                outputs.append(ExportFile(Path(imported.project.target_language) / path, content))
         return outputs

@@ -144,9 +144,12 @@ def load_paths(paths: list[Path], adapter: FileAdapter) -> ImportedTranslation:
 def merge_imports(imports: list[ImportedTranslation]) -> ImportedTranslation:
     project = TranslationProject()
     source_refs: dict[str, SourceRef] = {}
+    embedded_translations: dict[str, str] = {}
     for imported in imports:
         if set(source_refs).intersection(imported.source_refs):
             raise ValueError("Duplicate translation unit IDs")
         project.extend(imported.project)
         source_refs.update(imported.source_refs)
-    return ImportedTranslation(project=project, source_refs=source_refs)
+        embedded_translations.update(imported.embedded_translations)
+    return ImportedTranslation(project=project, source_refs=source_refs,
+                               embedded_translations=embedded_translations)

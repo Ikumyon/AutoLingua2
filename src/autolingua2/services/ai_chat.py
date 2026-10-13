@@ -109,13 +109,19 @@ class AiChatSession(QObject):
         # token limits are reported by the API; this caps accidental huge posts.
         if sum(len(m.content) for m in self.history) + len(content) > 200_000:
             raise ValueError("会話と参照が大きすぎます。参照を減らすか、新しい会話を開始してください。")
+        images = tuple(attachment.image for attachment in attachments if attachment.image is not None)
+        conversation_images = tuple(image for message in self.history for image in message.images) + images
+        if any(image.mime_type not in translator.chat_image_types for image in conversation_images):
+            raise ValueError("会話に含まれる画像形式に、このプロバイダは対応していません。画像を変更するか、新しい会話を開始してください。")
+        if sum(len(image.data) for image in conversation_images) > 12_000_000:
+            raise ValueError("会話の画像が大きすぎます。画像を減らすか、新しい会話を開始してください。")
         self._clear_operation_continuation()
         self.translator = translator
         self._turn_project = self.operations.project_id
         self._turn_scope = {"language": self.operations.scope_language,
                             "file_id": self.operations.scope_file, "ids": list(self.operations.scope_selection)}
         self._history_start = len(self.history)
-        self.history.append(ChatMessage("user", content))
+        self.history.append(ChatMessage("user", content, images))
         self.continuation = []
         self._turn_notes = []
         self._rounds = 0

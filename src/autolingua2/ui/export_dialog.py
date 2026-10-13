@@ -14,7 +14,9 @@ from PySide6.QtWidgets import (
 
 from autolingua2.ir.imported import ImportedTranslation
 from autolingua2.plugins.api import ExportSettingsPanel
+from autolingua2.services.bmfont_exporter import BmFontCharListExporter
 from autolingua2.services.export_contract import TranslationExporter
+from autolingua2.ui.bmfont_export_panel import BmFontExportSettingsPanel
 from autolingua2.ui.dialogs.base import SimpleDialogController, require_child
 from autolingua2.ui.i18n import tr
 
@@ -246,10 +248,18 @@ class ExportDialog(SimpleDialogController):
                  panels: Mapping[str, ExportSettingsPanel], directory: Path,
                  preferred_plugin: str, parent: QWidget) -> None:
         super().__init__("ExportDialog.ui", parent)
+        merged_exporters: dict[str, TranslationExporter] = dict(exporters)
+        merged_panels: dict[str, ExportSettingsPanel] = dict(panels)
+        builtin_key = "builtin:bmfont_chars"
+        if builtin_key not in merged_exporters:
+            merged_exporters[builtin_key] = BmFontCharListExporter()
+        if builtin_key not in merged_panels:
+            merged_panels[builtin_key] = BmFontExportSettingsPanel()
+
         self._workspaces = workspaces
-        self._exporters = exporters
-        self._panels = panels
-        self._keys = list(exporters)
+        self._exporters = merged_exporters
+        self._panels = merged_panels
+        self._keys = list(merged_exporters)
         self._panel: ExportSettingsPanel | None = None
         self._widget: QWidget | None = None
         self.exporter: TranslationExporter | None = None
@@ -292,7 +302,7 @@ class ExportDialog(SimpleDialogController):
         # Navigation controls must not accidentally submit the dialog on Return.
         for name in ("buttonBack", "buttonForward", "buttonUp", "buttonNewFolder", "buttonCancel"):
             require_child(self.dialog, QPushButton, name).setAutoDefault(False)
-        for exporter in exporters.values():
+        for exporter in self._exporters.values():
             self._formats.addItem(exporter.name)
         preferred = next((index for index, key in enumerate(self._keys)
                           if key.startswith(preferred_plugin + ":")), 0)

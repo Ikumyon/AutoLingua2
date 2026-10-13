@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 import sqlite3
 
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, QPersistentModelIndex, QPoint, QSignalBlocker, Qt, QTimer
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QAbstractItemDelegate, QCheckBox, QComboBox, QDialog,
-    QDialogButtonBox, QHeaderView, QLabel, QLineEdit, QListWidget,
+    QDialogButtonBox, QFileDialog, QHeaderView, QLabel, QLineEdit, QListWidget,
     QMenu, QMessageBox, QPlainTextEdit, QPushButton, QSplitter, QStyledItemDelegate,
     QTableWidget, QTableWidgetItem, QTableWidgetSelectionRange, QTreeWidget, QTreeWidgetItem, QWidget,
 )
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
 from autolingua2.extensions import ExtensionEntrance
 from autolingua2.ir.glossary import Glossary, GlossaryTerm, PARTS_OF_SPEECH, glossary_chain
 from autolingua2.services.glossary_store import GlossaryStore
+from autolingua2.ui.components.drop_zone import DropZone
 from autolingua2.ui.components.searchable_combo_box import enable_combo_search
 from autolingua2.ui.i18n import tr
 from .base import SimpleDialogController, require_child
@@ -133,6 +135,14 @@ class GlossaryPageController:
         self.add_term = require_child(widget, QPushButton, "buttonAddTerm")
         self.edit_term = require_child(widget, QPushButton, "buttonEditTerm")
         self.delete_term = require_child(widget, QPushButton, "buttonDeleteTerm")
+        self.import_drop = require_child(widget, DropZone, "dropGlossaryImport")
+        self.import_drop.allowed_extensions = {".json"}
+        self.import_drop.allow_multiple = False
+        self.import_drop.dialog_filter = "JSON (*.json)"
+        self.import_drop.set_hint_text(tr("Glossary", "ParaTranz JSONをドロップ"))
+        self.import_drop.add_button(tr("Glossary", "ファイルを選択"), self._select_import_file)
+        self.import_drop.files_dropped.connect(self._import_paths)
+        self.import_drop.multiple_files_rejected.connect(self._reject_multiple_import_files)
         splitter = require_child(widget, QSplitter, "splitterGlossary")
         splitter.setSizes([1, 3])
         splitter.setStretchFactor(0, 1)
@@ -168,8 +178,8 @@ class GlossaryPageController:
         self.tree.currentItemChanged.connect(self._selection_changed)
         self.tree_search.textChanged.connect(self._filter_tree)
         self.term_search.textChanged.connect(self._refresh_terms)
-        self.source_language.currentIndexChanged.connect(self._refresh_terms)
-        self.target_language.currentIndexChanged.connect(self._refresh_terms)
+        self.source_language.currentIndexChanged.connect(self._language_changed)
+        self.target_language.currentIndexChanged.connect(self._language_changed)
         self.add_glossary.clicked.connect(self._add_glossary)
         self.delete_glossary.clicked.connect(self._delete_glossary)
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -268,6 +278,58 @@ class GlossaryPageController:
             return tr("Glossary", "子用語集があるため削除できません")
         return ""
 
+    def _term_add_reason(self, glossary: Glossary | None) -> str:
+        if glossary is None:
+            return tr("Glossary", "用語集を選択してください")
+        if not (self.source_language.currentData() and self.target_language.currentData()):
+            return tr("Glossary", "原語と訳語を選択してください")
+        return ""
+
+    def _update_term_actions(self) -> None:
+        glossary = self._selected_glossary()
+        reason = self._term_add_reason(glossary)
+        self.add_term.setEnabled(not reason)
+        self.add_term.setToolTip(reason)
+        self.import_drop.setEnabled(not reason)
+        self.import_drop.set_hint_text(reason or tr("Glossary", "ParaTranz JSONをドロップ"))
+        self.import_drop.setToolTip(reason)
+
+    def _reject_multiple_import_files(self) -> None:
+        self._error(ValueError(tr("Glossary", "JSONファイルは1つずつ取り込んでください。")))
+
+    def _select_import_file(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self.widget, tr("Glossary", "ParaTranz JSONを取り込む"), "", "JSON (*.json)")
+        if path:
+            self._import_paths([Path(path)])
+
+    def _import_paths(self, paths: list[Path]) -> None:
+        if len(paths) != 1:
+            self._reject_multiple_import_files()
+            return
+        glossary = self._selected_glossary()
+        reason = self._term_add_reason(glossary)
+        if reason:
+            self._error(ValueError(reason))
+            return
+        if glossary is None:
+            raise ValueError("用語集を選択してください")
+        try:
+            added, updated = self.store.import_paratranz_terms(
+                paths[0], glossary.id, str(self.source_language.currentData() or ""),
+                str(self.target_language.currentData() or ""))
+        except STORAGE_ERRORS as exc:
+            self._error(exc)
+            return
+        self._refresh_terms()
+        QMessageBox.information(
+            self.widget, tr("Glossary", "取り込み完了"),
+            tr("Glossary", "追加：{added}件\n更新：{updated}件").format(added=added, updated=updated))
+
+    def _language_changed(self, *_args: object) -> None:
+        self._update_term_actions()
+        self._refresh_terms()
+
     def _glossary_menu(self, position: QPoint) -> None:
         item = self.tree.itemAt(position)
         if item is None:
@@ -365,7 +427,7 @@ class GlossaryPageController:
         reason = self._glossary_delete_reason(glossary)
         self.delete_glossary.setEnabled(not reason)
         self.delete_glossary.setToolTip(reason)
-        self.add_term.setEnabled(glossary is not None)
+        self._update_term_actions()
         self.name.setEnabled(glossary is not None)
         self.name.setText(glossary.name if glossary is not None else "")
         if glossary is not None:
@@ -456,7 +518,7 @@ class GlossaryPageController:
 
     def _open_term(self, edit: bool) -> None:
         glossary = self._selected_glossary()
-        if glossary is None:
+        if glossary is None or (not edit and bool(self._term_add_reason(glossary))):
             return
         term = self._selected_term() if edit else None
         if edit and term is None:

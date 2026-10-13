@@ -41,4 +41,4 @@ impl CoreSession {
 fn os_error(err: std::io::Error) -> PyErr { PyOSError::new_err(err.to_string()) }
 
 #[pyfunction]
-pub fn update_status() -> (&'static str, &'static str) { super::update_status() }
+pub fn update_status() -> String { super::update_status() }

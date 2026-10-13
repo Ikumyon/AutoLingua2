@@ -6,7 +6,6 @@ import logging
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
-from dataclasses import asdict
 from PySide6.QtCore import QIODevice, QSaveFile
 from autolingua2.ir.source_watch import WatchSettings, WatchTarget
 from autolingua2.ir.translation import LowModelRange, ModelSelection
@@ -41,7 +40,6 @@ KEY_AI_PROVIDERS = "providers"
 KEY_AI_API_KEY = "api_key"
 KEY_AI_SELECTED_MODEL = "selected_model"
 KEY_AI_MODELS = "models"
-KEY_AI_SELECTED_MODELS = "selected_models"
 KEY_AI_CONCURRENCY = "concurrency"
 KEY_INITIAL_SETUP_SEEN = "initial_setup_seen"
 KEY_WINDOW_GEOMETRY = "window_geometry"
@@ -568,6 +566,7 @@ def load_watch_settings() -> WatchSettings:
             [text(suffix, nonempty=True) for suffix in array(required(target, "suffixes"))],
             text(target.get("icon_path", "")), text(target.get("sound_path", "")),
             text(target.get("adapter_id", "")), text(target.get("source_language", "")),
+            text(target.get("source_slot", "")),
         ))
     return WatchSettings(enabled, targets)
 

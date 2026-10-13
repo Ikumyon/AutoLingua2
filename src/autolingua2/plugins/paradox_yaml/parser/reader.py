@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import re
 from collections.abc import Callable
 
@@ -44,6 +45,8 @@ SLOT_LANGUAGE: dict[str, str] = {slot.slot_id: slot.language_code for slot in PA
 
 
 def detect_file_slot_from_name(path: Path) -> str | None:
+    if path.suffix.lower() == ".json":
+        path = path.with_suffix("")
     stem = path.stem.lower()
     for slot in SLOT_LANGUAGE:
         if stem.endswith(f"_{slot}") or stem == slot:
@@ -81,10 +84,19 @@ PARADOX_YAML_DEFAULT_RULES: list[FilterRule] = [
 ]
 
 
+def is_paratranz_json(path: Path) -> bool:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+    return isinstance(data, list) and all(isinstance(entry, dict)
+        and {"key", "original", "translation"} <= entry.keys() for entry in data)
+
+
 class ParadoxYamlAdapter:
     id = "paradox_yaml"
     name = "Paradox YAML"
-    suffixes = {".yml", ".yaml"}
+    suffixes = {".yml", ".yaml", ".json"}
     supported_games = PARADOX_GAMES
     supported_languages: list[tuple[str, str]] = list(dict.fromkeys(
         (slot.language_code, slot.name) for slot in PARADOX_STANDARD_SLOTS
@@ -97,26 +109,38 @@ class ParadoxYamlAdapter:
         self._detect_encoding = detect_encoding
 
     def can_load(self, path: Path) -> bool:
-        return path.is_file() and path.suffix.lower() in self.suffixes
+        if not path.is_file() or path.suffix.lower() not in self.suffixes:
+            return False
+        if path.suffix.lower() != ".json":
+            return True
+        return is_paratranz_json(path)
 
-    def filter_source_files(self, paths: list[Path], current_source_lang: str) -> list[Path]:
+    def contains_translations(self, path: Path) -> bool:
+        if path.is_dir():
+            return any(self.contains_translations(child) for child in path.rglob("*.json"))
+        return path.suffix.lower() == ".json" and self.can_load(path)
+
+    def filter_source_files(self, paths: list[Path], source_slot: str) -> list[Path]:
         files: dict[Path, None] = {}
         for path in paths:
             if not path.exists():
                 raise ValueError(f"対象が見つかりません: {path}")
             if path.is_file() and not self.can_load(path):
-                raise ValueError(f"YAMLファイルではありません: {path}")
+                raise ValueError(f"YAMLまたはParaTranz JSONファイルではありません: {path}")
             for child in sorted(path.rglob("*")) if path.is_dir() else [path]:
                 if self.can_load(child):
                     files[child.resolve()] = None
-        languages = {path: self.detect_source_language(path) for path in files}
-        selected = current_source_lang
-        if selected == "auto":
-            detected = {language for language in languages.values() if language}
-            if len(detected) != 1 or any(language is None for language in languages.values()):
-                raise ValueError("翻訳元言語を一意に検出できません。言語を選択してください。")
-            selected = detected.pop()
-        return [path for path, language in languages.items() if language == selected]
+        if not source_slot:
+            return list(files)
+        return [path for path in files if self.detect_source_slot(path) == source_slot]
+
+    def detect_source_slot(self, path: Path) -> str | None:
+        if path.is_dir():
+            slots = {self.detect_source_slot(child) for child in path.rglob("*") if self.can_load(child)}
+            return next(iter(slots)) if len(slots) == 1 else None
+        if path.suffix.lower() == ".json":
+            return detect_file_slot_from_name(path)
+        return self._detect_file_language(path) or detect_file_slot_from_name(path)
 
     def detect_source_language(self, path: Path) -> str | None:
         if path.is_dir():
@@ -126,6 +150,8 @@ class ParadoxYamlAdapter:
         from_name = detect_file_language_from_name(path)
         if from_name:
             return from_name
+        if path.suffix.lower() == ".json":
+            return None
         return SLOT_LANGUAGE.get(self._detect_file_language(path) or "")
 
     def _detect_file_language(self, path: Path) -> str | None:
@@ -143,11 +169,46 @@ class ParadoxYamlAdapter:
         return None
 
     def load(self, path: Path) -> ImportedTranslation:
+        if path.suffix.lower() == ".json":
+            return self._load_paratranz(path, path.read_text(encoding="utf-8-sig"))
         text = self._read_text(path)
         return self._load_text(path, text)
 
+    def _load_paratranz(self, path: Path, text: str) -> ImportedTranslation:
+        data = json.loads(text)
+        if not isinstance(data, list):
+            raise ValueError("ParaTranz JSONは配列で指定してください。")
+        source_id = str(path)
+        slot = detect_file_slot_from_name(path) or ""
+        project = TranslationProject(sources=[TranslationSource(source_id, path.name)],
+                                     source_language=SLOT_LANGUAGE.get(slot, ""), source_slot=slot)
+        imported = ImportedTranslation(project)
+        for index, entry in enumerate(data, 1):
+            if not isinstance(entry, dict) or any(not isinstance(entry.get(field), str)
+                                                 for field in ("key", "original", "translation")):
+                raise ValueError(f"ParaTranz JSONの{index}件目: key・original・translationは文字列が必要です。")
+            key = entry["key"].strip()
+            match = re.fullmatch(r"([A-Za-z0-9_.-]+):\d+", key)
+            key = match.group(1) if match else key
+            if not key:
+                raise ValueError(f"ParaTranz JSONの{index}件目: keyが空です。")
+            unit_id = f"{source_id}#{index}:{key}"
+            project.units.append(TranslationUnit(unit_id, key, entry["original"], context=path.name,
+                                                issues=validate_value(entry["original"])))
+            imported.source_refs[unit_id] = SourceRef(source_id, key, str(index),
+                {"paratranz_entry": json.dumps(entry, ensure_ascii=False)})
+            imported.embedded_translations[unit_id] = entry["translation"]
+        return imported
+
     def inspect_key_file(self, path: Path) -> KeyFile:
         content = path.read_bytes()
+        if path.suffix.lower() == ".json":
+            imported = self._load_paratranz(path, content.decode("utf-8-sig"))
+            entries = tuple(KeyEntry(unit.label, imported.project.source_language, unit.source_text,
+                                     int(imported.source_refs[unit.id].location))
+                            for unit in imported.project.units)
+            return KeyFile(path.resolve(), content, "utf-8", b"\xef\xbb\xbf" if content.startswith(b"\xef\xbb\xbf")
+                           else b"", entries)
         encoding = self._detect_encoding(content)
         bom = next((mark for mark in (b"\xef\xbb\xbf", b"\xff\xfe", b"\xfe\xff")
                     if content.startswith(mark)), b"")
@@ -167,6 +228,10 @@ class ParadoxYamlAdapter:
         if not lines <= {entry.line_number for entry in snapshot.entries}:
             raise ValueError("削除するキー行が見つかりません。")
         text = snapshot.content[len(snapshot.bom):].decode(snapshot.encoding)
+        if snapshot.path.suffix.lower() == ".json":
+            data = json.loads(text)
+            remaining_entries = [entry for index, entry in enumerate(data, 1) if index not in lines]
+            return snapshot.bom + (json.dumps(remaining_entries, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
         remaining = "".join(line for number, line in enumerate(text.splitlines(keepends=True), 1)
                             if number not in lines)
         return snapshot.bom + remaining.encode(snapshot.encoding)

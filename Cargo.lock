@@ -441,6 +441,7 @@ name = "autolingua-launcher"
 version = "0.1.0"
 dependencies = [
  "autolingua2-native",
+ "chrono",
  "slint",
  "slint-build",
  "winres",

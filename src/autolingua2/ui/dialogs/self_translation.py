@@ -9,6 +9,7 @@ from autolingua2.extensions import ExtensionEntrance
 from autolingua2.services.language_tags import normalize_language, qt_language_options, system_language
 from autolingua2.services.settings_store import load_ai_settings, load_ui_language, save_ui_language
 from autolingua2.services.ui_translation import UiTranslationService, coverage
+from autolingua2.ui.components.searchable_combo_box import enable_combo_search
 from autolingua2.ui.i18n import tr
 from .base import load_ui, require_child
 
@@ -34,28 +35,29 @@ class SelfTranslationController(QObject):
         self.stop_button = require_child(self.widget, QPushButton, "buttonStop")
         self.status = require_child(self.widget, QLabel, "labelStatus")
         self.progress = require_child(self.widget, QProgressBar, "progressTranslation")
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(200)
+        self._timer.timeout.connect(self._refresh)
         self._choices = qt_language_options()
         for tag, name in self._choices:
             self.target.addItem(f"{name} [{tag}]", tag)
-        completer = self.target.completer()
-        if completer is not None:
-            completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-            completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        enable_combo_search(
+            self.target,
+            action_text=tr("SelfTranslation", "＋一覧にない言語を指定…"),
+            on_action=self._open_custom,
+        )
         os_tag = system_language()
         require_child(self.widget, QLabel, "valueOsLanguage").setText(
             f"{QLocale.system().nativeLanguageName()} [{os_tag}]",
         )
         self.custom_button.setChecked(self.target.findData(os_tag) < 0)
-        self.custom.setVisible(self.custom_button.isChecked())
+        self._custom_changed(self.custom_button.isChecked())
         self.target.setEnabled(not self.custom_button.isChecked())
         self.target.setCurrentIndex(max(0, self.target.findData(os_tag)))
         self.tag_edit.setText(os_tag)
         self.name_edit.setText(QLocale.system().nativeLanguageName() or os_tag)
-        self._timer = QTimer(self)
-        self._timer.setSingleShot(True)
-        self._timer.setInterval(200)
-        self._timer.timeout.connect(self._refresh)
-        self.target.editTextChanged.connect(self._schedule)
+        self.target.currentIndexChanged.connect(self._schedule)
         self.tag_edit.textChanged.connect(self._schedule)
         self.name_edit.textChanged.connect(self._schedule)
         self.custom_button.toggled.connect(self._custom_changed)
@@ -104,9 +106,18 @@ class SelfTranslationController(QObject):
             self.model.setCurrentIndex(max(0, self.model.findData(settings.selected_models.get(identifier, ""))))
         self._schedule()
 
+    def _open_custom(self) -> None:
+        self.custom_button.setChecked(True)
+        self.tag_edit.setFocus()
+        self.tag_edit.selectAll()
+
     def _custom_changed(self, checked: bool) -> None:
         self.custom.setVisible(checked)
         self.target.setEnabled(not checked)
+        self.custom_button.setText(
+            tr("SelfTranslation", "一覧から選択に戻る") if checked
+            else tr("SelfTranslation", "一覧にない言語を指定")
+        )
         self._schedule()
 
     def _schedule(self) -> None:
@@ -121,12 +132,10 @@ class SelfTranslationController(QObject):
             if not name:
                 raise ValueError(tr("SelfTranslation", "言語の表示名を入力してください。"))
             return tag, name
-        query = self.target.currentText().strip().casefold()
-        matches = [(tag, name) for tag, name in self._choices
-                   if query in (tag.casefold(), name.casefold(), f"{name} [{tag}]".casefold())]
-        if len(matches) != 1:
-            raise ValueError(tr("SelfTranslation", "翻訳先を候補から選択してください。"))
-        return matches[0]
+        index = self.target.currentIndex()
+        if 0 <= index < len(self._choices):
+            return self._choices[index]
+        raise ValueError(tr("SelfTranslation", "翻訳先を候補から選択してください。"))
 
     def _refresh(self) -> None:
         if self.busy:

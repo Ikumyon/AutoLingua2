@@ -13,6 +13,7 @@ class OpenAiTranslator(BaseHttpTranslator):
     """OpenAI API用の翻訳トランスレーター（BaseHttpTranslatorの差分のみ実装）。"""
 
     supports_chat = True
+    chat_image_types = ("image/png", "image/jpeg", "image/webp", "image/gif")
 
     def extract_usage(self, data: dict[str, Any]) -> TranslationUsage:
         usage = data.get("usage")
@@ -30,7 +31,9 @@ class OpenAiTranslator(BaseHttpTranslator):
         return {
             "model": self.model,
             "messages": [{"role": "system", "content": system_prompt}]
-            + [{"role": m.role, "content": m.content} for m in messages] + continuation,
+            + [{"role": m.role, "content": ([{"type": "text", "text": m.content}]
+                + [{"type": "image_url", "image_url": {"url": image.data_url}} for image in m.images]
+                if m.images else m.content)} for m in messages] + continuation,
             "tools": [{"type": "function", "function": {
                 "name": t["name"], "description": t["description"], "parameters": t["inputSchema"],
             }} for t in tools],

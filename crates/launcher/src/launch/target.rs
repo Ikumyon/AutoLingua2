@@ -58,7 +58,7 @@ impl Target {
         } else { activate(context) }
     }
 
-    pub(super) fn spawn(&self, credential: &str) -> io::Result<Child> {
+    pub(super) fn spawn(&self, credential: &str, update_info: Option<&str>) -> io::Result<Child> {
         let mut command = Command::new(&self.executable);
         command.args(&self.args).current_dir(&self.root)
             .env("AUTOLINGUA_BOOT_TOKEN", credential)
@@ -66,6 +66,11 @@ impl Target {
             .env_remove("AUTOLINGUA_RESTART_TICKET").env_remove("AUTOLINGUA_RESTART_PID")
             .env("PYINSTALLER_RESET_ENVIRONMENT", "1")
             .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::from(log_file()?));
+        if let Some(info) = update_info {
+            command.env("AUTOLINGUA_UPDATE_INFO", info);
+        } else {
+            command.env_remove("AUTOLINGUA_UPDATE_INFO");
+        }
         if let Some(root) = &self.development {
             command.env("AUTOLINGUA_DEVELOPMENT_ROOT", root);
             command.env("PYTHONPATH", std::env::join_paths([root.join("build/native"), root.join("src")]).map_err(error)?);

@@ -18,6 +18,7 @@ class GeminiTranslator(BaseHttpTranslator):
     """Google Gemini API用の翻訳トランスレーター（BaseHttpTranslatorの差分のみ実装）。"""
 
     supports_chat = True
+    chat_image_types = ("image/png", "image/jpeg", "image/webp")
 
     def extract_usage(self, data: dict[str, Any]) -> TranslationUsage:
         usage = data.get("usageMetadata")
@@ -32,7 +33,9 @@ class GeminiTranslator(BaseHttpTranslator):
         return {
             "system_instruction": {"parts": [{"text": system_prompt}]},
             "contents": [{"role": "model" if m.role == "assistant" else "user",
-                          "parts": [{"text": m.content}]} for m in messages] + continuation,
+                          "parts": [{"text": m.content}] + [
+                              {"inlineData": {"mimeType": image.mime_type, "data": image.data}}
+                              for image in m.images]} for m in messages] + continuation,
             "tools": [{"functionDeclarations": [{
                 "name": t["name"], "description": t["description"], "parametersJsonSchema": t["inputSchema"],
             } for t in tools]}],

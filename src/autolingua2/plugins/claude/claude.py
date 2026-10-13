@@ -20,6 +20,7 @@ class ClaudeTranslator(BaseHttpTranslator):
     """Anthropic Claude API用の翻訳トランスレーター（BaseHttpTranslatorの差分のみ実装）。"""
 
     supports_chat = True
+    chat_image_types = ("image/png", "image/jpeg", "image/webp", "image/gif")
 
     def extract_usage(self, data: dict[str, Any]) -> TranslationUsage:
         usage = data.get("usage")
@@ -34,7 +35,10 @@ class ClaudeTranslator(BaseHttpTranslator):
                            tools: list[dict[str, Any]], continuation: list[dict[str, Any]]) -> dict[str, Any]:
         return {
             "model": self.model, "max_tokens": 4096, "system": system_prompt,
-            "messages": [{"role": m.role, "content": m.content} for m in messages] + continuation,
+            "messages": [{"role": m.role, "content": ([{"type": "text", "text": m.content}]
+                + [{"type": "image", "source": {"type": "base64", "media_type": image.mime_type,
+                    "data": image.data}} for image in m.images]
+                if m.images else m.content)} for m in messages] + continuation,
             "tools": [{"name": t["name"], "description": t["description"],
                        "input_schema": t["inputSchema"]} for t in tools],
         }

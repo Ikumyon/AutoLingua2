@@ -99,6 +99,16 @@ class ChatComposer(QTextEdit):
         super().clear()
         self._references.clear()
 
+    def insert_files(self, paths: list[Path], cursor: QTextCursor | None = None) -> None:
+        if self.isReadOnly():
+            return
+        for path in paths:
+            try:
+                self.insert_reference(read_chat_file(path), cursor)
+                cursor = self.textCursor()
+            except (OSError, ValueError) as exc:
+                self.reference_error.emit(str(exc))
+
     def keyPressEvent(self, event: QKeyEvent) -> None:
         if (not self._preediting and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
                 and not event.modifiers() & Qt.KeyboardModifier.ShiftModifier):
@@ -157,13 +167,9 @@ class ChatComposer(QTextEdit):
             else:
                 for url in mime.urls():
                     if not url.isLocalFile():
-                        raise ValueError("ローカルのテキストファイルを選択してください")
-                    try:
-                        reference = read_chat_file(Path(url.toLocalFile()))
-                        self.insert_reference(reference, cursor)
-                        cursor = self.textCursor()
-                    except (OSError, ValueError) as exc:
-                        self.reference_error.emit(str(exc))
+                        raise ValueError("ローカルの画像・テキストファイルを選択してください")
+                    self.insert_files([Path(url.toLocalFile())], cursor)
+                    cursor = self.textCursor()
         except (ValueError, UnicodeError) as exc:
             self.reference_error.emit(str(exc))
         event.setDropAction(Qt.DropAction.CopyAction)

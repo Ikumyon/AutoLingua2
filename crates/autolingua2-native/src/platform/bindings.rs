@@ -132,3 +132,10 @@ pub fn spawn_launcher(py: Python<'_>, command: Vec<String>, environment: HashMap
         Ok(())
     }).map_err(|err: std::io::Error| PyOSError::new_err(err.to_string()))
 }
+
+#[pyfunction]
+pub fn schedule_update_on_exit(py: Python<'_>, zip_path: String, app_dir: String) -> PyResult<()> {
+    py.detach(|| {
+        os_impl::schedule_update_on_exit(Path::new(&zip_path), Path::new(&app_dir))
+    }).map_err(|err: String| PyOSError::new_err(err))
+}

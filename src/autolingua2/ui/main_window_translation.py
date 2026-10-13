@@ -64,16 +64,16 @@ class MainWindowTranslationController(QObject):
                 return None
             provider = host.plugins.providers.get(selection.provider_id)
             if provider is None or not any(item.enabled and item.model == selection.model_id
-                                          for item in host.ai_models.get(selection.provider_id, [])):
+                                          for item in host.ai_settings.models.get(selection.provider_id, [])):
                 invalid(f"{label}モデルが利用できません。設定 → 翻訳を確認してください。")
                 return None
-            api_key = host.ai_api_keys.get(selection.provider_id, "")
+            api_key = host.ai_settings.api_keys.get(selection.provider_id, "")
             if not api_key:
                 invalid(f"{label}モデルのAPIキーが未設定です。設定 → AIで設定してください。")
                 return None
             return TranslationModel(provider, api_key, selection.model_id)
 
-        high, low = selected_model(host.ai_high_model, "高"), selected_model(host.ai_low_model, "低")
+        high, low = selected_model(host.ai_settings.high_model, "高"), selected_model(host.ai_settings.low_model, "低")
         if high is None or low is None:
             return None
         source = host.project.source_language
@@ -90,7 +90,7 @@ class MainWindowTranslationController(QObject):
             workspace_language_name(host.workspace_service, target),
             tone=next((tone for tone in host.tone_choices if tone.id == host.selected_tone_id), None),
             tone_items=tuple(tone for tone in host.tone_choices if isinstance(tone, ToneItem)),
-            low_model_range=host.ai_low_model_range, concurrency=host.ai_concurrency,
+            low_model_range=host.ai_settings.low_model_range, concurrency=host.ai_settings.concurrency,
         )
 
     def _text_context(self) -> TranslationTextContext:

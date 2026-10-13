@@ -25,7 +25,10 @@ class ImportWorker(QThread):
         parent=None,
         *,
         game_id: str,
+        source_slot: str = "",
         inherited_paths: list[Path] | None = None,
+        inherited_slot: str = "",
+        inherited_language: str = "",
         inherited_state: UnitState = UnitState.HUMAN_REVIEWED,
     ):
         super().__init__(parent)
@@ -33,7 +36,10 @@ class ImportWorker(QThread):
         self.paths = list(paths)
         self.language = language
         self.game_id = game_id
+        self.source_slot = source_slot
+        self.inherited_slot = inherited_slot
         self.inherited_paths = list(inherited_paths) if inherited_paths else []
+        self.inherited_language = inherited_language
         self.inherited_state = inherited_state
         self.cancel_event = Event()
         self._confirmation = Condition()
@@ -73,7 +79,10 @@ class ImportWorker(QThread):
                 imported = import_project(
                     self.adapter, self.paths, self.language,
                     game_id=self.game_id,
+                    source_slot=self.source_slot,
                     inherited_paths=self.inherited_paths,
+                    inherited_slot=self.inherited_slot,
+                    inherited_language=self.inherited_language,
                     inherited_state=self.inherited_state,
                     confirm_conflict=self.confirm_conflict,
                 )

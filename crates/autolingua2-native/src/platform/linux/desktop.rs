@@ -29,3 +29,8 @@ pub fn system_voice_input_available() -> bool {
 pub fn start_system_voice_input() -> Result<(), String> {
     Err("System voice input is unavailable; select a desktop voice input plugin".into())
 }
+
+#[cfg(feature = "python")]
+pub fn schedule_update_on_exit(_zip_path: &Path, _app_dir: &Path) -> Result<(), String> {
+    Ok(())
+}

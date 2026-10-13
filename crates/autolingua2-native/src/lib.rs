@@ -33,6 +33,7 @@ fn autolingua2_native(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     platform_module.add_function(wrap_pyfunction!(platform::bindings::qt_file_path, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::bindings::show_folder, &platform_module)?)?;
     platform_module.add_function(wrap_pyfunction!(platform::spawn_launcher, &platform_module)?)?;
+    platform_module.add_function(wrap_pyfunction!(platform::bindings::schedule_update_on_exit, &platform_module)?)?;
     platform_module.add_class::<platform::PluginProcess>()?;
     platform_module.add_class::<platform::BinaryReader>()?;
     platform_module.add_class::<platform::BinaryWriter>()?;

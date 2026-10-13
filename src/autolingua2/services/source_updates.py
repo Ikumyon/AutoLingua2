@@ -78,6 +78,7 @@ def set_project_notification(project: TranslationProject, path: Path | None, reg
         if adapter is not None:
             existing.adapter_id = adapter.id
             existing.source_language = project.source_language
+            existing.source_slot = project.source_slot
         apply_watch_settings(settings)
         return
     settings.targets = [entry for entry in settings.targets if entry.source_root != root]
@@ -88,6 +89,7 @@ def set_project_notification(project: TranslationProject, path: Path | None, reg
         target.project_path = str(path.resolve()) if path is not None else ""
         target.adapter_id = adapter.id
         target.source_language = project.source_language
+        target.source_slot = project.source_slot
         settings.targets.append(target)
     apply_watch_settings(settings)
 
@@ -117,7 +119,8 @@ def notification_target(path: Path) -> WatchTarget:
 
 def import_notification_target(target: WatchTarget, adapter: FileAdapter) -> ImportedTranslation:
     root = Path(target.source_root)
-    return import_project(adapter, [root], target.source_language, source_root=root, allow_empty=True)
+    return import_project(adapter, [root], target.source_language, source_root=root, allow_empty=True,
+                          source_slot=target.source_slot, inherit_embedded=False)
 
 
 def ensure_watcher() -> None:
@@ -164,7 +167,8 @@ def prepare_update(service: WorkspaceService, target: WatchTarget, adapter: File
     observed = source_watch.snapshot(settings_path(), path)
     root = Path(target.source_root)
     imported = import_project(adapter, [root], service.imported.project.source_language,
-                              source_root=root, allow_empty=True, game_id=service.imported.project.game_id)
+                              source_root=root, allow_empty=True, game_id=service.imported.project.game_id,
+                              source_slot=service.imported.project.source_slot, inherit_embedded=False)
     if source_watch.snapshot(settings_path(), path) != observed:
         raise ValueError("読み込み中に翻訳元が変更されました。もう一度確認してください。")
     old = {unit.id: unit for unit in service.imported.project.units}

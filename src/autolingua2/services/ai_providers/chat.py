@@ -6,9 +6,20 @@ from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
+class ChatImage:
+    mime_type: str
+    data: str
+
+    @property
+    def data_url(self) -> str:
+        return f"data:{self.mime_type};base64,{self.data}"
+
+
+@dataclass(frozen=True, slots=True)
 class ChatMessage:
     role: str
     content: str
+    images: tuple[ChatImage, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

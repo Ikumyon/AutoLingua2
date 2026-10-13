@@ -206,6 +206,7 @@ class BaseHttpTranslator(TextTranslator, ABC):
         ...
 
     supports_chat = False
+    chat_image_types: tuple[str, ...] = ()
 
     def extract_usage(self, data: dict[str, Any]) -> TranslationUsage:
         return TranslationUsage()
