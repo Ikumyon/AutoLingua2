@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 from collections.abc import Callable, Mapping
 import json
 from base64 import b64decode
@@ -81,7 +83,7 @@ class AiChatDockController(QObject):
         self.status = require_child(window, QLabel, "labelChatStatus")
         self.scope_combo = QComboBox(window)
         self.scope_combo.setToolTip(tr("AiChat", "操作の対象範囲"))
-        for label, value in (("プロジェクト全体", "project"), ("現在のファイル", "file"), ("選択行", "selection")):
+        for label, value in ((translation_source('AiChat', "プロジェクト全体"), "project"), (translation_source('AiChat', "現在のファイル"), "file"), (translation_source('AiChat', "選択行"), "selection")):
             self.scope_combo.addItem(tr("AiChat", label), value)
         self.execution_combo = QComboBox(window)
         self.execution_combo.addItem(tr("AiChat", "提案を確認"), True)
@@ -520,7 +522,7 @@ class AiChatDockController(QObject):
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if watched is self.dock and event.type() == QEvent.Type.LanguageChange:
-            for index, label in enumerate(("プロジェクト全体", "現在のファイル", "選択行")):
+            for index, label in enumerate((translation_source('AiChat', "プロジェクト全体"), translation_source('AiChat', "現在のファイル"), translation_source('AiChat', "選択行"))):
                 self.scope_combo.setItemText(index, tr("AiChat", label))
             for index, label in enumerate(("提案を確認", "依頼どおり実行")):
                 self.execution_combo.setItemText(index, tr("AiChat", label))

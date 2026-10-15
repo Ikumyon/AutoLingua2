@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 from typing import Callable
 
 from PySide6.QtWidgets import QHeaderView, QLineEdit, QMessageBox, QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QWidget
@@ -13,7 +15,7 @@ from autolingua2.ui.language_names import workspace_language_name
 
 class WorkspaceLanguageDialog(SimpleDialogController):
     def __init__(self, service: WorkspaceService, changed: Callable[[str | None], None], parent: QWidget) -> None:
-        super().__init__("WorkspaceLanguageDialog.ui", parent)
+        super().__init__("dialogs/WorkspaceLanguageDialog.ui", parent)
         self.service = service
         self.changed = changed
         self.tabs = require_child(self.dialog, QTabWidget, "tabs")
@@ -41,7 +43,7 @@ class WorkspaceLanguageDialog(SimpleDialogController):
             self.table.setItem(row, 0, QTableWidgetItem(name))
             self.table.setItem(row, 1, QTableWidgetItem(language.code))
             added = language.code in self.service.workspaces
-            button = QPushButton(tr("WorkspaceLanguageDialog", "追加済み · 削除" if added else "追加"))
+            button = QPushButton(tr("WorkspaceLanguageDialog", translation_source('WorkspaceLanguageDialog', '追加済み · 削除') if added else translation_source('WorkspaceLanguageDialog', '追加')))
             button.clicked.connect(lambda checked=False, code=language.code: self.toggle(code))
             self.table.setCellWidget(row, 2, button)
 

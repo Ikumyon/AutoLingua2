@@ -3,12 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication, QLocale, QObject, Qt, QTimer, Signal
-from PySide6.QtWidgets import QComboBox, QLabel, QLineEdit, QProgressBar, QPushButton, QWidget
+from PySide6.QtWidgets import (
+    QComboBox, QFileDialog, QLabel, QLineEdit, QMessageBox, QProgressBar, QPushButton,
+    QRadioButton, QStackedWidget, QWidget,
+)
 
 from autolingua2.extensions import ExtensionEntrance
 from autolingua2.services.language_tags import normalize_language, qt_language_options, system_language
 from autolingua2.services.settings_store import load_ai_settings, load_ui_language, save_ui_language
-from autolingua2.services.ui_translation import UiTranslationService, coverage
+from autolingua2.services.ui_translation import UiTranslationService, coverage, export_ts
 from autolingua2.ui.components.searchable_combo_box import enable_combo_search
 from autolingua2.ui.i18n import tr
 from .base import load_ui, require_child
@@ -35,6 +38,10 @@ class SelfTranslationController(QObject):
         self.stop_button = require_child(self.widget, QPushButton, "buttonStop")
         self.status = require_child(self.widget, QLabel, "labelStatus")
         self.progress = require_child(self.widget, QProgressBar, "progressTranslation")
+        self.coverage_label = require_child(self.widget, QLabel, "labelCoverage")
+        self.ai_method = require_child(self.widget, QRadioButton, "radioAi")
+        self.method_stack = require_child(self.widget, QStackedWidget, "stackMethod")
+        self.export_button = require_child(self.widget, QPushButton, "buttonExport")
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.setInterval(200)
@@ -48,9 +55,6 @@ class SelfTranslationController(QObject):
             on_action=self._open_custom,
         )
         os_tag = system_language()
-        require_child(self.widget, QLabel, "valueOsLanguage").setText(
-            f"{QLocale.system().nativeLanguageName()} [{os_tag}]",
-        )
         self.custom_button.setChecked(self.target.findData(os_tag) < 0)
         self._custom_changed(self.custom_button.isChecked())
         self.target.setEnabled(not self.custom_button.isChecked())
@@ -65,12 +69,23 @@ class SelfTranslationController(QObject):
         self.model.currentIndexChanged.connect(self._schedule)
         self.start_button.clicked.connect(self._start)
         self.stop_button.clicked.connect(self.cancel)
+        self.export_button.clicked.connect(self._export)
+        self.ai_method.toggled.connect(self._method_changed)
         self.service.progress.connect(self._progress)
         self.service.running_changed.connect(self._running)
         self.service.failed.connect(self.status.setText)
         self.service.completed.connect(self._committed)
         self.stop_button.setEnabled(False)
         self.refresh_ai()
+        self._method_changed()
+
+    def _method_changed(self) -> None:
+        ai = self.ai_method.isChecked()
+        self.method_stack.setCurrentIndex(0 if ai else 1)
+        self.start_button.setVisible(ai)
+        self.stop_button.setVisible(ai)
+        self.progress.setVisible(ai)
+        self.export_button.setVisible(not ai)
         self._refresh()
 
     @property
@@ -123,6 +138,7 @@ class SelfTranslationController(QObject):
     def _schedule(self) -> None:
         if not self.busy:
             self.start_button.setEnabled(False)
+            self.export_button.setEnabled(False)
             self._timer.start()
 
     def _target(self) -> tuple[str, str]:
@@ -142,8 +158,12 @@ class SelfTranslationController(QObject):
             return
         try:
             tag, _ = self._target()
+            self.export_button.setEnabled(True)
+            if not self.ai_method.isChecked():
+                self.start_button.setEnabled(False)
+                return
             state = coverage(tag, self.entrance.localization.available_languages)
-            self.status.setText(tr("SelfTranslation", "未翻訳: {missing} / {total} 件").format(
+            self.coverage_label.setText(tr("SelfTranslation", "未翻訳: {missing} / {total} 件").format(
                 missing=state.missing, total=state.total,
             ))
             self.start_button.setEnabled(state.missing > 0 and self.provider.currentIndex() >= 0
@@ -151,6 +171,32 @@ class SelfTranslationController(QObject):
         except Exception as error:
             self.status.setText(str(error))
             self.start_button.setEnabled(False)
+            self.export_button.setEnabled(False)
+
+    def _export(self) -> None:
+        try:
+            tag, _ = self._target()
+            selected = QFileDialog.getExistingDirectory(self.widget, tr("SelfTranslation", "TSの保存先を選択"))
+            if not selected:
+                return
+            folder = Path(selected)
+            try:
+                count = export_ts(folder, tag)
+            except FileExistsError as error:
+                answer = QMessageBox.question(
+                    self.widget, tr("SelfTranslation", "TSの上書き確認"),
+                    tr("SelfTranslation", "次のファイルを上書きしますか？\n{files}").format(files=str(error)),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if answer != QMessageBox.StandardButton.Yes:
+                    return
+                count = export_ts(folder, tag, overwrite=True)
+            self.status.setText(tr("SelfTranslation", "{count}個のTSを保存しました: {folder}").format(
+                count=count, folder=folder,
+            ))
+        except Exception as error:
+            self.status.setText(str(error))
 
     def _start(self) -> None:
         try:
@@ -164,6 +210,7 @@ class SelfTranslationController(QObject):
 
     def _running(self, running: bool) -> None:
         self.options.setEnabled(not running)
+        self.export_button.setEnabled(not running)
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(running)
         self.running_changed.emit(running)

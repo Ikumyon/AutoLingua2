@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="ja" sourcelanguage="ja">
+  <context>
+    <name>InitialSetupDialog</name>
+    <message>
+      <source>AIを選ぶ</source>
+      <translation>AIを選ぶ</translation>
+    </message>
+    <message>
+      <source>あとで設定する</source>
+      <translation>あとで設定する</translation>
+    </message>
+    <message>
+      <source>初期設定</source>
+      <translation>初期設定</translation>
+    </message>
+    <message>
+      <source>利用するAIを選んでください</source>
+      <translation>利用するAIを選んでください</translation>
+    </message>
+    <message>
+      <source>利用できるAIが登録されていません。</source>
+      <translation>利用できるAIが登録されていません。</translation>
+    </message>
+    <message>
+      <source>完了</source>
+      <translation>完了</translation>
+    </message>
+    <message>
+      <source>戻る</source>
+      <translation>戻る</translation>
+    </message>
+    <message>
+      <source>次へ</source>
+      <translation>次へ</translation>
+    </message>
+    <message>
+      <source>設定する</source>
+      <translation>設定する</translation>
+    </message>
+    <message>
+      <source>設定はあとから変更できます。</source>
+      <translation>設定はあとから変更できます。</translation>
+    </message>
+  </context>
+</TS>

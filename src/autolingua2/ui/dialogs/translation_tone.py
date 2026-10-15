@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 from collections.abc import Sequence
 
 from PySide6.QtCore import Qt
@@ -17,7 +19,7 @@ class TranslationToneDialog(QDialog):
         self.setWindowTitle(tr("TranslationToneDialog", "訳文の確定"))
         self.resize(600, 480)
         layout = QVBoxLayout(self)
-        for label, text in (("原文", source), ("訳文", target)):
+        for label, text in ((translation_source('TranslationToneDialog', "原文"), source), (translation_source('TranslationToneDialog', "訳文"), target)):
             layout.addWidget(QLabel(tr("TranslationToneDialog", label)))
             preview = QPlainTextEdit(text)
             preview.setReadOnly(True)

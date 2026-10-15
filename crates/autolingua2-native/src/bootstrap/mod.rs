@@ -41,7 +41,8 @@ fn format_json(state: &str, current: &str, latest: &str, url: &str, notes: &str,
 
 pub fn update_status() -> String {
     let current_version = env!("CARGO_PKG_VERSION");
-    let url = "https://api.github.com/repos/Ikumyon/AutoLingua2/releases/latest";
+    let test_url = std::env::var("AUTOLINGUA_UPDATE_TEST_URL").ok();
+    let url = test_url.as_deref().unwrap_or("https://api.github.com/repos/Ikumyon/AutoLingua2/releases/latest");
 
     let mut command = std::process::Command::new("curl");
     os::configure_core_command(&mut command);
@@ -91,7 +92,7 @@ pub fn update_status() -> String {
     }
 
     let is_newer = match (parse_version(current_version), parse_version(latest_version)) {
-        (Some(curr), Some(latest)) => latest > curr,
+        (Some(curr), Some(latest)) => latest > curr || (test_url.is_some() && latest == curr),
         _ => false,
     };
 

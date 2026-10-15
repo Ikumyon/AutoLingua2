@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 import math
 
 from PySide6.QtCore import QEasingCurve, QRectF, Qt, QVariantAnimation, Signal
@@ -11,14 +13,14 @@ from autolingua2.ui.i18n import tr
 
 
 STATUS_LABELS: dict[UnitState, str] = {
-    UnitState.UNTRANSLATED: "未翻訳",
-    UnitState.AI_TRANSLATED: "AIによる翻訳",
-    UnitState.HUMAN_TRANSLATED: "人間による翻訳",
-    UnitState.AI_REVIEWED: "AIによる校閲",
-    UnitState.HUMAN_REVIEWED: "人間による校閲",
-    UnitState.DOUBTFUL: "疑問あり",
-    UnitState.LOCKED: "ロック",
-    UnitState.HIDDEN: "非表示",
+    UnitState.UNTRANSLATED: translation_source('MainWindow', '未翻訳'),
+    UnitState.AI_TRANSLATED: translation_source('MainWindow', 'AIによる翻訳'),
+    UnitState.HUMAN_TRANSLATED: translation_source('MainWindow', '人間による翻訳'),
+    UnitState.AI_REVIEWED: translation_source('MainWindow', 'AIによる校閲'),
+    UnitState.HUMAN_REVIEWED: translation_source('MainWindow', '人間による校閲'),
+    UnitState.DOUBTFUL: translation_source('MainWindow', '疑問あり'),
+    UnitState.LOCKED: translation_source('MainWindow', 'ロック'),
+    UnitState.HIDDEN: translation_source('MainWindow', '非表示'),
 }
 
 

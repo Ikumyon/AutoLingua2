@@ -18,8 +18,9 @@ from autolingua2.ir.tone import (
 from autolingua2.services.tone_store import ToneStore
 from autolingua2.ui.components.searchable_combo_box import SearchableActionComboBox
 from autolingua2.ui.icons import IconManager
+from autolingua2.ui.i18n import tr
 from .base import require_child
-from .tone_rules import BranchLocation, ToneRulesController, branch_text, populate_branches, t
+from .tone_rules import BranchLocation, ToneRulesController, branch_text, populate_branches
 
 
 class TonePageController:
@@ -37,16 +38,16 @@ class TonePageController:
         if selection_layout is None:
             raise RuntimeError("口調選択のレイアウトがありません。")
         self.combo = SearchableActionComboBox(
-            t("＋新しい口調…"), t("該当する口調がありません。"), selection_container,
+            tr('TonePage', "＋新しい口調…"), tr('TonePage', "該当する口調がありません。"), selection_container,
             search_role=Qt.ItemDataRole.UserRole + 1,
         )
         self.combo.setObjectName("comboManagedTone")
-        self.combo.editor.setPlaceholderText(t("名前を入力して検索"))
+        self.combo.editor.setPlaceholderText(tr('TonePage', "名前を入力して検索"))
         selection_layout.addWidget(self.combo)
         self.creation_row = require_child(page, QWidget, "paneToneCreation")
         self.kind = require_child(page, QComboBox, "comboNewToneKind")
-        self.kind.addItems([t("通常口調"), t("条件付き口調")])
-        self.kind.setPlaceholderText(t("種類を選択してください"))
+        self.kind.addItems([tr('TonePage', "通常口調"), tr('TonePage', "条件付き口調")])
+        self.kind.setPlaceholderText(tr('TonePage', "種類を選択してください"))
         self.kind.setCurrentIndex(-1)
         self.creation_row.hide()
         self.name = require_child(page, QLineEdit, "editToneName")
@@ -120,8 +121,8 @@ class TonePageController:
         self._branch_selected()
 
     def _label(self, tone: Tone) -> str:
-        name = tone.name if tone.name.strip() else t("新しい口調（未保存）")
-        return name + (t("［条件付き］") if isinstance(tone, ConditionalTone) else "")
+        name = tone.name if tone.name.strip() else tr('TonePage', "新しい口調（未保存）")
+        return name + (tr('TonePage', "［条件付き］") if isinstance(tone, ConditionalTone) else "")
 
     def _refresh_choices(self, selected_id: str = "") -> None:
         with QSignalBlocker(self.combo):
@@ -136,7 +137,7 @@ class TonePageController:
         tone = self._tone()
         self.creating = False
         self.creation_row.hide()
-        self.combo.editor.setPlaceholderText(t("名前を入力して検索"))
+        self.combo.editor.setPlaceholderText(tr('TonePage', "名前を入力して検索"))
         self.stack.setCurrentIndex(1 if isinstance(tone, ConditionalTone) else 0 if tone is not None else 2)
         self.name.setEnabled(tone is not None)
         self.delete_tone.setEnabled(tone is not None)
@@ -157,9 +158,9 @@ class TonePageController:
         parent = location.branch if location is not None else tone
         block = parent.block if isinstance(parent, (ConditionalTone, ToneBranch)) else None
         has_children = block is not None and bool(block.branches)
-        self.add_branch.setText(t("「そうでなく、～なら」を追加") if has_children else t("「もし～なら」を追加"))
+        self.add_branch.setText(tr('TonePage', "「そうでなく、～なら」を追加") if has_children else tr('TonePage', "「もし～なら」を追加"))
         self.add_branch.setEnabled(isinstance(tone, ConditionalTone))
-        self.delete_branch.setText(t("内側の分岐を削除") if has_children else t("分岐を削除"))
+        self.delete_branch.setText(tr('TonePage', "内側の分岐を削除") if has_children else tr('TonePage', "分岐を削除"))
         removable = False
         up = down = False
         if location is not None:
@@ -173,8 +174,8 @@ class TonePageController:
         self._update_delete_tooltip(location, has_children)
         self.up.setEnabled(up)
         self.down.setEnabled(down)
-        self.depth.setText(t("分岐の深さ：{depth}").format(depth=location.depth)
-                           + (t("　深さ5以上の入れ子は非推奨です。") if location.depth >= 5 else "")
+        self.depth.setText(tr('TonePage', "分岐の深さ：{depth}").format(depth=location.depth)
+                           + (tr('TonePage', "　深さ5以上の入れ子は非推奨です。") if location.depth >= 5 else "")
                            if location is not None else "")
 
     def _tooltip_icon(self, name: str) -> str:
@@ -193,26 +194,26 @@ class TonePageController:
 
     def _update_delete_tooltip(self, location: BranchLocation | None, has_children: bool) -> None:
         requirements: list[tuple[bool, str]] = [
-            (location is not None, t("分岐を選択している")),
+            (location is not None, tr('TonePage', "分岐を選択している")),
         ]
         nested = location is not None and has_children
         if nested:
-            requirements.append((has_children, t("選択した分岐の内側に分岐がある")))
+            requirements.append((has_children, tr('TonePage', "選択した分岐の内側に分岐がある")))
         else:
             requirements.extend([
                 (location is not None and location.branch.condition is not None,
-                 t("条件のある分岐である")),
+                 tr('TonePage', "条件のある分岐である")),
                 (location is not None and len(location.block.branches) > 2,
-                 t("同じ階層に条件のある分岐が2つ以上ある")),
+                 tr('TonePage', "同じ階層に条件のある分岐が2つ以上ある")),
             ])
         icons = {True: self._tooltip_icon("check"), False: self._tooltip_icon("x")}
         rows = "".join(
             f'<tr><td>{icons[met]}</td><td>{escape(label)}</td></tr>'
             for met, label in requirements
         )
-        tooltip = f'<p><b>{escape(t("削除条件（すべて必要）"))}</b></p><table>{rows}</table>'
+        tooltip = f'<p><b>{escape(tr('TonePage', "削除条件（すべて必要）"))}</b></p><table>{rows}</table>'
         if nested:
-            tooltip += "<p>" + escape(t(
+            tooltip += "<p>" + escape(tr('TonePage', 
                 "選択中の分岐自体は残り、最も内側の「それ以外の場合」の口調を引き継ぎます。"
             )) + "</p>"
         self.delete_branch.setToolTip(tooltip)
@@ -251,13 +252,13 @@ class TonePageController:
         self.creating = True
         with QSignalBlocker(self.combo), QSignalBlocker(self.name), QSignalBlocker(self.kind):
             self.combo.setCurrentIndex(-1)
-            self.combo.setEditText(t("新しい口調"))
+            self.combo.setEditText(tr('TonePage', "新しい口調"))
             self.name.clear()
             self.kind.setCurrentIndex(-1)
         self.name.setEnabled(False)
         self.delete_tone.setEnabled(False)
         self.creation_row.show()
-        self.combo.editor.setPlaceholderText(t("新しい口調"))
+        self.combo.editor.setPlaceholderText(tr('TonePage', "新しい口調"))
         self.stack.setCurrentIndex(2)
         self._rebuild()
         self.error.clear()
@@ -279,10 +280,10 @@ class TonePageController:
         tone = self._tone()
         if tone is None:
             return
-        message = t("「{name}」を削除しますか？").format(name=tone.name)
+        message = tr('TonePage', "「{name}」を削除しますか？").format(name=tone.name)
         if tone_references(self.tones, tone.id):
-            message += t("\n条件付き口調で参照している箇所は「なし」になります。")
-        if QMessageBox.question(self.page, t("口調の削除"), message,
+            message += tr('TonePage', "\n条件付き口調で参照している箇所は「なし」になります。")
+        if QMessageBox.question(self.page, tr('TonePage', "口調の削除"), message,
                                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                 QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
@@ -306,7 +307,7 @@ class TonePageController:
             return
         branch = location.branch
         if branch.block is not None:
-            if QMessageBox.question(self.page, t("条件分岐の削除"), t("配下の条件分岐を削除しますか？"),
+            if QMessageBox.question(self.page, tr('TonePage', "条件分岐の削除"), tr('TonePage', "配下の条件分岐を削除しますか？"),
                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                     QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
                 return
@@ -346,7 +347,7 @@ class TonePageController:
 
     def validate(self) -> bool:
         if self.creating:
-            self.error.setText(t("新しい口調の種類を選択してください。"))
+            self.error.setText(tr('TonePage', "新しい口調の種類を選択してください。"))
             return False
         return not self.dirty or self._validate_draft()
 

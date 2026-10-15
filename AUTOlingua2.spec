@@ -10,6 +10,14 @@ if not Path('assets/chat/index.html').is_file():
     raise RuntimeError('Build the chat frontend first: cd web && npm run build')
 
 sys.path.insert(0, str(Path('src').resolve()))
+sys.path.insert(0, str(Path('.').resolve()))
+ui_imports = []
+for ui_file in sorted(Path('ui').rglob('*.ui')):
+    generated = ui_file.with_suffix('.py')
+    if not generated.is_file():
+        raise RuntimeError(f'UI module has not been generated: {generated}')
+    ui_imports.append('.'.join(generated.with_suffix('').parts))
+
 plugin_datas = []
 plugin_imports = []
 for manifest in sorted(Path('src/autolingua2/plugins').glob('*/manifest.json')):
@@ -23,11 +31,11 @@ a = Analysis(
     ['main.py'],
     pathex=['src', '.', 'build/native'],
     binaries=[(str(lrelease_binary), 'PySide6')],
-    datas=[('ui', 'ui'), ('assets/images/app.ico', 'assets/images'),
+    datas=[('assets/images/app.ico', 'assets/images'),
            ('assets/images/app.png', 'assets/images'), ('assets/i18n', 'assets/i18n'),
            ('assets/chat', 'assets/chat')]
           + plugin_datas,
-    hiddenimports=['autolingua2_native'] + plugin_imports,
+    hiddenimports=['autolingua2_native'] + ui_imports + plugin_imports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

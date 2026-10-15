@@ -20,7 +20,7 @@ class UpdateDialogController(SimpleDialogController):
         parent: QWidget | None = None,
         on_restart_requested: Callable[[], None] | None = None,
     ) -> None:
-        super().__init__("UpdateDialog.ui", parent)
+        super().__init__("dialogs/UpdateDialog.ui", parent)
         self.info = info
         self.on_restart_requested = on_restart_requested
         self.downloader = UpdateDownloader(self.dialog)

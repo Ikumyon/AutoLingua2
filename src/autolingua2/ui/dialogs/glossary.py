@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from autolingua2.extensions import ExtensionEntrance
 from autolingua2.ir.glossary import Glossary, GlossaryTerm, PARTS_OF_SPEECH, glossary_chain
+from autolingua2.ir.text_search import SearchSyntaxError, TextSearch
 from autolingua2.services.glossary_store import GlossaryStore
 from autolingua2.ui.components.drop_zone import DropZone
 from autolingua2.ui.components.searchable_combo_box import enable_combo_search
@@ -125,6 +126,8 @@ class GlossaryPageController:
         self.tree_search = require_child(widget, QLineEdit, "editGlossarySearch")
         self.table = require_child(widget, QTableWidget, "tableGlossaryTerms")
         self.term_search = require_child(widget, QLineEdit, "editTermSearch")
+        self.search_error = require_child(widget, QLabel, "labelTermSearchError")
+        self.search_error.hide()
         self.source_language = require_child(widget, QComboBox, "comboGlossarySourceLanguage")
         self.target_language = require_child(widget, QComboBox, "comboGlossaryTargetLanguage")
         self.name = require_child(widget, QLineEdit, "editGlossaryName")
@@ -439,6 +442,8 @@ class GlossaryPageController:
         self._refresh_terms()
 
     def _refresh_terms(self, *_args: object) -> None:
+        self.search_error.hide()
+        self.search_error.clear()
         glossary = self._selected_glossary()
         self.rows = []
         self.table.clearSpans()
@@ -453,9 +458,16 @@ class GlossaryPageController:
         except STORAGE_ERRORS as exc:
             self._error(exc)
             return
-        query = self.term_search.text().strip().casefold()
-        terms = [term for term in terms if query in " ".join(
-            (term.source, term.translation, *term.variants, term.memo)).casefold()]
+        try:
+            search = TextSearch(self.term_search.text(), fields=("source", "target", "variant", "memo"))
+        except SearchSyntaxError as error:
+            self.search_error.setText(tr("Glossary", "検索エラー：{error}").format(error=error))
+            self.search_error.show()
+            return
+        terms = [term for term in terms if search.matches_fields({
+            "source": (term.source,), "target": (term.translation,),
+            "variant": term.variants, "memo": (term.memo,),
+        })]
         by_id = {g.id: g for g in self.glossaries}
         for term in terms:
             start = len(self.rows)

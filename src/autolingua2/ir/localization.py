@@ -19,6 +19,8 @@ class UiMessage:
     source: str
     original: str
     comment: str = ""
+    filename: str = ""
+    extra_comment: str = ""
 
     @property
     def key(self) -> tuple[str, str, str]:

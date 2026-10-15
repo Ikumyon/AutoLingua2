@@ -38,6 +38,11 @@ def tr(context: str, text: str) -> str:
     return QCoreApplication.translate(context, text)
 
 
+def translation_source(_context: str, text: str) -> str:
+    """Typed lupdate marker for labels translated later (Qt's NOOP returns object)."""
+    return text
+
+
 class LocalizationManager:
     """Owns application and Qt dictionaries; plugin dictionaries remain independent."""
 

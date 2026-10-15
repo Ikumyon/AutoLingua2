@@ -38,6 +38,26 @@ class ChatReply:
     message: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True, slots=True)
+class ChatCapacity:
+    context_tokens: int
+    response_tokens: int = 4096
+
+    @property
+    def input_budget(self) -> int:
+        return max(0, self.context_tokens - self.response_tokens)
+
+
+@dataclass(frozen=True, slots=True)
+class ChatFailure:
+    message: str
+    context_exceeded: bool = False
+
+
+class ChatContextExceeded(ValueError):
+    """A provider reported an input context limit, including inside a stream."""
+
+
 def object_value(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{label} must be an object")

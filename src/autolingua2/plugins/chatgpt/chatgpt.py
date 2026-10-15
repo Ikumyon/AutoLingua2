@@ -4,13 +4,14 @@ import json
 import logging
 from collections.abc import Iterator
 from typing import Any
+from urllib.parse import quote
 
 from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 
 from autolingua2.plugins.contracts import (
     BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
-    object_value, string_value,
+    object_value, string_value, ChatContextExceeded,
 )
 from .auth import ChatGptAuthManager
 
@@ -65,6 +66,21 @@ class ChatGptTranslator(BaseHttpTranslator):
 
     supports_chat = True
     chat_image_types = ("image/png", "image/jpeg", "image/webp", "image/gif")
+
+    @property
+    def chat_model_endpoint(self) -> str:
+        return f"https://api.openai.com/v1/models/{quote(self.model, safe='')}"
+
+    def is_chat_context_error(self, data: dict[str, Any], status_code: int) -> bool:
+        error = data.get("error")
+        return (status_code == 400 and isinstance(error, dict)
+                and error.get("code") == "context_length_exceeded")
+
+    def build_summary_payload(self, messages: list[ChatMessage], instructions: str,
+                              output_tokens: int) -> dict[str, Any]:
+        payload = self.build_chat_payload(messages, instructions, [], [])
+        payload["max_output_tokens"] = output_tokens
+        return payload
 
     @property
     def endpoint(self) -> str:
@@ -163,6 +179,8 @@ class ChatGptTranslator(BaseHttpTranslator):
                 )
                 reason = error.get("reason") or error.get("code") or "unknown_error"
                 message = error.get("message") or ""
+                if reason == "context_length_exceeded":
+                    raise ChatContextExceeded(str(message or reason))
                 raise ValueError(f"ChatGPT: {event_type} ({reason}) {message}".strip())
         if completed is None:
             raise ValueError(f"ChatGPT: ストリームが完了せず終了しました ({event_count}イベント)。")

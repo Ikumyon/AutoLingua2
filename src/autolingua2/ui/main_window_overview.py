@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, QSignalBlocker, QTimer, Qt
@@ -90,7 +92,7 @@ class OverviewController(QObject):
         source_count = sum(unit.id not in service.imported.excluded_unit_ids for unit in project.units)
         self.source_count.setText(tr("MainWindow", "原文件数：{count}").format(count=f"{source_count:,}"))
         self.workspaces.setHorizontalHeaderLabels([tr("MainWindow", label) for label in
-                                                  ("言語", "翻訳進捗", "未翻訳", "確認済み", "要確認")])
+                                                  (translation_source('MainWindow', "言語"), translation_source('MainWindow', "翻訳進捗"), translation_source('MainWindow', "未翻訳"), translation_source('MainWindow', "確認済み"), translation_source('MainWindow', "要確認"))])
         active_code = host.active_workspace.language_code if host.active_workspace is not None else None
         if active_code != self._selection_workspace:
             self._selection_workspace = active_code
@@ -119,7 +121,7 @@ class OverviewController(QObject):
                                         workspace_language_name(service, selected.language_code))
         counts = selected.counts if selected is not None else dict.fromkeys(UnitState, 0)
         total = selected.total if selected is not None else 0
-        self.statuses.setHorizontalHeaderLabels([tr("MainWindow", label) for label in ("ステータス", "件数", "割合")])
+        self.statuses.setHorizontalHeaderLabels([tr("MainWindow", label) for label in (translation_source('MainWindow', "ステータス"), translation_source('MainWindow', "件数"), translation_source('MainWindow', "割合"))])
         for row, state in enumerate(UnitState):
             name = QTableWidgetItem("● " + tr("MainWindow", STATUS_LABELS[state]))
             name.setForeground(QBrush(self.chart.state_color(state)))

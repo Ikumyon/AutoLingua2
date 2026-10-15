@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 import json
+from urllib.parse import quote
 
 from autolingua2.plugins.contracts import (
     BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
@@ -14,6 +15,22 @@ class OpenAiTranslator(BaseHttpTranslator):
 
     supports_chat = True
     chat_image_types = ("image/png", "image/jpeg", "image/webp", "image/gif")
+
+    @property
+    def chat_model_endpoint(self) -> str:
+        # The official endpoint currently does not expose capacity; unknown is valid.
+        return f"https://api.openai.com/v1/models/{quote(self.model, safe='')}"
+
+    def is_chat_context_error(self, data: dict[str, Any], status_code: int) -> bool:
+        error = data.get("error")
+        return (status_code == 400 and isinstance(error, dict)
+                and error.get("code") == "context_length_exceeded")
+
+    def build_summary_payload(self, messages: list[ChatMessage], instructions: str,
+                              output_tokens: int) -> dict[str, Any]:
+        payload = self.build_chat_payload(messages, instructions, [], [])
+        payload["max_completion_tokens"] = output_tokens
+        return payload
 
     def extract_usage(self, data: dict[str, Any]) -> TranslationUsage:
         usage = data.get("usage")
@@ -28,7 +45,7 @@ class OpenAiTranslator(BaseHttpTranslator):
 
     def build_chat_payload(self, messages: list[ChatMessage], system_prompt: str,
                            tools: list[dict[str, Any]], continuation: list[dict[str, Any]]) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "model": self.model,
             "messages": [{"role": "system", "content": system_prompt}]
             + [{"role": m.role, "content": ([{"type": "text", "text": m.content}]
@@ -38,6 +55,9 @@ class OpenAiTranslator(BaseHttpTranslator):
                 "name": t["name"], "description": t["description"], "parameters": t["inputSchema"],
             }} for t in tools],
         }
+        if not tools:
+            payload.pop("tools")
+        return payload
 
     def extract_chat_reply(self, data: dict[str, Any]) -> ChatReply:
         choices = data.get("choices")

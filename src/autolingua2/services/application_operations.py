@@ -31,7 +31,7 @@ from autolingua2.ir.validation import array, record, text
 from autolingua2.ir.workspace import TranslationNotes, TranslationRecord, UnitView, Workspace, WorkspaceUnit
 from autolingua2.services.ai_network import AiNetworkClient
 from autolingua2.services.ai_providers.base import AiProviderPlugin, BaseHttpTranslator
-from autolingua2.services.ai_providers.chat import ChatMessage, ChatReply
+from autolingua2.services.ai_providers.chat import ChatFailure, ChatMessage, ChatReply
 from autolingua2.services.export import export_translation, plan_export_translation
 from autolingua2.services.export_contract import TranslationExporter
 from autolingua2.services.filter_rules import get_filter_config
@@ -1396,12 +1396,14 @@ class ApplicationOperations(QObject):
         self._emit_job(job)
         QTimer.singleShot(0, lambda: self._review_next(job, arguments, translator, remaining))
 
-    def _review_failed(self, request_id: str, error: str) -> None:
+    def _review_failed(self, request_id: str, error: object) -> None:
+        if not isinstance(error, ChatFailure):
+            raise TypeError("Invalid chat failure")
         stored = self._reviews.pop(request_id, None)
         self._review_translators.pop(request_id, None)
         if stored is not None:
             job = stored[0]
-            job.status, job.error = "failed", error
+            job.status, job.error = "failed", error.message
             self._emit_job(job)
 
     def _external_job(self, arguments: dict[str, Any], method: str, params: dict[str, Any]) -> dict[str, Any]:

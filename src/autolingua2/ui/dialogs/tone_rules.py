@@ -1,6 +1,8 @@
 """GUI editor for ordered branches and boolean expression trees."""
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -18,22 +20,18 @@ from autolingua2.ui.i18n import tr
 from .base import require_child
 
 
-def t(value: str) -> str:
-    return tr("TonePage", value)
-
-
-TARGET_LABELS = ("ファイル名", "キー", "原文")
-COMPARISON_LABELS = ("一致する", "含む", "で始まる", "で終わる", "正規表現で検索")
+TARGET_LABELS = (translation_source('TonePage', 'ファイル名'), translation_source('TonePage', 'キー'), translation_source('TonePage', '原文'))
+COMPARISON_LABELS = (translation_source('TonePage', '一致する'), translation_source('TonePage', '含む'), translation_source('TonePage', 'で始まる'), translation_source('TonePage', 'で終わる'), translation_source('TonePage', '正規表現で検索'))
 
 
 def expression_text(expression: ToneExpression) -> str:
     if isinstance(expression, ToneCondition):
-        target = t(TARGET_LABELS[TARGETS.index(expression.target)])
-        comparison = t(COMPARISON_LABELS[COMPARISONS.index(expression.comparison)])
+        target = tr('TonePage', TARGET_LABELS[TARGETS.index(expression.target)])
+        comparison = tr('TonePage', COMPARISON_LABELS[COMPARISONS.index(expression.comparison)])
         return f'{target} {comparison} 「{expression.value}」'
     children = [expression_text(child) for child in expression.children]
     if expression.operator == "not":
-        return f"NOT ({children[0] if children else t('未指定')})"
+        return f"NOT ({children[0] if children else tr('TonePage', '未指定')})"
     separator = "、" if expression.operator == "and" else " OR "
     return "(" + separator.join(children) + ")"
 
@@ -54,18 +52,18 @@ class ExpressionLocation:
 def branch_text(location: BranchLocation, tones: list[ToneItem]) -> str:
     branch = location.branch
     if branch.condition is None:
-        label = t("それ以外の場合")
+        label = tr('TonePage', 'それ以外の場合')
     else:
         index = next(i for i, item in enumerate(location.block.branches) if item is branch)
-        template = t("もし {condition} なら") if index == 0 else t("そうでなく、{condition} なら")
+        template = tr('TonePage', 'もし {condition} なら') if index == 0 else tr('TonePage', 'そうでなく、{condition} なら')
         label = template.format(condition=expression_text(branch.condition))
     if branch.block is not None:
         output = None
     elif branch.tone_id is None:
-        output = t("なし")
+        output = tr('TonePage', 'なし')
     else:
-        output = next((tone.name for tone in tones if tone.id == branch.tone_id), t("未登録の口調"))
-    warning = t("［深さ5以上・非推奨］") if location.depth >= 5 else ""
+        output = next((tone.name for tone in tones if tone.id == branch.tone_id), tr('TonePage', '未登録の口調'))
+    warning = tr('TonePage', '［深さ5以上・非推奨］') if location.depth >= 5 else ""
     return f"{warning}{label}" + (f" → {output}" if output is not None else "")
 
 
@@ -108,8 +106,8 @@ class ToneRulesController:
         self.select_branch = require_child(page, QLabel, "labelSelectBranch")
         self.preview = require_child(page, QPlainTextEdit, "editExpressionPreview")
         self.condition_error = require_child(page, QLabel, "labelConditionError")
-        self.target.addItems([t(label) for label in TARGET_LABELS])
-        self.comparison.addItems([t(label) for label in COMPARISON_LABELS])
+        self.target.addItems([tr('TonePage', label) for label in TARGET_LABELS])
+        self.comparison.addItems([tr('TonePage', label) for label in COMPARISON_LABELS])
         self.add_condition = require_child(page, QPushButton, "buttonAddCondition")
         self.add_group = require_child(page, QPushButton, "buttonAddGroup")
         self.toggle_not = require_child(page, QPushButton, "buttonToggleNot")
@@ -117,8 +115,8 @@ class ToneRulesController:
         self.expression_up = require_child(page, QPushButton, "buttonExpressionUp")
         self.expression_down = require_child(page, QPushButton, "buttonExpressionDown")
         group_menu = QMenu(self.add_group)
-        group_menu.addAction(t("AND"), lambda: self._add_group("and"))
-        group_menu.addAction(t("OR"), lambda: self._add_group("or"))
+        group_menu.addAction(tr('TonePage', 'AND'), lambda: self._add_group("and"))
+        group_menu.addAction(tr('TonePage', 'OR'), lambda: self._add_group("or"))
         self.add_group.setMenu(group_menu)
         self.expressions.currentItemChanged.connect(self._expression_selected)
         self.target.currentIndexChanged.connect(self._predicate_changed)
@@ -140,7 +138,7 @@ class ToneRulesController:
         self.output_row.setVisible(leaf)
         with QSignalBlocker(self.output):
             self.output.clear()
-            self.output.addItem(t("なし"), None)
+            self.output.addItem(tr('TonePage', 'なし'), None)
             for tone in tones:
                 self.output.addItem(tone.name, tone.id)
             self.output.setCurrentIndex(max(0, self.output.findData(branch.tone_id))
@@ -204,15 +202,15 @@ class ToneRulesController:
             self.value.setText(predicate.value if predicate is not None else "")
             self.operator.clear()
             if group is not None:
-                self.operator.addItems([t("すべて満たす（既定）"), t("OR（いずれか満たす）")])
+                self.operator.addItems([tr('TonePage', 'すべて満たす（既定）'), tr('TonePage', 'OR（いずれか満たす）')])
                 self.operator.setCurrentIndex(("and", "or").index(group.operator))
         self.operator.setEnabled(group is not None)
         self.predicate_form.setRowVisible(self.operator, group is not None)
         for widget in (self.target, self.comparison, self.value):
             self.predicate_form.setRowVisible(widget, predicate is not None)
         enabled = expression is not None
-        self.toggle_not.setText(t("NOTを解除") if isinstance(expression, ToneGroup)
-                                and expression.operator == "not" else t("NOTを付ける"))
+        self.toggle_not.setText(tr('TonePage', 'NOTを解除') if isinstance(expression, ToneGroup)
+                                and expression.operator == "not" else tr('TonePage', 'NOTを付ける'))
         for button in (self.add_condition, self.add_group, self.toggle_not):
             button.setEnabled(enabled)
         parent = location.parent if location is not None else None
@@ -227,14 +225,14 @@ class ToneRulesController:
         for item, location in self.expression_items:
             expression = location.expression
             if isinstance(expression, ToneGroup) and expression.operator == "and":
-                label = "AND" if expression.children else t("条件を追加してください")
+                label = "AND" if expression.children else tr('TonePage', '条件を追加してください')
             else:
                 label = expression.operator.upper() if isinstance(expression, ToneGroup) else expression_text(expression)
             item.setText(0, label)
             item.setToolTip(0, expression_text(expression))
         condition = self.branch.condition if self.branch is not None else None
         self.preview.setPlainText(expression_text(condition) if condition is not None
-                                  else t("それ以外の場合（条件なし）") if self.branch is not None else "")
+                                  else tr('TonePage', 'それ以外の場合（条件なし）') if self.branch is not None else "")
         self._validate()
 
     def _validate(self) -> None:

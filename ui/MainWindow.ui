@@ -803,13 +803,51 @@ QFrame#frameSegmentMode QToolButton:checked {
             <item>
              <layout class="QHBoxLayout" name="layoutTopBar">
               <item>
-               <widget class="QLineEdit" name="editSearch">
-                <property name="placeholderText">
-                 <string>キー・原文・訳文を検索</string>
-                </property>
-                <property name="clearButtonEnabled">
-                 <bool>true</bool>
-                </property>
+               <widget class="QToolButton" name="buttonToggleReplace">
+                <property name="text"><string>▶</string></property>
+                <property name="toolTip"><string>置換欄を開く／閉じる</string></property>
+                <property name="checkable"><bool>true</bool></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QFrame" name="frameSearch">
+                <property name="frameShape"><enum>QFrame::StyledPanel</enum></property>
+                <layout class="QHBoxLayout" name="layoutSearchField">
+                 <property name="spacing"><number>0</number></property>
+                 <property name="leftMargin"><number>0</number></property>
+                 <property name="topMargin"><number>0</number></property>
+                 <property name="rightMargin"><number>0</number></property>
+                 <property name="bottomMargin"><number>0</number></property>
+                 <item>
+                  <widget class="QLineEdit" name="editSearch">
+                   <property name="frame"><bool>false</bool></property>
+                   <property name="placeholderText"><string>検索（例：file:会話.json AND source:魔法）</string></property>
+                   <property name="toolTip"><string>key: キー / source: 原文 / target: 訳文 / context: コンテキスト / file: ファイル名
+status: 表示ステータス / exp:/パターン/フラグ: 正規表現
+指定なしは全体検索。AND・OR・NOT・先頭の -・括弧に対応。空白区切りはANDです。
+優先順位：括弧 → NOT・- → AND → OR。演算子は大文字小文字を区別しません。
+空白を含む語は引用符で囲みます。バックスラッシュで特殊文字をエスケープできます。
+正規表現ボタンONでは入力全体を正規表現として扱います。
+状態フィルターの範囲内で検索します。置換は単一条件で指定なし、または target: の場合に利用できます。</string></property>
+                   <property name="clearButtonEnabled"><bool>true</bool></property>
+                  </widget>
+                 </item>
+                 <item><widget class="QToolButton" name="buttonSearchCase">
+                  <property name="text"><string>Aa</string></property>
+                  <property name="toolTip"><string>大文字と小文字を区別する</string></property>
+                  <property name="checkable"><bool>true</bool></property>
+                 </widget></item>
+                 <item><widget class="QToolButton" name="buttonSearchWord">
+                  <property name="text"><string>ab</string></property>
+                  <property name="toolTip"><string>単語全体に一致する</string></property>
+                  <property name="checkable"><bool>true</bool></property>
+                 </widget></item>
+                 <item><widget class="QToolButton" name="buttonSearchRegex">
+                  <property name="text"><string>.*</string></property>
+                  <property name="toolTip"><string>正規表現を使用する</string></property>
+                  <property name="checkable"><bool>true</bool></property>
+                 </widget></item>
+                </layout>
                </widget>
               </item>
               <item>
@@ -888,6 +926,38 @@ QFrame#frameSegmentMode QToolButton:checked {
               </item>
              </layout>
             </item>
+            <item>
+             <widget class="QWidget" name="replacePanel" native="true">
+              <layout class="QVBoxLayout" name="layoutReplacePanel">
+               <property name="leftMargin"><number>0</number></property>
+               <property name="topMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+               <property name="bottomMargin"><number>0</number></property>
+               <item><layout class="QHBoxLayout" name="layoutReplaceField">
+                <item><widget class="QLineEdit" name="editReplace">
+                 <property name="placeholderText"><string>置換後の文字列</string></property>
+                 <property name="clearButtonEnabled"><bool>true</bool></property>
+                 <property name="toolTip"><string>正規表現では参照（\1、\g&lt;name&gt;）を使用できます</string></property>
+                </widget></item>
+                <item><widget class="QPushButton" name="buttonReplace">
+                 <property name="text"><string>置換</string></property>
+                 <property name="toolTip"><string>選択中の項目の訳文で、最初の一致箇所を置換</string></property>
+                </widget></item>
+                <item><widget class="QPushButton" name="buttonReplaceAll">
+                 <property name="text"><string>すべて置換</string></property>
+                 <property name="toolTip"><string>現在の絞り込み結果の訳文をすべて置換</string></property>
+                </widget></item>
+               </layout></item>
+               <item><widget class="QLabel" name="labelReplaceTarget">
+                <property name="text"><string>置換対象：訳文（ロック中・非表示・翻訳処理中を除く）</string></property>
+               </widget></item>
+              </layout>
+             </widget>
+            </item>
+            <item><widget class="QLabel" name="labelSearchResult">
+             <property name="text"><string>一致：0件</string></property>
+             <property name="wordWrap"><bool>true</bool></property>
+            </widget></item>
            </layout>
           </widget>
          </widget>

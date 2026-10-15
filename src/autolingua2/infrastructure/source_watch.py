@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 from autolingua2_native import platform
 from .filesystem import ASSETS_DIR, PROJECT_ROOT
@@ -9,9 +10,8 @@ from .bootstrap import configuration
 
 def watcher_executable() -> Path:
     name = platform.executable_name("autolingua-source-watcher")
-    packaged = PROJECT_ROOT / name
-    if packaged.is_file():
-        return packaged
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent / name
     return PROJECT_ROOT / "target" / "release" / name
 
 

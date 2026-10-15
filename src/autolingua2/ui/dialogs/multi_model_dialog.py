@@ -144,7 +144,7 @@ class MultiModelTranslationDialog(QDialog):
         self._start_translations()
 
     def _setup_ui(self) -> None:
-        loaded = load_ui("MultiModelTranslationDialog.ui")
+        loaded = load_ui("dialogs/MultiModelTranslationDialog.ui")
         if not isinstance(loaded, QDialog):
             raise TypeError("MultiModelTranslationDialog.ui は QDialog ではありません")
         self.setWindowTitle(loaded.windowTitle())

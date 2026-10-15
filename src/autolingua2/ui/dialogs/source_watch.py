@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 from copy import deepcopy
 from collections.abc import Callable, Mapping
 from functools import partial
@@ -46,9 +48,9 @@ class SourceWatchTargetDialog(SimpleDialogController):
         self.root.setText(target.source_root)
         self.icon = require_child(self.dialog, QLabel, "labelNotificationIcon")
         self.sound = require_child(self.dialog, QLabel, "labelNotificationSound")
-        self.dialog.setWindowTitle(tr("SourceWatchTargetDialog", "監視対象を編集" if editing else "監視対象を追加"))
+        self.dialog.setWindowTitle(tr("SourceWatchTargetDialog", translation_source('SourceWatchTargetDialog', '監視対象を編集') if editing else translation_source('SourceWatchTargetDialog', '監視対象を追加')))
         submit = require_child(self.dialog, QPushButton, "buttonSubmit")
-        submit.setText(tr("SourceWatchTargetDialog", "保存" if editing else "追加"))
+        submit.setText(tr("SourceWatchTargetDialog", translation_source('SourceWatchTargetDialog', '保存') if editing else translation_source('SourceWatchTargetDialog', '追加')))
         submit.clicked.connect(self.accept)
         require_child(self.dialog, QPushButton, "buttonBrowseSourceRoot").clicked.connect(self.browse)
         for name, callback in (
@@ -84,7 +86,7 @@ class SourceWatchTargetDialog(SimpleDialogController):
 
     def choose_file(self, sound: bool) -> None:
         selected, _ = QFileDialog.getOpenFileName(
-            self.dialog, tr("SourceWatchTargetDialog", "通知音" if sound else "通知画像"),
+            self.dialog, tr("SourceWatchTargetDialog", translation_source('SourceWatchTargetDialog', '通知音') if sound else translation_source('SourceWatchTargetDialog', '通知画像')),
             self.target.sound_path if sound else self.target.icon_path,
             "WAV (*.wav)" if sound else "Images (*.png *.jpg *.jpeg)")
         if not selected:
@@ -180,7 +182,7 @@ class WatchPageController(QObject):
         except (OSError, ImportError, AttributeError, ValueError) as exc:
             status_error = str(exc)
         self.label.setText(status_error or tr("SettingsDialog", "監視状態：{state}").format(
-            state=tr("SettingsDialog", "監視中" if running else "停止中")))
+            state=tr("SettingsDialog", translation_source('SettingsDialog', '監視中') if running else translation_source('SettingsDialog', '停止中'))))
         indicator = require_child(self.dialog, QLabel, "labelSourceWatchIndicator")
         indicator.setProperty("watchState", "error" if status_error else "running" if running else "stopped")
         indicator.setText("!" if status_error else "")
@@ -190,7 +192,7 @@ class WatchPageController(QObject):
         style.unpolish(indicator)
         style.polish(indicator)
         indicator.update()
-        self.toggle.setText(tr("SettingsDialog", "監視を停止" if self.settings.enabled else "監視を開始"))
+        self.toggle.setText(tr("SettingsDialog", translation_source('SettingsDialog', '監視を停止') if self.settings.enabled else translation_source('SettingsDialog', '監視を開始')))
         self.toggle.setIcon(self.icons.get_icon("stop" if self.settings.enabled else "play"))
         errors = 0
         pending_count = 0
@@ -212,7 +214,7 @@ class WatchPageController(QObject):
             name.setObjectName("sourceWatchTitle")
             name.setTextFormat(Qt.TextFormat.PlainText)
             layout.addWidget(name, 0, 1)
-            status = tr("SettingsDialog", "エラー" if error else "監視中" if running else "停止中")
+            status = tr("SettingsDialog", translation_source('SettingsDialog', 'エラー') if error else translation_source('SettingsDialog', '監視中') if running else translation_source('SettingsDialog', '停止中'))
             status_widget = QWidget(card)
             status_layout = QHBoxLayout(status_widget)
             status_layout.setContentsMargins(0, 0, 0, 0)
@@ -247,8 +249,8 @@ class WatchPageController(QObject):
                 update.clicked.connect(partial(self.request_update, target.source_root))
                 actions.addWidget(update)
             for title, icon_name, callback in (
-                ("編集", "pencil", partial(self.edit, target)),
-                ("削除", "trash", partial(self.remove, target)),
+                (translation_source('SettingsDialog', "編集"), "pencil", partial(self.edit, target)),
+                (translation_source('SettingsDialog', "削除"), "trash", partial(self.remove, target)),
             ):
                 button = QPushButton(tr("SettingsDialog", title), card)
                 button.setIcon(self.icons.get_icon(icon_name))
@@ -261,9 +263,9 @@ class WatchPageController(QObject):
         if not self.settings.targets:
             self.targets_layout.addWidget(QLabel(tr("SettingsDialog", "監視対象は登録されていません。"), self.targets_widget))
         for name, text, count in (
-            ("Target", "登録対象：{count}件", len(self.settings.targets)),
-            ("Error", "エラー：{count}件", errors),
-            ("Pending", "未反映の更新：{count}件", pending_count),
+            ("Target", translation_source('SettingsDialog', "登録対象：{count}件"), len(self.settings.targets)),
+            ("Error", translation_source('SettingsDialog', "エラー：{count}件"), errors),
+            ("Pending", translation_source('SettingsDialog', "未反映の更新：{count}件"), pending_count),
         ):
             require_child(self.dialog, QLabel, "labelSourceWatch" + name + "Count").setText(
                 tr("SettingsDialog", text).format(count=count))
@@ -364,7 +366,7 @@ class SourceUpdateDialog(SimpleDialogController):
         require_child(self.dialog, QLabel, "labelDetectedAt").hide()
         self.list = require_child(self.dialog, QListWidget, "listChanges")
         self.list.currentRowChanged.connect(self.select_change)
-        for name, kind in (("All", ""), ("Added", "追加"), ("Modified", "変更"), ("Deleted", "削除")):
+        for name, kind in (("All", ""), ("Added", translation_source('SourceUpdateDialog', "追加")), ("Modified", translation_source('SourceUpdateDialog', "変更")), ("Deleted", translation_source('SourceUpdateDialog', "削除"))):
             count = len(update.changes) if not kind else sum(change.kind == kind for change in update.changes)
             button = require_child(self.dialog, QPushButton, "buttonFilter" + name)
             title = tr("SourceUpdateDialog", kind or "すべて")
@@ -390,6 +392,6 @@ class SourceUpdateDialog(SimpleDialogController):
         require_child(self.dialog, QPlainTextEdit, "textBefore").setPlainText(change.before if change is not None else "")
         require_child(self.dialog, QPlainTextEdit, "textAfter").setPlainText(change.after if change is not None else "")
         require_child(self.dialog, QLabel, "labelBeforeTitle").setText(tr(
-            "SourceUpdateDialog", "削除前の原文" if change is not None and change.kind == "削除" else "変更前"))
+            "SourceUpdateDialog", translation_source('SourceUpdateDialog', '削除前の原文') if change is not None and change.kind == translation_source('SourceUpdateDialog', '削除') else translation_source('SourceUpdateDialog', '変更前')))
         require_child(self.dialog, QLabel, "labelAfterTitle").setText(tr(
-            "SourceUpdateDialog", "原文" if change is not None and change.kind == "追加" else "変更後"))
+            "SourceUpdateDialog", translation_source('SourceUpdateDialog', '原文') if change is not None and change.kind == translation_source('SourceUpdateDialog', '追加') else translation_source('SourceUpdateDialog', '変更後')))

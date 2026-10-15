@@ -3,12 +3,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QFile, QIODeviceBase, QObject, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QIcon, QMouseEvent, QShowEvent
-from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from autolingua2.infrastructure.filesystem import UI_DIR
+from autolingua2.ui.ui_loader import load_ui
 
 
 class DropZone(QWidget):
@@ -36,24 +35,13 @@ class DropZone(QWidget):
         self._hint_text = hint_text
 
     def _ensure_ui(self) -> None:
-        # QUiLoaderによるカスタム部品の生成中に、別の.uiを読み込まない。
+        # 親画面のカスタム部品生成が終わってから内部のUIを構築する。
         if self._ui_widget is not None:
             return
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
-        ui_path = UI_DIR / "components" / "DropZone.ui"
-        file = QFile(str(ui_path))
-        if not file.open(QIODeviceBase.OpenModeFlag.ReadOnly):
-            raise RuntimeError(f"UIファイルを開けません: {ui_path}")
-        try:
-            loader = QUiLoader()
-            loader.setLanguageChangeEnabled(True)
-            widget = loader.load(file, self)
-        finally:
-            file.close()
-        if widget is None:
-            raise RuntimeError(f"UIファイルを読み込めません: {ui_path}")
+        widget = load_ui("components/DropZone.ui", self)
         self._ui_widget = widget
         root_layout.addWidget(widget)
 

@@ -18,7 +18,8 @@ from autolingua2.services.voice_input_contract import (
     VoiceInputCallbacks, VoiceInputMode, VoiceInputOperation, VoiceInputProvider,
 )
 from autolingua2.services.ai_providers.chat import (
-    ChatImage, ChatMessage, ChatReply, ChatToolCall, object_value, string_value,
+    ChatImage, ChatMessage, ChatReply, ChatToolCall, ChatCapacity, ChatContextExceeded,
+    object_value, string_value,
 )
 from autolingua2.services.ai_providers.base import (
     AiProviderPlugin,
@@ -33,6 +34,7 @@ __all__ = [
     "OperationContext", "OperationContribution", "OperationTool",
     "VoiceInputCallbacks", "VoiceInputMode", "VoiceInputOperation", "VoiceInputProvider",
     "ChatImage", "ChatMessage", "ChatReply", "ChatToolCall", "object_value", "string_value",
+    "ChatCapacity", "ChatContextExceeded",
     "ExportFile", "TranslationExporter",
     "EmbeddedTranslationAdapter", "FileAdapter", "KeyConflictAdapter", "KeyEntry", "KeyFile",
     "TranslationTextAdapter", "TranslationTextRules",

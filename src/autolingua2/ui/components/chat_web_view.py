@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 import json
 import logging
 from pathlib import Path
@@ -138,22 +140,22 @@ class ChatWebView(QWebEngineView):
             return
         palette = self.palette()
         labels = {key: tr("AiChat", label) for key, label in {
-            "copy": "コピー", "copied": "コピーしました", "source": "原文",
-            "preview": "プレビュー", "code": "コード", "expand": "拡大", "close": "閉じる",
-            "latest": "最新へ", "empty": "AIへの依頼を入力してください。ファイルや選択行を文中に挿入できます。",
-            "error": "エラー", "operation": "操作", "apply": "選択した変更を適用",
-            "discard": "破棄", "undo": "変更を取り消す", "view": "対象を表示",
-            "cancel": "中止", "results": "結果を表示", "before": "現在", "after": "提案",
-            "invalid": "構造化UIの形式が不正です", "reply": "操作結果をAIへ送信",
-            "selected": "選択", "thinking": "AIが応答しています…", "math": "数式をコピー",
-            "table": "表をコピー", "markdown": "Markdown原文", "selectAll": "すべて選択",
+            "copy": translation_source('AiChat', 'コピー'), "copied": translation_source('AiChat', 'コピーしました'), "source": translation_source('AiChat', '原文'),
+            "preview": translation_source('AiChat', 'プレビュー'), "code": translation_source('AiChat', 'コード'), "expand": translation_source('AiChat', '拡大'), "close": translation_source('AiChat', '閉じる'),
+            "latest": translation_source('AiChat', '最新へ'), "empty": translation_source('AiChat', 'AIへの依頼を入力してください。ファイルや選択行を文中に挿入できます。'),
+            "error": translation_source('AiChat', 'エラー'), "operation": translation_source('AiChat', '操作'), "apply": translation_source('AiChat', '選択した変更を適用'),
+            "discard": translation_source('AiChat', '破棄'), "undo": translation_source('AiChat', '変更を取り消す'), "view": translation_source('AiChat', '対象を表示'),
+            "cancel": translation_source('AiChat', '中止'), "results": translation_source('AiChat', '結果を表示'), "before": translation_source('AiChat', '現在'), "after": translation_source('AiChat', '提案'),
+            "invalid": translation_source('AiChat', '構造化UIの形式が不正です'), "reply": translation_source('AiChat', '操作結果をAIへ送信'),
+            "selected": translation_source('AiChat', '選択'), "thinking": translation_source('AiChat', 'AIが応答しています…'), "math": translation_source('AiChat', '数式をコピー'),
+            "table": translation_source('AiChat', '表をコピー'), "markdown": translation_source('AiChat', 'Markdown原文'), "selectAll": translation_source('AiChat', 'すべて選択'),
         }.items()}
         labels.update({f"name:{key}": tr("AiChat", value) for key, value in NAMES.items()})
         labels.update({f"status:{key}": tr("AiChat", value) for key, value in STATUSES.items()})
         labels.update({f"field:{key}": tr("AiChat", value) for key, value in {
-            "target_text": "訳文", "translation": "訳文", "source": "原文・用語", "name": "名称",
-            "prompt": "口調", "review": "レビュー", "rationale": "採用理由", "candidates": "候補",
-            "memo": "メモ", "notes": "翻訳メモ", "terms": "用語候補", "path": "保存先",
+            "target_text": translation_source('AiChat', '訳文'), "translation": translation_source('AiChat', '訳文'), "source": translation_source('AiChat', '原文・用語'), "name": translation_source('AiChat', '名称'),
+            "prompt": translation_source('AiChat', '口調'), "review": translation_source('AiChat', 'レビュー'), "rationale": translation_source('AiChat', '採用理由'), "candidates": translation_source('AiChat', '候補'),
+            "memo": translation_source('AiChat', 'メモ'), "notes": translation_source('AiChat', '翻訳メモ'), "terms": translation_source('AiChat', '用語候補'), "path": translation_source('AiChat', '保存先'),
         }.items()})
         base_color = palette.color(QPalette.ColorRole.Base)
         dark = base_color.lightness() < 128

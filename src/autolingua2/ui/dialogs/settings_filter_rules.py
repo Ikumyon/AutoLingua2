@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 import re
 import uuid
 from collections.abc import Mapping
@@ -41,7 +43,7 @@ class FilterRulesPageController(QObject):
 
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels([
-            tr("SettingsDialog", value) for value in ("有効", "タグ区分", "正規表現", "例")
+            tr("SettingsDialog", value) for value in (translation_source('SettingsDialog', "有効"), translation_source('SettingsDialog', "タグ区分"), translation_source('SettingsDialog', "正規表現"), translation_source('SettingsDialog', "例"))
         ])
         header = self.table.horizontalHeader()
         for column in (0, 1):

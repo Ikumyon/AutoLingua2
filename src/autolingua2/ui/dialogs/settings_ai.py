@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from autolingua2.ui.i18n import translation_source
 import json
 
 from PySide6.QtCore import QObject, QTimer, Signal
@@ -207,7 +209,7 @@ class AiSettingsPageController(QObject):
             QMessageBox.warning(
                 self.dialog,
                 tr("SettingsDialog", "接続テスト"),
-                tr("SettingsDialog", f"選択中の Provider '{self._current_provider_id}' は利用できません。"),
+                tr("SettingsDialog", "選択中の Provider '{provider}' は利用できません。").format(provider=self._current_provider_id),
             )
             return
 
@@ -444,7 +446,7 @@ class AiSettingsPageController(QObject):
         custom_ui = option is not None and option.mode == "custom"
         self.edit_api_key.setVisible(not plugin_ui)
         self.label_api_key.setVisible(not custom_ui)
-        self.label_api_key.setText(tr("SettingsDialog", "アカウント" if plugin_ui else "APIキー"))
+        self.label_api_key.setText(tr("SettingsDialog", translation_source('SettingsDialog', 'アカウント') if plugin_ui else translation_source('SettingsDialog', 'APIキー')))
         for name in ("labelModel", "scrollAreaModels", "buttonAddModel", "buttonResetModels", "buttonTestConnection"):
             require_child(self.dialog, QWidget, name).setVisible(not custom_ui)
         for panel in self._plugin_panels.values():

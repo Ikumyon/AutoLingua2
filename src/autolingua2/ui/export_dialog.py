@@ -247,7 +247,7 @@ class ExportDialog(SimpleDialogController):
     def __init__(self, workspaces: list[ImportedTranslation], exporters: Mapping[str, TranslationExporter],
                  panels: Mapping[str, ExportSettingsPanel], directory: Path,
                  preferred_plugin: str, parent: QWidget) -> None:
-        super().__init__("ExportDialog.ui", parent)
+        super().__init__("dialogs/ExportDialog.ui", parent)
         merged_exporters: dict[str, TranslationExporter] = dict(exporters)
         merged_panels: dict[str, ExportSettingsPanel] = dict(panels)
         builtin_key = "builtin:bmfont_chars"

@@ -1,6 +1,8 @@
 """MCP settings integrated into the application's existing settings dialog."""
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 from copy import deepcopy
 import secrets
 from uuid import uuid4
@@ -51,7 +53,7 @@ class McpSettingsPage(QWidget):
         form.addRow(copy)
         permissions = QHBoxLayout()
         self.permissions: dict[Permission, QCheckBox] = {}
-        for permission, title in zip(PERMISSIONS, ("参照", "編集", "翻訳", "書き出し")):
+        for permission, title in zip(PERMISSIONS, ("参照", translation_source('SettingsDialog', "編集"), "翻訳", "書き出し")):
             checkbox = QCheckBox(tr("SettingsDialog", title), self)
             checkbox.setChecked(permission in self.settings.permissions)
             self.permissions[permission] = checkbox
@@ -65,7 +67,7 @@ class McpSettingsPage(QWidget):
         self.tree.setRootIsDecorated(False)
         layout.addWidget(self.tree)
         buttons = QHBoxLayout()
-        for title, callback in (("追加", self._add), ("編集", self._edit), ("削除", self._delete), ("接続確認", self._check)):
+        for title, callback in ((translation_source('SettingsDialog', "追加"), self._add), (translation_source('SettingsDialog', "編集"), self._edit), (translation_source('SettingsDialog', "削除"), self._delete), (translation_source('SettingsDialog', "接続確認"), self._check)):
             button = QPushButton(tr("SettingsDialog", title), self)
             button.clicked.connect(callback)
             buttons.addWidget(button)

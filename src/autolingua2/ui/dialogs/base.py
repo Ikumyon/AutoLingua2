@@ -1,16 +1,10 @@
-from pathlib import Path
 from typing import TypeVar
 
-from PySide6.QtCore import QFile, QIODeviceBase, QObject
-from PySide6.QtUiTools import QUiLoader
+from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QDialog, QMessageBox, QPushButton, QWidget
 
-from autolingua2.infrastructure.filesystem import UI_DIR
-from autolingua2.ui.components.combo_menu_button import ComboMenuButton
-from autolingua2.ui.components.chat_composer import ChatComposer, ChatReferenceTable
-from autolingua2.ui.components.chat_web_view import ChatWebView
-from autolingua2.ui.components.drop_zone import DropZone
 from autolingua2.ui.i18n import tr
+from autolingua2.ui.ui_loader import load_ui as load_ui
 
 
 ChildType = TypeVar("ChildType", bound=QObject)
@@ -21,33 +15,6 @@ def require_child(parent: QObject, child_type: type[ChildType], name: str) -> Ch
     if child is None:
         raise RuntimeError(f"UI部品が見つかりません: {name} ({child_type.__name__})")
     return child
-
-
-def load_ui(name: str, parent: QWidget | None = None) -> QWidget:
-    # Source and frozen distributions both use the packaged .ui resources.
-    path = UI_DIR / name
-    if not path.is_file():
-        matches = list(UI_DIR.rglob(Path(name).name))
-        if matches:
-            path = matches[0]
-    file = QFile(str(path))
-    if not file.open(QIODeviceBase.OpenModeFlag.ReadOnly):
-        raise RuntimeError(f"UIファイルを開けません: {path}")
-    try:
-        loader = QUiLoader()
-        loader.registerCustomWidget(ComboMenuButton)
-        loader.registerCustomWidget(ChatComposer)
-        loader.registerCustomWidget(ChatReferenceTable)
-        loader.registerCustomWidget(ChatWebView)
-        loader.registerCustomWidget(DropZone)
-        loader.setLanguageChangeEnabled(True)
-        widget = loader.load(file, parent)
-    finally:
-        file.close()
-
-    if widget is None:
-        raise RuntimeError(f"UIファイルを読み込めません: {path}")
-    return widget
 
 
 class SimpleDialogController:

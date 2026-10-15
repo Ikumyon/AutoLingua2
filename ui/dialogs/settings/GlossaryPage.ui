@@ -167,7 +167,14 @@
          <item>
           <widget class="QLineEdit" name="editTermSearch">
            <property name="placeholderText">
-            <string>原語・指定訳・他形態・メモを検索</string>
+            <string>検索（例：source:魔法 AND NOT memo:要確認）</string>
+           </property>
+           <property name="toolTip">
+            <string>source: 原語 / target: 訳語 / variant: 表記揺れ / memo: メモ
+exp:/パターン/フラグ: 正規表現。通常検索は大文字小文字を区別しません。
+指定なしは全体検索。AND・OR・NOT・先頭の -・括弧に対応。空白区切りはANDです。
+優先順位：括弧 → NOT・- → AND → OR。演算子は大文字小文字を区別しません。
+空白を含む語は引用符で囲みます。バックスラッシュで特殊文字をエスケープできます。</string>
            </property>
            <property name="clearButtonEnabled">
             <bool>true</bool>
@@ -196,6 +203,12 @@
           </widget>
          </item>
         </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="labelTermSearchError">
+         <property name="text"><string/></property>
+         <property name="wordWrap"><bool>true</bool></property>
+        </widget>
        </item>
        <item>
         <widget class="QTableWidget" name="tableGlossaryTerms">

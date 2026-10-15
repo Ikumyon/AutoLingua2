@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 from PySide6.QtCore import QLocale
 from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QGroupBox, QLabel, QListWidget, QPlainTextEdit,
@@ -28,7 +30,7 @@ class KeyConflictDialog(QDialog):
         self.previews: list[QPlainTextEdit] = []
         for index, side in enumerate(conflict.sides):
             name = QLocale(side.language_code.replace("-", "_")).nativeLanguageName() or side.language_code
-            role = tr("KeyConflictDialog", "原文候補" if side.role == "source" else "既存訳候補")
+            role = tr("KeyConflictDialog", translation_source('KeyConflictDialog', '原文候補') if side.role == "source" else translation_source('KeyConflictDialog', '既存訳候補'))
             group = QGroupBox(f"{role}［{name} / {side.language_code}］")
             group_layout = QVBoxLayout(group)
             candidates = QListWidget()
@@ -60,7 +62,7 @@ class KeyConflictDialog(QDialog):
         changes = []
         for side in conflict.sides:
             if len(side.candidates) > 1:
-                role = tr("KeyConflictDialog", "原文" if side.role == "source" else "既存訳")
+                role = tr("KeyConflictDialog", translation_source('KeyConflictDialog', '原文') if side.role == "source" else translation_source('KeyConflictDialog', '既存訳'))
                 changes.append(tr("KeyConflictDialog", "{role}［{language}］：選択した1行を残し、他の競合{count}行を削除").format(
                     role=role, language=side.language_code, count=len(side.candidates) - 1))
         summary = QLabel(tr("KeyConflictDialog", "修正内容：") + "\n" + "\n".join(changes))

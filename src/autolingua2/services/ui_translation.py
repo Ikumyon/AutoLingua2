@@ -24,14 +24,16 @@ from autolingua2.services.settings_store import load_ai_settings
 
 @lru_cache(maxsize=1)
 def source_messages() -> tuple[UiMessage, ...]:
-    document = ET.parse(ASSETS_DIR / "i18n/source.ts").getroot()
     result: list[UiMessage] = []
-    for context in document.findall("context"):
-        for message in context.findall("message"):
-            source = message.findtext("source", "")
-            if source:
-                result.append(UiMessage(context.findtext("name", ""), source,
-                                        message.findtext("translation", source), message.findtext("comment", "")))
+    for path in sorted((ASSETS_DIR / "i18n").glob("*.ts")):
+        document = ET.parse(path).getroot()
+        for context in document.findall("context"):
+            for message in context.findall("message"):
+                source = message.findtext("source", "")
+                if source:
+                    result.append(UiMessage(context.findtext("name", ""), source,
+                                            message.findtext("translation", source), message.findtext("comment", ""),
+                                            path.name, message.findtext("extracomment", "")))
     if not result:
         raise ValueError("本体UIの原文カタログが空です。")
     return tuple(result)
@@ -93,6 +95,70 @@ def _write(path: Path, data: bytes) -> None:
         raise OSError(file.errorString())
 
 
+def translation_catalogs(tag: str, values: Mapping[tuple[str, str, str], str]) -> dict[str, bytes]:
+    """Build context catalogs from packaged originals, independent of the UI."""
+    roots: dict[str, ET.Element] = {}
+    contexts: dict[tuple[str, str], ET.Element] = {}
+    for message in source_messages():
+        root = roots.get(message.filename)
+        if root is None:
+            root = ET.Element("TS", version="2.1", language=normalize_language(tag), sourcelanguage="ja")
+            if message.context == "LanguageNames":
+                root.append(ET.Comment("Language names: Unicode CLDR 48.0.0, main/ja. Unicode License v3; see CLDR-LICENSE.txt."))
+            roots[message.filename] = root
+        section = contexts.get((message.filename, message.context))
+        if section is None:
+            section = ET.SubElement(root, "context")
+            ET.SubElement(section, "name").text = message.context
+            contexts[(message.filename, message.context)] = section
+        item = ET.SubElement(section, "message")
+        ET.SubElement(item, "source").text = message.source
+        if message.comment:
+            ET.SubElement(item, "comment").text = message.comment
+        notes = [message.extra_comment] if message.extra_comment else []
+        if message.original != message.source:
+            notes.append(message.original)
+        if notes:
+            ET.SubElement(item, "extracomment").text = "\n".join(notes)
+        translated = values.get(message.key, "")
+        translation = ET.SubElement(item, "translation")
+        translation.text = translated
+        if not translated:
+            translation.set("type", "unfinished")
+    catalogs: dict[str, bytes] = {}
+    for filename, root in roots.items():
+        ET.indent(root, space="  ")
+        catalogs[filename] = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    return catalogs
+
+
+def export_ts(folder: Path, tag: str, *, overwrite: bool = False) -> int:
+    """Export untranslated TS and its license; restore overwritten files on failure."""
+    catalogs = translation_catalogs(tag, {})
+    count = len(catalogs)
+    catalogs["CLDR-LICENSE.txt"] = (ASSETS_DIR / "i18n/CLDR-LICENSE.txt").read_bytes()
+    conflicts = [folder / name for name in catalogs if (folder / name).exists()]
+    for path in conflicts:
+        if not path.is_file():
+            raise IsADirectoryError(str(path))
+    if conflicts and not overwrite:
+        raise FileExistsError("\n".join(str(path) for path in conflicts))
+    originals: dict[Path, bytes | None] = {}
+    try:
+        for filename, data in catalogs.items():
+            path = folder / filename
+            originals[path] = path.read_bytes() if path.is_file() else None
+            _write(path, data)
+    except Exception:
+        for path, original in reversed(tuple(originals.items())):
+            if original is None:
+                path.unlink(missing_ok=True)
+            else:
+                _write(path, original)
+        raise
+    return count
+
+
 class UiTranslationService(QObject):
     progress = Signal(int, int)
     running_changed = Signal(bool)
@@ -125,6 +191,9 @@ class UiTranslationService(QObject):
         self._temporary: QTemporaryDir | None = None
         self._lrelease = ""
         self._published: dict[Path, bytes | None] = {}
+        self._compile_queue: deque[str] = deque()
+        self._catalog_names: tuple[str, ...] = ()
+        self._compiling = ""
 
     def start(self, tag: str, name: str, provider_id: str, model: str,
               languages: Mapping[str, LanguageInfo]) -> None:
@@ -150,7 +219,7 @@ class UiTranslationService(QObject):
         missing = [message for message in source_messages() if message.key not in existing]
         if not missing:
             raise ValueError("この言語の表示文言はすでに揃っています。")
-        self._values = {}
+        self._values = existing
         info = languages.get(tag)
         self._folder = info.folder if info is not None else PROJECT_ROOT / "translations" / tag
         self._tag, self._name = tag, name.strip()
@@ -188,7 +257,10 @@ class UiTranslationService(QObject):
         batch = self._queue.popleft()
         self._pending = {str(index): message for index, message in enumerate(batch)}
         self._request = uuid4().hex
-        payload = json.dumps({key: message.original for key, message in self._pending.items()}, ensure_ascii=False)
+        payload = json.dumps({key: {"source": message.source, "original": message.original,
+                                   "context": message.context,
+                                   "comment": "\n".join(note for note in (message.comment, message.extra_comment) if note)}
+                              for key, message in self._pending.items()}, ensure_ascii=False)
         self.client.translate_text(self._request, provider, self._api_key, self._model, payload,
                                    "ja", self._tag, target_language_name=self._name, purpose="ui")
 
@@ -217,35 +289,25 @@ class UiTranslationService(QObject):
             if not temporary.isValid():
                 raise OSError("翻訳用の一時フォルダを作成できません。")
             self._temporary = temporary
-            root = ET.Element("TS", version="2.1", language=self._tag, sourcelanguage="ja")
-            messages = {message.key: message for message in source_messages()}
-            old = self._folder / "personal.ts"
-            if old.is_file():
-                for context in ET.parse(old).getroot().findall("context"):
-                    for item in context.findall("message"):
-                        key = (context.findtext("name", ""), item.findtext("source", ""), item.findtext("comment", ""))
-                        translated = item.findtext("translation", "")
-                        if key in messages and translated:
-                            self._values.setdefault(key, translated)
-            contexts: dict[str, ET.Element] = {}
-            for key, translated in sorted(self._values.items()):
-                context, source, comment = key
-                section = contexts.get(context)
-                if section is None:
-                    section = ET.SubElement(root, "context")
-                    ET.SubElement(section, "name").text = context
-                    contexts[context] = section
-                item = ET.SubElement(section, "message")
-                ET.SubElement(item, "source").text = source
-                if comment:
-                    ET.SubElement(item, "comment").text = comment
-                ET.SubElement(item, "translation").text = translated
-            ET.indent(root, space="  ")
-            ts_path = Path(temporary.path()) / "personal.ts"
-            _write(ts_path, ET.tostring(root, encoding="utf-8", xml_declaration=True))
-            self.process.start(self._lrelease, [str(ts_path), "-qm", str(ts_path.with_suffix(".qm"))])
+            catalogs = translation_catalogs(self._tag, self._values)
+            self._catalog_names = tuple(catalogs)
+            self._compile_queue = deque(catalogs)
+            for filename, data in catalogs.items():
+                _write(Path(temporary.path()) / filename, data)
+            self._compile_next()
         except Exception as error:
             self._fail(str(error))
+
+    def _compile_next(self) -> None:
+        temporary = self._temporary
+        if temporary is None:
+            raise RuntimeError("翻訳用の一時フォルダがありません。")
+        if not self._compile_queue:
+            self._publish()
+            return
+        self._compiling = self._compile_queue.popleft()
+        ts_path = Path(temporary.path()) / self._compiling
+        self.process.start(self._lrelease, [str(ts_path), "-qm", str(ts_path.with_suffix(".qm"))])
 
     def _compiled(self, code: int, status: QProcess.ExitStatus) -> None:
         if not self.busy:
@@ -257,23 +319,37 @@ class UiTranslationService(QObject):
             temporary = self._temporary
             if temporary is None:
                 raise RuntimeError("翻訳用の一時フォルダがありません。")
-            qm_path = Path(temporary.path()) / "personal.qm"
+            qm_path = (Path(temporary.path()) / self._compiling).with_suffix(".qm")
             translator = QTranslator()
             if not translator.load(str(qm_path)):
-                raise ValueError("生成した翻訳辞書を読み込めません。")
-            self._folder.mkdir(parents=True, exist_ok=True)
-            for filename in ("personal.ts", "personal.qm"):
-                destination = self._folder / filename
-                self._published[destination] = destination.read_bytes() if destination.is_file() else None
-                _write(destination, (Path(temporary.path()) / filename).read_bytes())
-            metadata = self._folder / "metadata.json"
-            if not metadata.exists():
-                self._published[metadata] = None
-                _write(metadata, json.dumps({"code": self._tag, "name": self._name}, ensure_ascii=False, indent=2).encode("utf-8"))
-            # Keep busy until the UI has registered, persisted and applied the resource.
-            self.completed.emit(self._tag, str(self._folder))
+                raise ValueError(f"生成した翻訳辞書を読み込めません: {qm_path.name}")
+            self._compile_next()
         except Exception as error:
             self._fail(str(error))
+
+    def _publish(self) -> None:
+        temporary = self._temporary
+        if temporary is None:
+            raise RuntimeError("翻訳用の一時フォルダがありません。")
+        self._folder.mkdir(parents=True, exist_ok=True)
+        for filename in self._catalog_names:
+            qm_name = Path(filename).with_suffix(".qm").name
+            destination = self._folder / qm_name
+            self._published[destination] = destination.read_bytes() if destination.is_file() else None
+            _write(destination, (Path(temporary.path()) / qm_name).read_bytes())
+        metadata = self._folder / "metadata.json"
+        if not metadata.exists():
+            self._published[metadata] = None
+            _write(metadata, json.dumps({"code": self._tag, "name": self._name}, ensure_ascii=False, indent=2).encode("utf-8"))
+        # The legacy QM was read through existing_translations before replacement.
+        # Remove both legacy artifacts only after every new QM has been compiled.
+        for filename in ("personal.ts", "personal.qm"):
+            path = self._folder / filename
+            if path.is_file():
+                self._published[path] = path.read_bytes()
+                path.unlink()
+        # Keep busy until resource registration and language switching succeed.
+        self.completed.emit(self._tag, str(self._folder))
 
     def confirm(self) -> None:
         self._published.clear()
@@ -308,6 +384,9 @@ class UiTranslationService(QObject):
             self._temporary = None
         self._queue.clear()
         self.running_changed.emit(False)
+        self._compile_queue.clear()
+        self._catalog_names = ()
+        self._compiling = ""
 
     def _fail(self, message: str) -> None:
         try:

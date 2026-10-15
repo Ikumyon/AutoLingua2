@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QCoreApplication, QObject, Qt
-from PySide6.QtWidgets import QComboBox, QDialog, QListWidget, QListWidgetItem, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QDialog, QListWidget, QListWidgetItem, QVBoxLayout, QWidget
 
 from autolingua2.extensions import ExtensionEntrance
 from autolingua2.services.settings_store import (
@@ -30,11 +30,6 @@ class GeneralSettingsPageController(QObject):
         self.self_translation = SelfTranslationController(entrance, dialog)
         container = require_child(dialog, QWidget, "selfTranslationContainer")
         require_child(container, QVBoxLayout, "layoutSelfTranslationContainer").addWidget(self.self_translation.widget)
-        self.self_translation_button = require_child(dialog, QPushButton, "buttonSelfTranslation")
-        self.self_translation_button.toggled.connect(container.setVisible)
-        automatic = self.self_translation.needs_os_translation()
-        self.self_translation_button.setChecked(automatic)
-        container.setVisible(automatic)
         self.self_translation.applied.connect(self._language_created)
 
     def save(self) -> None:

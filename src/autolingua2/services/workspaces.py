@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from autolingua2.ir import UnitState
+from autolingua2.ir.text_search import TextSearch
 from autolingua2.ir.classification import SourceCategory
 from autolingua2.ir.tone import ToneItem
 from autolingua2.ir.filter_rules import TagRules
@@ -193,6 +194,28 @@ class WorkspaceService:
         record.target_text = target_text
         record.generation += 1
         return True
+
+    def replace_translation_drafts(self, workspace: Workspace, units: list[WorkspaceUnit],
+                                   search: TextSearch, replacement: str, *,
+                                   all_matches: bool) -> tuple[list[WorkspaceUnit], int]:
+        if self.workspaces.get(workspace.language_code) is not workspace:
+            raise ValueError("編集先の翻訳ワークスペースが見つかりません。")
+        changes: list[tuple[WorkspaceUnit, str, int]] = []
+        for unit in units:
+            if (workspace.records.get(unit.id) is not unit.record or unit.locked
+                    or unit.hidden or unit.record.translating):
+                continue
+            text, count = search.replace(unit.target_text, replacement, all_matches=all_matches)
+            if count and text != unit.target_text:
+                changes.append((unit, text, count))
+        # Validate every substitution before modifying any record.
+        changed: list[WorkspaceUnit] = []
+        replaced = 0
+        for unit, text, count in changes:
+            if self.update_translation_draft(workspace, unit.id, text):
+                changed.append(unit)
+                replaced += count
+        return changed, replaced
 
     def discard_translation_draft(self, workspace: Workspace, unit_id: str) -> bool:
         if self.workspaces.get(workspace.language_code) is not workspace:

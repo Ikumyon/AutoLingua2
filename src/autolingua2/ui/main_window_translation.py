@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 from collections import Counter, deque
 from collections.abc import Sequence
 from dataclasses import replace
@@ -137,7 +139,7 @@ class MainWindowTranslationController(QObject):
         options = self._options(warn=True)
         if options is None or not unit.source_text.strip():
             return
-        host.window.statusBar().showMessage(tr("MainWindow", f"[{unit.label}] を翻訳中..."), 3000)
+        host.window.statusBar().showMessage(tr("MainWindow", "[{label}] を翻訳中...").format(label=unit.label), 3000)
         self.service.translate_single(workspace, unit, options)
 
     def _unit_translated(self, workspace: Workspace, unit: TranslationUnit, batch: bool,
@@ -156,7 +158,7 @@ class MainWindowTranslationController(QObject):
             host.focus_controller.refresh_focus(sync_list=False)
         if not batch:
             host.focus_controller.refresh_focus_unit_list()
-            host.window.statusBar().showMessage(tr("MainWindow", f"[{unit.label}] の翻訳が完了しました。"), 4000)
+            host.window.statusBar().showMessage(tr("MainWindow", "[{label}] の翻訳が完了しました。").format(label=unit.label), 4000)
             self._offer_shared_translation(workspace, unit, manual=False,
                                            options=self.service.completed_options if eligible_ids is None else None,
                                            eligible_ids=eligible_ids,
@@ -406,14 +408,14 @@ class MainWindowTranslationController(QObject):
         self, peers: Sequence[TranslationUnit], *, similar: bool, manual: bool, reference_text: str,
     ) -> set[UnitState] | None:
         dialog = QDialog(self.host.window)
-        dialog.setWindowTitle(tr("MainWindow", "類似する項目のAI翻訳" if similar else "完全一致する項目への適用"))
+        dialog.setWindowTitle(tr("MainWindow", translation_source('MainWindow', '類似する項目のAI翻訳') if similar else translation_source('MainWindow', '完全一致する項目への適用')))
         layout = QVBoxLayout(dialog)
         message = (
-            "この訳文を参考に、類似する項目をAIが個別に翻訳します。\n結果の状態は「AIによる翻訳」になります。"
+            translation_source('MainWindow', "この訳文を参考に、類似する項目をAIが個別に翻訳します。\n結果の状態は「AIによる翻訳」になります。")
             if similar else
-            "この訳文を適用する対象を選んでください。\n適用した項目の状態は「人間による翻訳」になります。"
+            translation_source('MainWindow', "この訳文を適用する対象を選んでください。\n適用した項目の状態は「人間による翻訳」になります。")
             if manual else
-            "この訳文を適用する対象を選んでください。\n適用した項目の状態は「AIによる翻訳」になります。"
+            translation_source('MainWindow', "この訳文を適用する対象を選んでください。\n適用した項目の状態は「AIによる翻訳」になります。")
         )
         layout.addWidget(QLabel(tr("MainWindow", message), dialog))
         if similar:
@@ -424,12 +426,12 @@ class MainWindowTranslationController(QObject):
         counts = Counter(peer.state for peer in peers)
         checkboxes: dict[UnitState, QCheckBox] = {}
         for state, label in (
-            (UnitState.UNTRANSLATED, "未翻訳"),
-            (UnitState.AI_TRANSLATED, "AIによる翻訳"),
-            (UnitState.HUMAN_TRANSLATED, "人間による翻訳"),
-            (UnitState.AI_REVIEWED, "AIによる校閲"),
-            (UnitState.HUMAN_REVIEWED, "人間による校閲"),
-            (UnitState.DOUBTFUL, "疑問あり"),
+            (UnitState.UNTRANSLATED, translation_source('MainWindow', "未翻訳")),
+            (UnitState.AI_TRANSLATED, translation_source('MainWindow', "AIによる翻訳")),
+            (UnitState.HUMAN_TRANSLATED, translation_source('MainWindow', "人間による翻訳")),
+            (UnitState.AI_REVIEWED, translation_source('MainWindow', "AIによる校閲")),
+            (UnitState.HUMAN_REVIEWED, translation_source('MainWindow', "人間による校閲")),
+            (UnitState.DOUBTFUL, translation_source('MainWindow', "疑問あり")),
         ):
             checkbox = QCheckBox(tr("MainWindow", "{label}（{count}件）").format(
                 label=tr("MainWindow", label), count=counts[state]), dialog)
@@ -439,9 +441,9 @@ class MainWindowTranslationController(QObject):
             layout.addWidget(checkbox)
         layout.addWidget(QLabel(tr("MainWindow", "ロック・非表示・処理中・編集中の項目は除外"), dialog))
         buttons = QDialogButtonBox(dialog)
-        apply_button = buttons.addButton(tr("MainWindow", "AI翻訳する" if similar else "適用する"),
+        apply_button = buttons.addButton(tr("MainWindow", translation_source('MainWindow', 'AI翻訳する') if similar else translation_source('MainWindow', '適用する')),
                                          QDialogButtonBox.ButtonRole.AcceptRole)
-        buttons.addButton(tr("MainWindow", "翻訳しない" if similar else "適用しない"),
+        buttons.addButton(tr("MainWindow", translation_source('MainWindow', '翻訳しない') if similar else translation_source('MainWindow', '適用しない')),
                           QDialogButtonBox.ButtonRole.RejectRole)
 
         def update_apply_button() -> None:
@@ -500,7 +502,7 @@ class MainWindowTranslationController(QObject):
 
     def _batch_unit_started(self, unit: TranslationUnit, position: int, total: int) -> None:
         self.host.window.statusBar().showMessage(
-            tr("MainWindow", f"[{unit.label}] を翻訳中... ({position}/{total})")
+            tr("MainWindow", "[{label}] を翻訳中... ({position}/{total})").format(label=unit.label, position=position, total=total)
         )
 
     def _batch_finished(self, succeeded: int, failed: int, total: int) -> None:
@@ -531,7 +533,7 @@ class MainWindowTranslationController(QObject):
         selected_rows = self.host.table_controller._get_selected_rows()
         if selected_rows:
             count = len(selected_rows)
-            self.host.button_translate_all.setText(tr("MainWindow", f"▶ 選択項目を翻訳 ({count}件)"))
+            self.host.button_translate_all.setText(tr("MainWindow", "▶ 選択項目を翻訳 ({count}件)").format(count=count))
         else:
             self.host.button_translate_all.setText(tr("MainWindow", "▶ 全翻訳"))
         self.host.button_translate_all.setEnabled(is_workspace_active)
@@ -569,7 +571,7 @@ class MainWindowTranslationController(QObject):
 
         if not untranslated:
             msg_box.setText(
-                tr("MainWindow", f"選択されたすべての項目（{len(valid_units)} 件）はすでに翻訳済みです。\n上書きして再翻訳を実行しますか？")
+                tr("MainWindow", "選択されたすべての項目（{count} 件）はすでに翻訳済みです。\n上書きして再翻訳を実行しますか？").format(count=len(valid_units))
             )
             btn_overwrite = msg_box.addButton(tr("MainWindow", "再翻訳 (上書き)"), QMessageBox.ButtonRole.AcceptRole)
             btn_cancel = msg_box.addButton(tr("MainWindow", "キャンセル"), QMessageBox.ButtonRole.RejectRole)
@@ -587,7 +589,7 @@ class MainWindowTranslationController(QObject):
             )
             btn_overwrite = msg_box.addButton(tr("MainWindow", "すべて再翻訳 (上書き)"), QMessageBox.ButtonRole.AcceptRole)
             btn_untranslated_only = msg_box.addButton(
-                tr("MainWindow", f"未翻訳のみ翻訳 ({len(untranslated)}件)"), QMessageBox.ButtonRole.ActionRole
+                tr("MainWindow", "未翻訳のみ翻訳 ({count}件)").format(count=len(untranslated)), QMessageBox.ButtonRole.ActionRole
             )
             btn_cancel = msg_box.addButton(tr("MainWindow", "キャンセル"), QMessageBox.ButtonRole.RejectRole)
             msg_box.setDefaultButton(btn_untranslated_only)

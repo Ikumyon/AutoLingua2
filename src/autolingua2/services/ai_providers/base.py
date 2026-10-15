@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 
 from autolingua2.infrastructure.filesystem import PROJECT_ROOT
-from autolingua2.services.ai_providers.chat import ChatMessage, ChatReply, ChatToolCall
+from autolingua2.services.ai_providers.chat import ChatCapacity, ChatMessage, ChatReply, ChatToolCall
 from autolingua2.services.language_tags import is_default_language, system_language
 
 logger = logging.getLogger(__name__)
@@ -207,6 +207,27 @@ class BaseHttpTranslator(TextTranslator, ABC):
 
     supports_chat = False
     chat_image_types: tuple[str, ...] = ()
+
+    @property
+    def chat_model_endpoint(self) -> str | None:
+        """Optional authenticated model metadata endpoint (not a model-name guess)."""
+        return None
+
+    def extract_chat_capacity(self, data: dict[str, Any]) -> ChatCapacity | None:
+        return None
+
+    def is_chat_context_error(self, data: dict[str, Any], status_code: int) -> bool:
+        return False
+
+    def build_summary_payload(self, messages: list[ChatMessage], instructions: str,
+                              output_tokens: int) -> dict[str, Any]:
+        return self.build_chat_payload(messages, instructions, [], [])
+
+    def estimate_chat_tokens(self, messages: list[ChatMessage], system_prompt: str,
+                             tools: list[dict[str, Any]], continuation: list[dict[str, Any]]) -> int:
+        # Deliberately conservative; includes provider framing, tools and image data.
+        payload = self.build_chat_payload(messages, system_prompt, tools, continuation)
+        return len(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
 
     def extract_usage(self, data: dict[str, Any]) -> TranslationUsage:
         return TranslationUsage()

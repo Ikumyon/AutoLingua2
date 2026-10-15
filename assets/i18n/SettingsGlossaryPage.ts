@@ -1,0 +1,90 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="ja" sourcelanguage="ja">
+  <context>
+    <name>SettingsGlossaryPage</name>
+    <message>
+      <source>source: 原語 / target: 訳語 / variant: 表記揺れ / memo: メモ
+exp:/パターン/フラグ: 正規表現。通常検索は大文字小文字を区別しません。
+指定なしは全体検索。AND・OR・NOT・先頭の -・括弧に対応。空白区切りはANDです。
+優先順位：括弧 → NOT・- → AND → OR。演算子は大文字小文字を区別しません。
+空白を含む語は引用符で囲みます。バックスラッシュで特殊文字をエスケープできます。</source>
+      <translation>source: 原語 / target: 訳語 / variant: 表記揺れ / memo: メモ
+exp:/パターン/フラグ: 正規表現。通常検索は大文字小文字を区別しません。
+指定なしは全体検索。AND・OR・NOT・先頭の -・括弧に対応。空白区切りはANDです。
+優先順位：括弧 → NOT・- → AND → OR。演算子は大文字小文字を区別しません。
+空白を含む語は引用符で囲みます。バックスラッシュで特殊文字をエスケープできます。</translation>
+    </message>
+    <message>
+      <source>ゲーム：</source>
+      <translation>ゲーム：</translation>
+    </message>
+    <message>
+      <source>メモ</source>
+      <translation>メモ</translation>
+    </message>
+    <message>
+      <source>他形態</source>
+      <translation>他形態</translation>
+    </message>
+    <message>
+      <source>削除</source>
+      <translation>削除</translation>
+    </message>
+    <message>
+      <source>原語</source>
+      <translation>原語</translation>
+    </message>
+    <message>
+      <source>原語：</source>
+      <translation>原語：</translation>
+    </message>
+    <message>
+      <source>品詞</source>
+      <translation>品詞</translation>
+    </message>
+    <message>
+      <source>指定訳</source>
+      <translation>指定訳</translation>
+    </message>
+    <message>
+      <source>検索（例：source:魔法 AND NOT memo:要確認）</source>
+      <translation>検索（例：source:魔法 AND NOT memo:要確認）</translation>
+    </message>
+    <message>
+      <source>用語集</source>
+      <translation>用語集</translation>
+    </message>
+    <message>
+      <source>用語集の変更は即時保存されます。設定画面のキャンセルでは元に戻りません。</source>
+      <translation>用語集の変更は即時保存されます。設定画面のキャンセルでは元に戻りません。</translation>
+    </message>
+    <message>
+      <source>用語集を検索</source>
+      <translation>用語集を検索</translation>
+    </message>
+    <message>
+      <source>用語集を選択してください</source>
+      <translation>用語集を選択してください</translation>
+    </message>
+    <message>
+      <source>編集</source>
+      <translation>編集</translation>
+    </message>
+    <message>
+      <source>親：なし</source>
+      <translation>親：なし</translation>
+    </message>
+    <message>
+      <source>訳語：</source>
+      <translation>訳語：</translation>
+    </message>
+    <message>
+      <source>＋ 用語</source>
+      <translation>＋ 用語</translation>
+    </message>
+    <message>
+      <source>＋ 用語集</source>
+      <translation>＋ 用語集</translation>
+    </message>
+  </context>
+</TS>

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 import os
+import re
 from copy import deepcopy
 from pathlib import Path
 import sys
@@ -59,7 +62,8 @@ from autolingua2.infrastructure.platform import current_platform, log_directory
 from autolingua2.infrastructure.platform.base import PlatformDriver
 from autolingua2.infrastructure.operations import OperationCancelled
 from autolingua2.ir import Issue, TranslationProject, UnitState
-from autolingua2.ir.workspace import UnitView as TranslationUnit, Workspace, is_pending_translation
+from autolingua2.ir.workspace import UnitView as TranslationUnit, Workspace, WorkspaceUnit, is_pending_translation
+from autolingua2.ir.text_search import SearchSyntaxError, TextSearch
 from autolingua2.services.workspaces import WorkspaceService
 from autolingua2.services.glossary_store import GlossaryStore
 from autolingua2.services.tone_store import ToneStore
@@ -472,6 +476,18 @@ class MainWindowController(QObject):
         self.list_focus_units = require_child(self.window, QListWidget, "listFocusUnits")
         self.list_focus_units.setIconSize(QSize(16, 16))
         self.search = require_child(self.window, QLineEdit, "editSearch")
+        self.search_case = require_child(self.window, QToolButton, "buttonSearchCase")
+        self.search_word = require_child(self.window, QToolButton, "buttonSearchWord")
+        self.search_regex = require_child(self.window, QToolButton, "buttonSearchRegex")
+        self.button_toggle_replace = require_child(self.window, QToolButton, "buttonToggleReplace")
+        self.replace_panel = require_child(self.window, QWidget, "replacePanel")
+        self.replace_panel.hide()
+        self.replace_text = require_child(self.window, QLineEdit, "editReplace")
+        self.button_replace = require_child(self.window, QPushButton, "buttonReplace")
+        self.button_replace_all = require_child(self.window, QPushButton, "buttonReplaceAll")
+        self.label_search_result = require_child(self.window, QLabel, "labelSearchResult")
+        self._text_search = TextSearch("")
+        self._search_error = ""
         self.status_filter = require_child(self.window, QComboBox, "comboStatusFilter")
         self.stack = require_child(self.window, QStackedWidget, "stackTranslationView")
         self.page_dashboard = require_child(self.window, QWidget, "pageDashboard")
@@ -739,10 +755,10 @@ class MainWindowController(QObject):
     def _connect_actions(self) -> None:
         file_menu = require_child(self.window, QMenu, "menuFile")
         for title, callback in (
-            ("プロジェクトを開く…", self.open_project),
+            (translation_source('MainWindow', "プロジェクトを開く…"), self.open_project),
             ("プロジェクトを保存", self.save_project),
-            ("プロジェクトを別名で保存…", self.save_project_as),
-            ("翻訳元の更新を確認…", self.check_source_updates),
+            (translation_source('MainWindow', "プロジェクトを別名で保存…"), self.save_project_as),
+            (translation_source('MainWindow', "翻訳元の更新を確認…"), self.check_source_updates),
         ):
             action = QAction(tr("MainWindow", title), self.window)
             action.triggered.connect(callback)
@@ -775,7 +791,7 @@ class MainWindowController(QObject):
         glossary_menu.addSeparator()
         glossary_menu.addAction(self.action_glossary)
         self.action_problems.triggered.connect(self.open_problems_dialog)
-        self.action_about.triggered.connect(lambda: SimpleDialogController("AboutDialog.ui", self.window).exec())
+        self.action_about.triggered.connect(lambda: SimpleDialogController("dialogs/AboutDialog.ui", self.window).exec())
 
         self.action_list_mode.triggered.connect(self.show_list_mode)
         self.action_dashboard_mode.triggered.connect(self.show_dashboard_mode)
@@ -813,6 +829,11 @@ class MainWindowController(QObject):
         self.button_save_split.clicked.connect(self.focus_controller.save_and_next)
 
         self.search.textChanged.connect(self.apply_filters)
+        for button in (self.search_case, self.search_word, self.search_regex):
+            button.toggled.connect(self.apply_filters)
+        self.button_toggle_replace.toggled.connect(self._toggle_replace)
+        self.button_replace.clicked.connect(lambda: self._replace_matches(all_matches=False))
+        self.button_replace_all.clicked.connect(lambda: self._replace_matches(all_matches=True))
         self.status_filter.currentTextChanged.connect(self.apply_filters)
         self.table.itemSelectionChanged.connect(self.table_controller._on_table_selection_changed)
         self.table.cellClicked.connect(self.table_controller._on_table_cell_clicked)
@@ -1824,7 +1845,7 @@ class MainWindowController(QObject):
         filter_str = tr("MainWindow", "すべてのファイル (*.*)")
         if adapter is not None and getattr(adapter, "suffixes", None):
             pattern = " ".join(f"*{s}" for s in adapter.suffixes)
-            filter_str = tr("MainWindow", f"対応ファイル ({pattern});;すべてのファイル (*.*)")
+            filter_str = tr("MainWindow", "対応ファイル ({pattern});;すべてのファイル (*.*)").format(pattern=pattern)
         files, _ = QFileDialog.getOpenFileNames(self.window, tr("MainWindow", "既存の翻訳ファイルを選択"), "", filter_str)
         for f in files:
             self.add_inherited_path(Path(f))
@@ -2285,15 +2306,72 @@ class MainWindowController(QObject):
     def refresh_all(self) -> None:
         self.apply_filters()
 
+    def _toggle_replace(self, visible: bool) -> None:
+        self.replace_panel.setVisible(visible)
+        self.button_toggle_replace.setText("▼" if visible else "▶")
+
+    def _replace_matches(self, *, all_matches: bool) -> None:
+        workspace = self.active_workspace
+        if workspace is None or self._search_error or not self._text_search.can_replace:
+            return
+        current = self.focus_controller.current_unit
+        candidates = self.filtered_units if all_matches else (
+            [current] if current is not None and current in self.filtered_units else []
+        )
+        units = [unit for unit in candidates if isinstance(unit, WorkspaceUnit)]
+        try:
+            changed, count = self.workspace_service.replace_translation_drafts(
+                workspace, units, self._text_search, self.replace_text.text(), all_matches=all_matches,
+            )
+        except (re.error, IndexError) as error:
+            self.label_search_result.setText(tr("MainWindow", "置換式が無効です：{error}").format(error=error))
+            return
+        for unit in changed:
+            self.translation_controller.cancel_deferred_confirmation(unit)
+            self.translation_controller.remember_confirmation(unit)
+        self.apply_filters()
+        self.label_search_result.setText(
+            self.label_search_result.text() + " | "
+            + tr("MainWindow", "{count}箇所を置換（{units}件）").format(count=count, units=len(changed))
+        )
+
+    def _update_search_controls(self) -> None:
+        if self._search_error:
+            self.label_search_result.setText(
+                tr("MainWindow", "検索エラー：{error}").format(error=self._search_error)
+            )
+        else:
+            replace_count = sum(self._text_search.count(unit.target_text) for unit in self.filtered_units
+                                if isinstance(unit, WorkspaceUnit) and not unit.locked and not unit.hidden
+                                and not unit.record.translating)
+            self.label_search_result.setText(
+                tr("MainWindow", "一致：{units}件 / 置換可能：{count}箇所").format(
+                    units=len(self.filtered_units), count=replace_count,
+                )
+            )
+        enabled = self.active_workspace is not None and self._text_search.can_replace and not self._search_error
+        self.button_replace.setEnabled(enabled)
+        self.button_replace_all.setEnabled(enabled)
+
     def apply_filters(self) -> None:
-        query = self.search.text()
+        self._search_error = ""
+        try:
+            self._text_search = TextSearch(
+                self.search.text(), case_sensitive=self.search_case.isChecked(),
+                whole_word=self.search_word.isChecked(), regex=self.search_regex.isChecked(),
+            )
+        except SearchSyntaxError as error:
+            self._search_error = str(error)
         selected_status = self.status_filter.currentText()
 
         self.filtered_units = [
             unit
             for unit in self.units
-            if unit.id not in self.imported.excluded_unit_ids and unit.matches(query)
+            if not self._search_error and unit.id not in self.imported.excluded_unit_ids
             and (selected_status == tr("MainWindow", "すべて") or self.unit_matches_status(unit, selected_status))
+            and self._text_search.matches(
+                unit, file_name=self.source_name_for_unit(unit), status=self.status_text(unit),
+            )
         ]
         if self.focus_controller.current_unit in self.filtered_units:
             idx = self.filtered_units.index(self.focus_controller.current_unit)
@@ -2390,6 +2468,7 @@ class MainWindowController(QObject):
 
     def _update_status_bar_counts(self) -> None:
         self.overview_controller.invalidate()
+        self._update_search_controls()
         if self.status_count_label is None:
             return
         if not self.units:
@@ -2599,7 +2678,7 @@ class MainWindowController(QObject):
             self.focus_controller.refresh_focus()
 
     def open_problems_dialog(self) -> None:
-        controller = SimpleDialogController("ProblemsDialog.ui", self.window)
+        controller = SimpleDialogController("dialogs/ProblemsDialog.ui", self.window)
         dialog = controller.dialog
         table = require_child(dialog, QTableWidget, "tableProblems")
         button_close = require_child(dialog, QPushButton, "buttonClose")

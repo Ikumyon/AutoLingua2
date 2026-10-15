@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from autolingua2.plugins.contracts import (
     BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
-    object_value, string_value, TranslationUsage, usage_number,
+    object_value, string_value, TranslationUsage, usage_number, ChatCapacity,
 )
 
 DEFAULT_GEMINI_MODELS: tuple[tuple[str, str], ...] = (
@@ -20,6 +21,31 @@ class GeminiTranslator(BaseHttpTranslator):
     supports_chat = True
     chat_image_types = ("image/png", "image/jpeg", "image/webp")
 
+    @property
+    def chat_model_endpoint(self) -> str:
+        return f"https://generativelanguage.googleapis.com/v1beta/models/{quote(self.model, safe='')}"
+
+    def extract_chat_capacity(self, data: dict[str, Any]) -> ChatCapacity | None:
+        limit = usage_number(data, "inputTokenLimit")
+        output = usage_number(data, "outputTokenLimit")
+        if limit is None or limit <= 0:
+            return None
+        return ChatCapacity(limit, min(4096, output) if output else 4096)
+
+    def is_chat_context_error(self, data: dict[str, Any], status_code: int) -> bool:
+        error = data.get("error")
+        if status_code != 400 or not isinstance(error, dict) or error.get("status") != "INVALID_ARGUMENT":
+            return False
+        message = str(error.get("message", "")).lower()
+        return ("input token" in message and ("exceed" in message or "maximum" in message)
+                or "exceeds the context window" in message)
+
+    def build_summary_payload(self, messages: list[ChatMessage], instructions: str,
+                              output_tokens: int) -> dict[str, Any]:
+        payload = self.build_chat_payload(messages, instructions, [], [])
+        payload["generationConfig"] = {"maxOutputTokens": output_tokens}
+        return payload
+
     def extract_usage(self, data: dict[str, Any]) -> TranslationUsage:
         usage = data.get("usageMetadata")
         return TranslationUsage(
@@ -30,7 +56,7 @@ class GeminiTranslator(BaseHttpTranslator):
 
     def build_chat_payload(self, messages: list[ChatMessage], system_prompt: str,
                            tools: list[dict[str, Any]], continuation: list[dict[str, Any]]) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "system_instruction": {"parts": [{"text": system_prompt}]},
             "contents": [{"role": "model" if m.role == "assistant" else "user",
                           "parts": [{"text": m.content}] + [
@@ -40,6 +66,9 @@ class GeminiTranslator(BaseHttpTranslator):
                 "name": t["name"], "description": t["description"], "parametersJsonSchema": t["inputSchema"],
             } for t in tools]}],
         }
+        if not tools:
+            payload.pop("tools")
+        return payload
 
     def extract_chat_reply(self, data: dict[str, Any]) -> ChatReply:
         candidates = data.get("candidates")

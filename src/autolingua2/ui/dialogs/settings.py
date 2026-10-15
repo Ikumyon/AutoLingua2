@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.ui.i18n import translation_source
+
 import logging
 from collections.abc import Callable
 
@@ -100,7 +102,7 @@ class SettingsDialogController(SimpleDialogController):
         self.dialog.rejected.connect(self._cancel_save)
         self.general_page = GeneralSettingsPageController(self.dialog, entrance)
         self.general_page.self_translation.running_changed.connect(self._self_translation_running)
-        self.dialog.rejected.connect(self.general_page.self_translation.cancel)
+        self.dialog.finished.connect(lambda _result: self.general_page.self_translation.cancel())
         self.filter_rules_page = FilterRulesPageController(
             self.dialog, self.plugins.parsers, glossary_adapter_id, glossary_game_id,
         )
@@ -108,16 +110,16 @@ class SettingsDialogController(SimpleDialogController):
 
     def _mount_pages(self) -> None:
         pages = [
-            ("application", "アプリ", "pageGeneral", "GeneralPage.ui", ""),
-            ("appearance", "外観", "pageDisplay", "DisplayPage.ui", "application"),
-            ("input", "入力", "pageInput", "InputPage.ui", "application"),
-            ("translation", "翻訳", "pageTranslation", "TranslationPage.ui", ""),
-            ("ai", "AI", "pageAI", "AiPage.ui", "translation"),
-            ("tone", "口調", "pageTone", "TonePage.ui", "translation"),
-            ("glossary", "用語集", "pageGlossary", "GlossaryPage.ui", "translation"),
-            ("filter_rules", "除外ルール", "pageFilterRules", "FilterRulesPage.ui", "translation"),
-            ("file", "ファイル", "pageFile", "FilePage.ui", ""),
-            ("source_watch", "翻訳元フォルダ監視", "pageSourceWatch", "SourceWatchPage.ui", "file"),
+            ("application", translation_source('SettingsDialog', "アプリ"), "pageGeneral", "GeneralPage.ui", ""),
+            ("appearance", translation_source('SettingsDialog', "外観"), "pageDisplay", "DisplayPage.ui", "application"),
+            ("input", translation_source('SettingsDialog', "入力"), "pageInput", "InputPage.ui", "application"),
+            ("translation", translation_source('SettingsDialog', "翻訳"), "pageTranslation", "TranslationPage.ui", ""),
+            ("ai", translation_source('SettingsDialog', "AI"), "pageAI", "AiPage.ui", "translation"),
+            ("tone", translation_source('SettingsDialog', "口調"), "pageTone", "TonePage.ui", "translation"),
+            ("glossary", translation_source('SettingsDialog', "用語集"), "pageGlossary", "GlossaryPage.ui", "translation"),
+            ("filter_rules", translation_source('SettingsDialog', "除外ルール"), "pageFilterRules", "FilterRulesPage.ui", "translation"),
+            ("file", translation_source('SettingsDialog', "ファイル"), "pageFile", "FilePage.ui", ""),
+            ("source_watch", translation_source('SettingsDialog', "翻訳元フォルダ監視"), "pageSourceWatch", "SourceWatchPage.ui", "file"),
         ]
         for target, title, page_name, ui_name, parent_id in pages:
             container = require_child(self.dialog, QWidget, page_name)
