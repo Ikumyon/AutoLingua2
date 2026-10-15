@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from autolingua2.ui.i18n import translation_source
 
+import json
 import os
 import re
 from copy import deepcopy
@@ -352,7 +353,13 @@ class MainWindowController(QObject):
         self.source_watch_timer.start()
         if load_watch_settings().enabled:
             QTimer.singleShot(0, lambda: self._run_operation(ensure_watcher, lambda _result: None))
-        QTimer.singleShot(600, self._check_startup_update)
+        if update_info_json := os.environ.pop("AUTOLINGUA_UPDATE_INFO", None):
+            try:
+                update_info = json.loads(update_info_json)
+                if isinstance(update_info, dict) and update_info.get("has_update"):
+                    QTimer.singleShot(0, lambda info=update_info: self._open_update_dialog(initial_data=info))
+            except Exception:
+                pass
 
     def show(self) -> None:
         self.window.show()
@@ -856,11 +863,10 @@ class MainWindowController(QObject):
 
         help_menu.addSeparator()
 
-        action_update = help_menu.addAction(tr("MainWindow", "更新を確認"))
+        action_update = help_menu.addAction(tr("MainWindow", "更新を確認…"))
         action_update.setObjectName("actionCheckForUpdates")
         action_update.setEnabled(True)
-        action_update.setToolTip(tr("MainWindow", "最新バージョンの更新を確認します"))
-        action_update.triggered.connect(self._manual_check_for_updates)
+        action_update.triggered.connect(self._open_update_dialog)
 
         is_debug = "--debug" in sys.argv
         restart_label = tr("MainWindow", "通常モードで再起動") if is_debug else tr("MainWindow", "デバッグモードで再起動")
@@ -872,28 +878,9 @@ class MainWindowController(QObject):
         action_logs = help_menu.addAction(tr("MainWindow", "ログフォルダを開く"))
         action_logs.triggered.connect(lambda: self._open_folder(log_directory()))
 
-    def _check_startup_update(self) -> None:
-        from autolingua2.services.updates import get_startup_update_info
+    def _open_update_dialog(self, initial_data: dict | None = None) -> None:
         from autolingua2.ui.dialogs.update import UpdateDialogController
-        info = get_startup_update_info()
-        if info is not None and info.state == "available":
-            dialog = UpdateDialogController(
-                info,
-                parent=self.window,
-                on_restart_requested=lambda: self.request_restart("--debug" in sys.argv),
-            )
-            dialog.exec()
-
-    def _manual_check_for_updates(self) -> None:
-        from autolingua2.services.updates import check_for_updates
-        from autolingua2.ui.dialogs.update import UpdateDialogController
-        info = check_for_updates()
-        dialog = UpdateDialogController(
-            info,
-            parent=self.window,
-            on_restart_requested=lambda: self.request_restart("--debug" in sys.argv),
-        )
-        dialog.exec()
+        UpdateDialogController(self.window, initial_data=initial_data).exec()
 
     def _restart_application_mode(self) -> None:
         self.request_restart("--debug" not in sys.argv)

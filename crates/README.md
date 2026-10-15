@@ -7,6 +7,8 @@ Cargoの成果物はリポジトリ直下の `target/` に出力します。
 
 - `launcher`: Slintの起動画面と本体プロセスの起動。`src/launch/` に起動対象の解決、監視、時間判定を配置します。UI更新は `src/ui.rs`、ログは `src/logging.rs` に置きます。
 - `autolingua2-native`: ランチャーとPython本体が利用するライブラリ。`src/bootstrap/` に起動通信、`src/encoding.rs` に文字コード処理、`src/platform/` にOS固有処理を配置します。
+- `source-watcher`: 外部ファイル更新を監視する常駐デーモン。
+- `updater`: 更新確認、ダウンロード、展開、適用を行うSlint製の独立プロセス型アップデーター。成果物は `dist/AUTOlingua2/core/autolingua-updater.exe` に配置します。
 
 `bootstrap/` は `context`、`protocol`、`progress`、`connection`、`core`、`bindings` に分かれます。公開型と関数は `mod.rs` から再公開し、利用側の公開パスを維持します。
 

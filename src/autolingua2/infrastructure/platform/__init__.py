@@ -77,8 +77,5 @@ class SystemPlatformDriver:
     def start_system_voice_input(self) -> None:
         _native().start_system_voice_input()
 
-    def schedule_update_on_exit(self, zip_path: Path, app_dir: Path) -> None:
-        _native().schedule_update_on_exit(str(zip_path.resolve()), str(app_dir.resolve()))
-
 
 current_platform: PlatformDriver = SystemPlatformDriver()

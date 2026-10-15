@@ -10,7 +10,7 @@ from typing import Any, Protocol, runtime_checkable
 import urllib.error
 import urllib.request
 
-from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from autolingua2.infrastructure.filesystem import DATA_DIR
 from autolingua2.services.ai_providers.chat import ChatCapacity, ChatMessage, ChatReply, ChatToolCall
 from autolingua2.services.language_tags import is_default_language, system_language
 
@@ -77,7 +77,7 @@ TRANSLATION_INSTRUCTIONS = (
     "Return only a JSON object with the supplied id and translation. Do not repeat the source or explain."
 )
 
-PROMPT_CACHE_FILE = PROJECT_ROOT / ".runtime" / "cache" / "prompts_cache.json"
+PROMPT_CACHE_FILE = DATA_DIR / "cache" / "prompts_cache.json"
 
 
 def get_prompt_hash(text: str) -> str:

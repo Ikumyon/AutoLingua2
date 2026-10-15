@@ -1,161 +1,206 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication
-from PySide6.QtWidgets import QLabel, QProgressBar, QPushButton, QTextBrowser, QWidget
+from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QLabel,
+    QPlainTextEdit,
+    QPushButton,
+    QStackedWidget,
+    QWidget,
+)
 
-from autolingua2.services.updates import UpdateDownloader, UpdateInfo
-from autolingua2.ui.i18n import tr
-from .base import SimpleDialogController, require_child
+from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from autolingua2.ui.dialogs import load_ui, require_child
 
 
-class UpdateDialogController(SimpleDialogController):
-    """更新ダイアログの表示・ダウンロード進捗・終了時適用の制御。"""
+def find_updater_executable() -> Path | None:
+    exe_name = "autolingua-updater.exe" if sys.platform == "win32" else "autolingua-updater"
+    candidates = [
+        PROJECT_ROOT / "core" / exe_name,
+        PROJECT_ROOT / "target" / "release" / exe_name,
+        PROJECT_ROOT / "target" / "debug" / exe_name,
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
 
-    def __init__(
-        self,
-        info: UpdateInfo,
-        parent: QWidget | None = None,
-        on_restart_requested: Callable[[], None] | None = None,
-    ) -> None:
-        super().__init__("dialogs/UpdateDialog.ui", parent)
-        self.info = info
-        self.on_restart_requested = on_restart_requested
-        self.downloader = UpdateDownloader(self.dialog)
-        self.downloaded_zip: Path | None = None
 
-        self.label_title = require_child(self.dialog, QLabel, "labelTitle")
-        self.label_version = require_child(self.dialog, QLabel, "labelVersion")
-        self.text_notes = require_child(self.dialog, QTextBrowser, "textReleaseNotes")
-        self.label_progress = require_child(self.dialog, QLabel, "labelProgress")
-        self.progress_bar = require_child(self.dialog, QProgressBar, "progressBar")
-        self.label_status = require_child(self.dialog, QLabel, "labelStatus")
-        self.button_cancel = require_child(self.dialog, QPushButton, "buttonCancel")
-        self.button_action = require_child(self.dialog, QPushButton, "buttonAction")
+def format_bytes_human(num_bytes: int) -> str:
+    if num_bytes >= 1024 * 1024 * 1024:
+        return f"{num_bytes / (1024 * 1024 * 1024):.1f} GB"
+    if num_bytes >= 1024 * 1024:
+        return f"{num_bytes / (1024 * 1024):.1f} MB"
+    if num_bytes >= 1024:
+        return f"{num_bytes / 1024:.1f} KB"
+    return f"{num_bytes} B"
 
-        self.button_cancel.clicked.connect(self._on_cancel_clicked)
-        self.button_action.clicked.connect(self._on_action_clicked)
 
-        self.downloader.progress_changed.connect(self._on_download_progress)
-        self.downloader.download_completed.connect(self._on_download_completed)
-        self.downloader.download_failed.connect(self._on_download_failed)
+class UpdateCheckWorker(QThread):
+    finished_check = Signal(dict)
+    failed_check = Signal(str)
 
-        self._setup_view()
+    def run(self) -> None:
+        updater_exe = find_updater_executable()
+        if updater_exe is None:
+            self.failed_check.emit("アップデーター実行ファイル (autolingua-updater) が見つかりません。")
+            return
 
-    def _setup_view(self) -> None:
-        self.progress_bar.hide()
-        self.label_progress.hide()
-        self.label_status.hide()
+        cmd = [str(updater_exe), "check", "--project-root", str(PROJECT_ROOT)]
+        creationflags = 0
+        if sys.platform == "win32":
+            creationflags = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
 
-        if self.info.state == "available":
-            self.label_title.setText(tr("UpdateDialog", "新しいバージョンが利用可能です！"))
-            current_v = self.info.current_version or "0.1.0"
-            latest_v = self.info.latest_version
-            self.label_version.setText(
-                tr("UpdateDialog", "現在のバージョン: v{current} ──▶ 最新バージョン: v{latest}").format(
-                    current=current_v, latest=latest_v
-                )
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False,
+                creationflags=creationflags,
+                cwd=str(PROJECT_ROOT),
             )
-            self.text_notes.setPlainText(self.info.release_notes or tr("UpdateDialog", "リリースノートはありません。"))
-            self.text_notes.show()
-            self.button_cancel.setText(tr("UpdateDialog", "後で"))
-            self.button_action.setText(tr("UpdateDialog", "ダウンロード"))
-            self.button_action.setEnabled(bool(self.info.download_url))
-            self.button_action.show()
-            self.button_cancel.show()
+            stdout = result.stdout.strip()
+            if not stdout:
+                self.failed_check.emit(result.stderr.strip() or "更新確認からの応答がありません。")
+                return
 
-        elif self.info.state == "up_to_date":
-            self.label_title.setText(tr("UpdateDialog", "最新バージョンです"))
-            current_v = self.info.current_version or "0.1.0"
-            self.label_version.setText(
-                tr("UpdateDialog", "お使いの AUTOlingua2 (v{current}) は最新バージョンです。").format(
-                    current=current_v
-                )
-            )
-            self.text_notes.hide()
-            self.button_cancel.hide()
-            self.button_action.setText(tr("UpdateDialog", "OK"))
-            self.button_action.setEnabled(True)
-            self.button_action.show()
+            data = json.loads(stdout)
+            self.finished_check.emit(data)
+        except Exception as e:
+            self.failed_check.emit(f"更新確認処理の実行に失敗しました: {e}")
 
+
+class UpdateDialogController(QObject):
+    def __init__(self, parent: QWidget | None = None, initial_data: dict | None = None) -> None:
+        super().__init__(parent)
+        widget = load_ui("dialogs/UpdateDialog.ui")
+        if not isinstance(widget, QDialog):
+            raise TypeError("UpdateDialog.ui は QDialog ではありません")
+
+        self.dialog = widget
+        self._initial_data = initial_data
+        self._update_data: dict | None = initial_data
+        self._worker: UpdateCheckWorker | None = None
+
+        # ウィジェットの取得
+        self.stack_update = require_child(self.dialog, QStackedWidget, "stackUpdate")
+        self.page_checking = require_child(self.dialog, QWidget, "pageChecking")
+        self.label_checking_version = require_child(self.dialog, QLabel, "labelCheckingVersion")
+        self.button_close_checking = require_child(self.dialog, QPushButton, "buttonCloseChecking")
+
+        self.page_available = require_child(self.dialog, QWidget, "pageAvailable")
+        self.label_current_version = require_child(self.dialog, QLabel, "labelCurrentVersion")
+        self.label_latest_version = require_child(self.dialog, QLabel, "labelLatestVersion")
+        self.label_published_at = require_child(self.dialog, QLabel, "labelPublishedAt")
+        self.label_download_size = require_child(self.dialog, QLabel, "labelDownloadSize")
+        self.text_release_notes = require_child(self.dialog, QPlainTextEdit, "textReleaseNotes")
+        self.button_later = require_child(self.dialog, QPushButton, "buttonLater")
+        self.button_download = require_child(self.dialog, QPushButton, "buttonDownload")
+
+        self.page_latest = require_child(self.dialog, QWidget, "pageLatest")
+        self.label_installed_version = require_child(self.dialog, QLabel, "labelInstalledVersion")
+        self.button_close_latest = require_child(self.dialog, QPushButton, "buttonCloseLatest")
+
+        self.page_error = require_child(self.dialog, QWidget, "pageError")
+        self.text_error_detail = require_child(self.dialog, QPlainTextEdit, "textErrorDetail")
+        self.button_close_error = require_child(self.dialog, QPushButton, "buttonCloseError")
+        self.button_retry = require_child(self.dialog, QPushButton, "buttonRetry")
+
+        self._connect_signals()
+
+    def _connect_signals(self) -> None:
+        self.button_close_checking.clicked.connect(self.dialog.reject)
+        self.button_close_latest.clicked.connect(self.dialog.reject)
+        self.button_close_error.clicked.connect(self.dialog.reject)
+        self.button_later.clicked.connect(self.dialog.reject)
+        self.button_retry.clicked.connect(self.start_check)
+        self.button_download.clicked.connect(self._on_download_clicked)
+
+    def start_check(self) -> None:
+        self.stack_update.setCurrentWidget(self.page_checking)
+        self._worker = UpdateCheckWorker(self)
+        self._worker.finished_check.connect(self._on_check_finished)
+        self._worker.failed_check.connect(self._on_check_failed)
+        self._worker.start()
+
+    def _on_check_finished(self, data: dict) -> None:
+        self._update_data = data
+        has_update = data.get("has_update", False)
+        current_version = data.get("current_version", "—")
+        self.label_checking_version.setText(current_version)
+
+        if has_update:
+            self.label_current_version.setText(current_version)
+            self.label_latest_version.setText(data.get("latest_version", "—"))
+            self.label_published_at.setText(data.get("published_at") or "—")
+            download_size = data.get("download_size")
+            size_str = format_bytes_human(download_size) if isinstance(download_size, int) else "—"
+            self.label_download_size.setText(size_str)
+            self.text_release_notes.setPlainText(data.get("release_notes") or "")
+            self.stack_update.setCurrentWidget(self.page_available)
         else:
-            self.label_title.setText(tr("UpdateDialog", "更新の確認"))
-            self.label_version.setText(self.info.message or tr("UpdateDialog", "更新情報の取得に失敗しました。"))
-            self.text_notes.hide()
-            self.button_cancel.hide()
-            self.button_action.setText(tr("UpdateDialog", "OK"))
-            self.button_action.setEnabled(True)
-            self.button_action.show()
+            self.label_installed_version.setText(current_version)
+            self.stack_update.setCurrentWidget(self.page_latest)
 
-    def _on_action_clicked(self) -> None:
-        if self.info.state == "available" and self.downloaded_zip is None:
-            # ダウンロード開始
-            self.label_title.setText(tr("UpdateDialog", "更新パッケージをダウンロード中…"))
-            self.text_notes.hide()
-            self.progress_bar.setValue(0)
-            self.progress_bar.show()
-            self.label_progress.setText(tr("UpdateDialog", "準備中…"))
-            self.label_progress.show()
-            self.button_action.hide()
-            self.button_cancel.setText(tr("UpdateDialog", "キャンセル"))
-            self.downloader.start_download(self.info.download_url)
-        elif self.downloaded_zip is not None:
-            # 今すぐ終了して更新
-            self.downloader.schedule_on_exit(self.downloaded_zip)
-            self.dialog.accept()
-            if callable(self.on_restart_requested):
-                self.on_restart_requested()
-            else:
-                app = QCoreApplication.instance()
-                if app is not None:
-                    app.quit()
-        else:
-            self.dialog.accept()
+    def _on_check_failed(self, error_message: str) -> None:
+        self.text_error_detail.setPlainText(error_message)
+        self.stack_update.setCurrentWidget(self.page_error)
 
-    def _on_cancel_clicked(self) -> None:
-        if self.downloaded_zip is None and self.downloader._reply is not None:
-            self.downloader.cancel()
-        elif self.downloaded_zip is not None:
-            # 作業を続ける: バックグラウンドで終了時更新をスケジュールしておく
-            self.downloader.schedule_on_exit(self.downloaded_zip)
-        self.dialog.reject()
+    def _on_download_clicked(self) -> None:
+        updater_exe = find_updater_executable()
+        if updater_exe is None:
+            self._on_check_failed("アップデーター実行ファイルが見つかりません。")
+            return
 
-    def _on_download_progress(self, received: int, total: int) -> None:
-        if total > 0:
-            percent = int((received / total) * 100)
-            self.progress_bar.setValue(percent)
-            received_mb = received / (1024 * 1024)
-            total_mb = total / (1024 * 1024)
-            self.label_progress.setText(f"{received_mb:.1f} MB / {total_mb:.1f} MB ({percent}%)")
-        else:
-            received_mb = received / (1024 * 1024)
-            self.label_progress.setText(f"{received_mb:.1f} MB")
+        cmd = [
+            str(updater_exe),
+            "gui",
+            "--project-root",
+            str(PROJECT_ROOT),
+            "--parent-pid",
+            str(os.getpid()),
+        ]
 
-    def _on_download_completed(self, zip_path: Path) -> None:
-        self.downloaded_zip = zip_path
-        self.label_title.setText(tr("UpdateDialog", "✔ ダウンロードが完了しました"))
-        self.label_progress.hide()
-        self.progress_bar.setValue(100)
-        self.label_status.setText(
-            tr(
-                "UpdateDialog",
-                "更新パッケージのダウンロードが完了しました。\nアプリを終了した際に自動的に解凍・更新が適用されます。\nこのまま作業を続けても問題ありません。",
-            )
+        if self._update_data:
+            if url := self._update_data.get("download_url"):
+                cmd.extend(["--download-url", str(url)])
+            if cur_ver := self._update_data.get("current_version"):
+                cmd.extend(["--current-version", str(cur_ver)])
+            if new_ver := self._update_data.get("latest_version"):
+                cmd.extend(["--new-version", str(new_ver)])
+            if sha := self._update_data.get("sha256"):
+                cmd.extend(["--sha256", str(sha)])
+
+        creationflags = 0
+        if sys.platform == "win32":
+            creationflags = subprocess.DETACHED_PROCESS  # type: ignore[attr-defined]
+
+        # アップデーターを別プロセスとして起動
+        subprocess.Popen(
+            cmd,
+            creationflags=creationflags,
+            cwd=str(PROJECT_ROOT),
+            close_fds=True,
         )
-        self.label_status.show()
-        self.button_cancel.setText(tr("UpdateDialog", "作業を続ける"))
-        self.button_cancel.show()
-        self.button_action.setText(tr("UpdateDialog", "今すぐ終了して更新"))
-        self.button_action.show()
 
-    def _on_download_failed(self, error: str) -> None:
-        self.label_title.setText(tr("UpdateDialog", "ダウンロードに失敗しました"))
-        self.progress_bar.hide()
-        self.label_progress.hide()
-        self.label_status.setText(error)
-        self.label_status.show()
-        self.button_cancel.hide()
-        self.button_action.setText(tr("UpdateDialog", "閉じる"))
-        self.button_action.show()
+        # 本体側ダイアログを閉じてアプリを終了
+        self.dialog.accept()
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
+
+    def exec(self) -> int:
+        if self._initial_data is not None:
+            self._on_check_finished(self._initial_data)
+        else:
+            self.start_check()
+        return self.dialog.exec()

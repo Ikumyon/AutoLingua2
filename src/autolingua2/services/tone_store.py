@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QIODevice, QSaveFile
 
-from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from autolingua2.infrastructure.filesystem import LIBRARY_DIR
 from autolingua2.infrastructure.platform import qt_file_path
 from autolingua2.ir.tone import (
     COMPARISONS, OPERATORS, TARGETS, ConditionalTone, Tone, ToneBlock,
@@ -18,7 +18,7 @@ from autolingua2.ir.tone import (
 from autolingua2.ir.validation import array, record, required, text
 
 
-TONE_PATH = PROJECT_ROOT / ".runtime" / "tones.json"
+TONE_PATH = LIBRARY_DIR / "tones.json"
 
 
 def _operator(value: object) -> ToneOperator:

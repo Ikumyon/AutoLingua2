@@ -9,13 +9,13 @@ from pathlib import Path
 import sqlite3
 from uuid import uuid4
 
-from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from autolingua2.infrastructure.filesystem import LIBRARY_DIR
 from autolingua2.ir.glossary import (
     Glossary, GlossaryTerm, PARTS_OF_SPEECH, glossary_chain, resolve_terms,
 )
 
 
-GLOSSARY_PATH = PROJECT_ROOT / ".runtime" / "glossary.sqlite3"
+GLOSSARY_PATH = LIBRARY_DIR / "glossary.sqlite3"
 
 
 class GlossaryStore:

@@ -67,30 +67,19 @@ pub fn identity() -> io::Result<String> {
 
 pub fn private_directory(path: &Path) -> io::Result<()> {
     if let Some(parent) = path.parent() {
-        if parent.file_name() == Some(std::ffi::OsStr::new(".runtime")) {
-            if let Some(ancestor) = parent.parent() {
-                std::fs::create_dir_all(ancestor)?;
+        std::fs::create_dir_all(parent)?;
+        if let Some(data) = parent.parent().filter(|data| {
+            parent.file_name() == Some(std::ffi::OsStr::new("runtime"))
+                && data.file_name() == Some(std::ffi::OsStr::new(".data"))
+        }) {
+            let data_wide = wide(data.as_os_str());
+            let attributes = unsafe { GetFileAttributesW(data_wide.as_ptr()) };
+            if attributes == INVALID_FILE_ATTRIBUTES {
+                return Err(io::Error::last_os_error());
             }
-            match std::fs::create_dir(parent) {
-                Ok(()) => {
-                    let parent_wide = wide(parent.as_os_str());
-                    let attributes = unsafe { GetFileAttributesW(parent_wide.as_ptr()) };
-                    if attributes == INVALID_FILE_ATTRIBUTES {
-                        return Err(io::Error::last_os_error());
-                    }
-                    if unsafe {
-                        SetFileAttributesW(parent_wide.as_ptr(), attributes | FILE_ATTRIBUTE_HIDDEN)
-                    } == 0 {
-                        return Err(io::Error::last_os_error());
-                    }
-                }
-                Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
-                    std::fs::create_dir_all(parent)?;
-                }
-                Err(err) => return Err(err),
+            if unsafe { SetFileAttributesW(data_wide.as_ptr(), attributes | FILE_ATTRIBUTE_HIDDEN) } == 0 {
+                return Err(io::Error::last_os_error());
             }
-        } else {
-            std::fs::create_dir_all(parent)?;
         }
     }
     let security = Security::new()?;

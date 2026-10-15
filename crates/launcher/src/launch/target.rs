@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
 pub(super) struct Target {
-    executable: PathBuf, args: Vec<OsString>, root: PathBuf,
+    executable: PathBuf, args: Vec<OsString>, pub(super) root: PathBuf,
     pub(super) development: Option<PathBuf>, source_update: Option<String>,
 }
 impl Target {

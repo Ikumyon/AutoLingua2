@@ -2,123 +2,310 @@
 <ui version="4.0">
  <class>UpdateDialog</class>
  <widget class="QDialog" name="UpdateDialog">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>500</width>
-    <height>380</height>
-   </rect>
-  </property>
-  <property name="windowTitle">
-   <string>AUTOlingua2 アップデート</string>
-  </property>
+  <property name="geometry"><rect><x>0</x><y>0</y><width>520</width><height>420</height></rect></property>
+  <property name="minimumSize"><size><width>460</width><height>360</height></size></property>
+  <property name="windowTitle"><string>ソフトウェアの更新</string></property>
   <layout class="QVBoxLayout" name="layoutRoot">
-   <property name="spacing">
-    <number>12</number>
-   </property>
-   <property name="leftMargin">
-    <number>16</number>
-   </property>
-   <property name="topMargin">
-    <number>16</number>
-   </property>
-   <property name="rightMargin">
-    <number>16</number>
-   </property>
-   <property name="bottomMargin">
-    <number>16</number>
-   </property>
+   <property name="spacing"><number>16</number></property>
+   <property name="leftMargin"><number>24</number></property>
+   <property name="topMargin"><number>24</number></property>
+   <property name="rightMargin"><number>24</number></property>
+   <property name="bottomMargin"><number>20</number></property>
    <item>
-    <widget class="QLabel" name="labelTitle">
-     <property name="text">
-      <string>更新を確認しています…</string>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">font-size: 16px; font-weight: 700;</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QLabel" name="labelVersion">
-     <property name="text">
-      <string></string>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">color: #888888;</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QTextBrowser" name="textReleaseNotes">
-     <property name="placeholderText">
-      <string>リリースノート</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QLabel" name="labelProgress">
-     <property name="text">
-      <string></string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QProgressBar" name="progressBar">
-     <property name="value">
-      <number>0</number>
-     </property>
-     <property name="textVisible">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
+    <widget class="QStackedWidget" name="stackUpdate">
+     <property name="currentIndex"><number>0</number></property>
+     <widget class="QWidget" name="pageChecking">
+      <layout class="QVBoxLayout" name="layoutChecking">
+       <property name="spacing"><number>16</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <widget class="QLabel" name="labelCheckingStatus">
+         <property name="font"><font><pointsize>12</pointsize><bold>true</bold></font></property>
+         <property name="text"><string>更新を確認しています…</string></property>
+         <property name="wordWrap"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QFormLayout" name="layoutCheckingVersion">
+         <property name="horizontalSpacing"><number>24</number></property>
+         <item row="0" column="0">
+          <widget class="QLabel" name="labelCheckingVersionTitle">
+           <property name="text"><string>現在のバージョン</string></property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLabel" name="labelCheckingVersion">
+           <property name="text"><string notr="true">—</string></property>
+           <property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QProgressBar" name="progressChecking">
+         <property name="minimum"><number>0</number></property>
+         <property name="maximum"><number>0</number></property>
+         <property name="value"><number>0</number></property>
+         <property name="textVisible"><bool>false</bool></property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="spacerChecking">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint"><size><width>20</width><height>40</height></size></property>
+        </spacer>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="layoutCheckingActions">
+         <item>
+          <spacer name="spacerCheckingActions">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           <property name="sizeHint"><size><width>40</width><height>20</height></size></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="buttonCloseChecking">
+           <property name="text"><string>閉じる</string></property>
+           <property name="autoDefault"><bool>false</bool></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="pageAvailable">
+      <layout class="QVBoxLayout" name="layoutAvailable">
+       <property name="spacing"><number>16</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
    <item>
     <widget class="QLabel" name="labelStatus">
-     <property name="text">
-      <string></string>
-     </property>
-     <property name="wordWrap">
-      <bool>true</bool>
-     </property>
+     <property name="font"><font><pointsize>12</pointsize><bold>true</bold></font></property>
+     <property name="text"><string>新しいバージョンが利用できます</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="layoutButtons">
-     <item>
-      <spacer name="spacerButtons">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeHint">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QPushButton" name="buttonCancel">
-       <property name="text">
-        <string>キャンセル</string>
-       </property>
+    <layout class="QFormLayout" name="layoutVersionInfo">
+     <property name="horizontalSpacing"><number>24</number></property>
+     <property name="verticalSpacing"><number>8</number></property>
+     <item row="0" column="0">
+      <widget class="QLabel" name="labelCurrentVersionTitle">
+       <property name="text"><string>現在のバージョン</string></property>
       </widget>
      </item>
-     <item>
-      <widget class="QPushButton" name="buttonAction">
-       <property name="text">
-        <string>ダウンロード</string>
-       </property>
-       <property name="default">
-        <bool>true</bool>
-       </property>
+     <item row="0" column="1">
+      <widget class="QLabel" name="labelCurrentVersion">
+       <property name="text"><string notr="true">—</string></property>
+       <property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="labelLatestVersionTitle">
+       <property name="text"><string>最新のバージョン</string></property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QLabel" name="labelLatestVersion">
+       <property name="text"><string notr="true">—</string></property>
+       <property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property>
+      </widget>
+     </item>
+     <item row="2" column="0">
+      <widget class="QLabel" name="labelPublishedAtTitle">
+       <property name="text"><string>公開日</string></property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QLabel" name="labelPublishedAt">
+       <property name="text"><string notr="true">—</string></property>
+      </widget>
+     </item>
+     <item row="3" column="0">
+      <widget class="QLabel" name="labelDownloadSizeTitle">
+       <property name="text"><string>ダウンロード容量</string></property>
+      </widget>
+     </item>
+     <item row="3" column="1">
+      <widget class="QLabel" name="labelDownloadSize">
+       <property name="text"><string notr="true">—</string></property>
       </widget>
      </item>
     </layout>
    </item>
+   <item>
+    <layout class="QVBoxLayout" name="layoutReleaseNotes">
+     <property name="spacing"><number>8</number></property>
+     <item>
+      <widget class="QLabel" name="labelReleaseNotesTitle">
+       <property name="text"><string>更新内容</string></property>
+       <property name="buddy"><cstring>textReleaseNotes</cstring></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPlainTextEdit" name="textReleaseNotes">
+       <property name="minimumSize"><size><width>0</width><height>120</height></size></property>
+       <property name="readOnly"><bool>true</bool></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="layoutActions">
+     <property name="spacing"><number>8</number></property>
+     <item>
+      <spacer name="spacerActions">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="buttonLater">
+       <property name="text"><string>あとで</string></property>
+       <property name="autoDefault"><bool>false</bool></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="buttonDownload">
+       <property name="text"><string>ダウンロード</string></property>
+       <property name="autoDefault"><bool>false</bool></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="pageLatest">
+      <layout class="QVBoxLayout" name="layoutLatest">
+       <property name="spacing"><number>16</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <widget class="QLabel" name="labelLatestStatus">
+         <property name="font"><font><pointsize>12</pointsize><bold>true</bold></font></property>
+         <property name="text"><string>最新バージョンを使用しています</string></property>
+         <property name="wordWrap"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QFormLayout" name="layoutInstalledVersion">
+         <property name="horizontalSpacing"><number>24</number></property>
+         <item row="0" column="0">
+          <widget class="QLabel" name="labelInstalledVersionTitle">
+           <property name="text"><string>現在のバージョン</string></property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLabel" name="labelInstalledVersion">
+           <property name="text"><string notr="true">—</string></property>
+           <property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="spacerLatest">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint"><size><width>20</width><height>40</height></size></property>
+        </spacer>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="layoutLatestActions">
+         <item>
+          <spacer name="spacerLatestActions">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           <property name="sizeHint"><size><width>40</width><height>20</height></size></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="buttonCloseLatest">
+           <property name="text"><string>閉じる</string></property>
+           <property name="autoDefault"><bool>false</bool></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="pageError">
+      <layout class="QVBoxLayout" name="layoutError">
+       <property name="spacing"><number>16</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <widget class="QLabel" name="labelErrorStatus">
+         <property name="font"><font><pointsize>12</pointsize><bold>true</bold></font></property>
+         <property name="text"><string>更新を確認できませんでした</string></property>
+         <property name="wordWrap"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPlainTextEdit" name="textErrorDetail">
+         <property name="readOnly"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="layoutErrorActions">
+         <property name="spacing"><number>8</number></property>
+         <item>
+          <spacer name="spacerErrorActions">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           <property name="sizeHint"><size><width>40</width><height>20</height></size></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="buttonCloseError">
+           <property name="text"><string>閉じる</string></property>
+           <property name="autoDefault"><bool>false</bool></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="buttonRetry">
+           <property name="text"><string>再試行</string></property>
+           <property name="autoDefault"><bool>false</bool></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>buttonCloseChecking</tabstop>
+  <tabstop>textReleaseNotes</tabstop>
+  <tabstop>buttonLater</tabstop>
+  <tabstop>buttonDownload</tabstop>
+  <tabstop>buttonCloseLatest</tabstop>
+  <tabstop>textErrorDetail</tabstop>
+  <tabstop>buttonCloseError</tabstop>
+  <tabstop>buttonRetry</tabstop>
+ </tabstops>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>buttonCloseChecking</sender><signal>clicked()</signal><receiver>UpdateDialog</receiver><slot>reject()</slot>
+  </connection>
+  <connection>
+   <sender>buttonCloseLatest</sender><signal>clicked()</signal><receiver>UpdateDialog</receiver><slot>reject()</slot>
+  </connection>
+  <connection>
+   <sender>buttonCloseError</sender><signal>clicked()</signal><receiver>UpdateDialog</receiver><slot>reject()</slot>
+  </connection>
+  <connection>
+   <sender>buttonLater</sender><signal>clicked()</signal><receiver>UpdateDialog</receiver><slot>reject()</slot>
+   <hints><hint type="sourcelabel"><x>310</x><y>380</y></hint><hint type="destinationlabel"><x>260</x><y>210</y></hint></hints>
+  </connection>
+ </connections>
 </ui>

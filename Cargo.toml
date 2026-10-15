@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/launcher", "crates/autolingua2-native", "crates/source-watcher"]
+members = ["crates/launcher", "crates/autolingua2-native", "crates/source-watcher", "crates/updater"]
 default-members = ["crates/launcher"]
 resolver = "2"
 

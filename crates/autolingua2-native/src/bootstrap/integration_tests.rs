@@ -135,9 +135,3 @@ fn truncated_and_oversized_frames_are_rejected() {
     client.write_all(&((MAX_FRAME + 1) as u32).to_le_bytes()).unwrap();
     assert!(server.receive(Duration::from_secs(1)).is_err());
 }
-
-#[test]
-fn update_placeholder_is_not_a_successful_check() {
-    let result = update_status();
-    assert!(result.contains("\"state\":"));
-}

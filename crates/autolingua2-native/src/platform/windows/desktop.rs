@@ -94,31 +94,3 @@ pub fn start_system_voice_input() -> Result<(), String> {
     }
     Ok(())
 }
-
-#[cfg(feature = "python")]
-pub fn schedule_update_on_exit(zip_path: &Path, app_dir: &Path) -> Result<(), String> {
-    use std::os::windows::process::CommandExt;
-    let pid = std::process::id();
-    let launcher_exe = app_dir.join("AUTOlingua2.exe");
-
-    const CREATE_NO_WINDOW: u32 = 0x08000000;
-    const DETACHED_PROCESS: u32 = 0x00000008;
-
-    let script = format!(
-        "Start-Sleep -Milliseconds 500; Wait-Process -Id {} -ErrorAction SilentlyContinue; Expand-Archive -LiteralPath '{}' -DestinationPath '{}' -Force; Remove-Item -LiteralPath '{}' -Force -ErrorAction SilentlyContinue; if (Test-Path '{}') {{ Start-Process '{}' }}",
-        pid,
-        zip_path.display(),
-        app_dir.display(),
-        zip_path.display(),
-        launcher_exe.display(),
-        launcher_exe.display(),
-    );
-
-    std::process::Command::new("powershell.exe")
-        .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &script])
-        .creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS)
-        .spawn()
-        .map_err(|e| format!("PowerShell の起動に失敗しました: {e}"))?;
-
-    Ok(())
-}

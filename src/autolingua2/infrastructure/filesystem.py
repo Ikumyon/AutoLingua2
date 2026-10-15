@@ -20,3 +20,5 @@ else:
 
 UI_DIR = RESOURCE_ROOT / "ui"
 ASSETS_DIR = RESOURCE_ROOT / "assets"
+DATA_DIR = PROJECT_ROOT / ".data"
+LIBRARY_DIR = DATA_DIR / "library"

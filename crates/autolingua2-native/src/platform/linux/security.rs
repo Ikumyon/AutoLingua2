@@ -21,6 +21,9 @@ pub(super) fn verify_directory(path: &Path) -> io::Result<()> {
 }
 
 pub fn private_directory(path: &Path) -> io::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
     match DirBuilder::new().mode(0o700).create(path) {
         Ok(()) => (),
         Err(err) if err.kind() == io::ErrorKind::AlreadyExists => (),

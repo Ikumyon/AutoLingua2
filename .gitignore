@@ -25,10 +25,8 @@ target/
 # === アプリ実行ログ・ローカルデータ ===
 logs/
 *.log
-settings.json
-settings.watch/
+.data/
 test file/
-.runtime/
 
 # === IDE / OS固有ファイル ===
 .vscode/

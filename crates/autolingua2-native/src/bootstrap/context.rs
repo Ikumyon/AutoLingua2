@@ -21,7 +21,7 @@ impl Context {
             |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3));
         let name = format!("{hash:016x}");
         let directory = match development_root {
-            Some(root) => root.join(".runtime").join(&name),
+            Some(root) => root.join(".data").join("runtime").join(&name),
             None => os::runtime_root()?.join(&name),
         };
         os::private_directory(&directory)?;

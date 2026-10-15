@@ -27,12 +27,12 @@ pub fn run(ui: &Ui, cancel: &AtomicBool) -> io::Result<()> {
         ui.delay(start.elapsed() >= Duration::from_secs(60), false);
         thread::sleep(Duration::from_millis(25));
     };
-    if let Some(ticket) = restart {
-        if !bootstrap::valid_token(&ticket) { return Err(error("Invalid restart ticket")); }
+    if let Some(ref ticket) = restart {
+        if !bootstrap::valid_token(ticket) { return Err(error("Invalid restart ticket")); }
         let pid: u32 = std::env::var("AUTOLINGUA_RESTART_PID").map_err(error)?.parse().map_err(error)?;
         let old_process = bootstrap::ProcessWatch::open(pid)?;
         let mut connection = Connection::connect(&context.endpoint("core"), Duration::from_secs(2))?;
-        connection.request(&Message::Restart(ticket))?;
+        connection.request(&Message::Restart(ticket.clone()))?;
         ui.phase("旧本体の終了を待っています…".into());
         let deadline = Instant::now() + Duration::from_secs(30);
         while old_process.alive()? || context.core_running()? {
@@ -42,12 +42,15 @@ pub fn run(ui: &Ui, cancel: &AtomicBool) -> io::Result<()> {
     } else if context.core_running()? {
         return target.activate(&context).map_err(|err| error(format!("既存の本体が応答しません: {err}")));
     }
-    let update_info = bootstrap::update_status();
-    let has_update = update_info.contains("\"state\":\"available\"") || update_info.contains("\"state\": \"available\"");
-    let update_info_opt = if has_update { Some(update_info.as_str()) } else { None };
+    let update_info = if restart.is_none() {
+        ui.phase("更新を確認しています…".into());
+        check_for_updates(&target.root)
+    } else {
+        None
+    };
     let credential = bootstrap::token()?;
     let mut listener = Listener::bind(&context.endpoint(&format!("boot-{}", &credential[..16])))?;
-    let mut child = target.spawn(&credential, update_info_opt)?;
+    let mut child = target.spawn(&credential, update_info.as_deref())?;
     ui.phase("本体の初期化を待っています…".into());
     let result = monitor(ui, cancel, &mut child, &mut listener, &credential);
     if result.is_err() {
@@ -60,4 +63,30 @@ pub fn run(ui: &Ui, cancel: &AtomicBool) -> io::Result<()> {
         child.wait()?;
     }
     result
+}
+
+fn check_for_updates(root: &std::path::Path) -> Option<String> {
+    let updater_name = if cfg!(windows) { "autolingua-updater.exe" } else { "autolingua-updater" };
+    let candidates = [
+        root.join("core").join(updater_name),
+        root.join("target").join("release").join(updater_name),
+        root.join("target").join("debug").join(updater_name),
+    ];
+    let updater = candidates.into_iter().find(|p| p.is_file())?;
+    let mut cmd = std::process::Command::new(updater);
+    cmd.arg("check").arg("--project-root").arg(root);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let output = cmd.output().ok()?;
+    if !output.status.success() { return None; }
+    let text = String::from_utf8(output.stdout).ok()?;
+    if text.contains("\"has_update\": true") {
+        Some(text)
+    } else {
+        None
+    }
 }

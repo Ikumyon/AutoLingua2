@@ -10,7 +10,7 @@ from PySide6.QtCore import QIODevice, QSaveFile
 from autolingua2.ir.source_watch import WatchSettings, WatchTarget
 from autolingua2.ir.translation import LowModelRange, ModelSelection
 from autolingua2.ir.validation import array, record, required, text
-from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from autolingua2.infrastructure.filesystem import DATA_DIR
 from autolingua2.infrastructure.platform import qt_file_path
 from autolingua2.infrastructure import source_watch
 from autolingua2.services.language_tags import normalize_language
@@ -584,4 +584,4 @@ def settings_path() -> Path:
     if override:
         return Path(override)
 
-    return PROJECT_ROOT / SETTINGS_FILE_NAME
+    return DATA_DIR / SETTINGS_FILE_NAME

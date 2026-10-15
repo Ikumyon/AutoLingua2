@@ -9,7 +9,7 @@ import json
 import sqlite3
 import time
 
-from autolingua2.infrastructure.filesystem import PROJECT_ROOT
+from autolingua2.infrastructure.filesystem import LIBRARY_DIR
 from autolingua2.ir.translation import text_hash
 
 
@@ -28,7 +28,7 @@ class MemoryWrite:
 
 
 class TranslationMemoryStore:
-    def __init__(self, root: Path = PROJECT_ROOT / ".runtime" / "translation_memory") -> None:
+    def __init__(self, root: Path = LIBRARY_DIR / "translation_memory") -> None:
         self.root = root
 
     @contextmanager
