@@ -137,6 +137,10 @@ class ExecutableExporter:
         self.rpc = rpc
         self.id = text(required(description, "id"), nonempty=True)
         self.name = text(required(description, "name"), nonempty=True)
+        exchange = required(description, "exchange")
+        if not isinstance(exchange, bool):
+            raise ValueError("Exporter exchange must be a boolean")
+        self.exchange = exchange
 
     def plan(self, workspaces: list[ImportedTranslation], settings: dict[str, object]) -> list[ExportFile]:
         result = array(self.rpc.call("export_plan", {
@@ -153,3 +157,4 @@ class ExecutableExporter:
             content = base64.b64decode(text(required(item, "content_base64")), validate=True)
             files.append(ExportFile(path, content))
         return files
+

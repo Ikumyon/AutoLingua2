@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 from autolingua2.services.ai.ai_network import AiNetworkClient
 from autolingua2.services.ai_providers import ProviderRegistry
 from autolingua2.plugins.api import AiSetupCallbacks, AiSetupOption, AiSetupPanel, AiSetupValues
-from autolingua2.services.settings.settings_store import AiModel, AiSettings, save_ai_settings
+from autolingua2.services.settings.settings_store import AiModel, AiSettings, load_ai_settings, save_ai_settings
 from autolingua2.ir.translation import LowModelRange, ModelSelection
 from autolingua2.ui.components.ai_model_row import ModelRowWidget
 from autolingua2.ui.components.ai_model_list import ModelListController
@@ -69,12 +69,14 @@ class AiSettingsPageController(QObject):
 
     def settings(self) -> AiSettings:
         self._save_current_ai_fields()
+        review_settings = load_ai_settings(self.registry)
         return AiSettings(
             provider_id=self.selected_provider_id, models=self.ai_models,
             selected_models=self.ai_selected_models, api_keys=self.ai_api_keys,
             concurrency=self.spin_concurrency.value(),
             high_model=self._assignment(self.combo_high), low_model=self._assignment(self.combo_low),
             low_model_range=list(LowModelRange)[self.slider_low_range.value()],
+            review_enabled=review_settings.review_enabled, review_model=review_settings.review_model,
         )
 
     @staticmethod

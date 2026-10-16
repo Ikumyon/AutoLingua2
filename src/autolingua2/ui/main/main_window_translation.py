@@ -78,6 +78,9 @@ class MainWindowTranslationController(QObject):
         high, low = selected_model(host.ai_settings.high_model, "高"), selected_model(host.ai_settings.low_model, "低")
         if high is None or low is None:
             return None
+        review_model = selected_model(host.ai_settings.review_model, "校閲") if host.ai_settings.review_enabled else None
+        if host.ai_settings.review_enabled and review_model is None:
+            return None
         source = host.project.source_language
         target = host.project.target_language
         try:
@@ -93,6 +96,7 @@ class MainWindowTranslationController(QObject):
             tone=next((tone for tone in host.tone_choices if tone.id == host.selected_tone_id), None),
             tone_items=tuple(tone for tone in host.tone_choices if isinstance(tone, ToneItem)),
             low_model_range=host.ai_settings.low_model_range, concurrency=host.ai_settings.concurrency,
+            review_model=review_model,
         )
 
     def _text_context(self) -> TranslationTextContext:
@@ -336,6 +340,8 @@ class MainWindowTranslationController(QObject):
         confirmed = (workspace, unit.target_text, unit.state, tone)
         previous = self._confirmed_values.get(key)
         self._confirmed_values[key] = confirmed
+        if unit.state == UnitState.REVIEW_ISSUES:
+            return
         if manual and previous is not None and previous[0] is workspace and previous[1:] == confirmed[1:]:
             return
         self._share_queue.append((workspace, unit, manual, unit.target_text, unit.state, options, tone,
@@ -440,6 +446,7 @@ class MainWindowTranslationController(QObject):
             (UnitState.HUMAN_TRANSLATED, translation_source('MainWindow', "人間による翻訳")),
             (UnitState.AI_REVIEWED, translation_source('MainWindow', "AIによる校閲")),
             (UnitState.HUMAN_REVIEWED, translation_source('MainWindow', "人間による校閲")),
+            (UnitState.REVIEW_ISSUES, translation_source('MainWindow', "校閲指摘あり")),
             (UnitState.TRANSLATION_ERROR, translation_source('MainWindow', "翻訳エラー")),
             (UnitState.REVIEW_ERROR, translation_source('MainWindow', "校閲エラー")),
             (UnitState.DOUBTFUL, translation_source('MainWindow', "疑問あり")),

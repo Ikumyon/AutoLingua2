@@ -128,6 +128,8 @@ class AiSettings:
     high_model: ModelSelection | None = None
     low_model: ModelSelection | None = None
     low_model_range: LowModelRange = LowModelRange.STANDARD
+    review_enabled: bool = False
+    review_model: ModelSelection | None = None
 
 
 @dataclass(frozen=True)
@@ -196,6 +198,7 @@ def load_ai_settings(registry: ProviderRegistry) -> AiSettings:
         api_keys=api_keys,
         concurrency=concurrency if type(concurrency) is int and 1 <= concurrency <= 32 else 4,
         high_model=assignment("high_model"), low_model=assignment("low_model"), low_model_range=low_range,
+        review_enabled=group.get("review_enabled", False) is True, review_model=assignment("review_model"),
     )
 
 
@@ -214,6 +217,8 @@ def _update_ai_settings(data: dict[str, object], settings: AiSettings) -> None:
     group["high_model"] = asdict(settings.high_model) if settings.high_model is not None else None
     group["low_model"] = asdict(settings.low_model) if settings.low_model is not None else None
     group["low_model_range"] = settings.low_model_range.value
+    group["review_enabled"] = settings.review_enabled
+    group["review_model"] = asdict(settings.review_model) if settings.review_model is not None else None
 
     all_provider_ids = set(settings.models.keys()) | set(settings.api_keys.keys()) | set(settings.selected_models.keys())
     providers_data: dict[str, dict[str, object]] = {}

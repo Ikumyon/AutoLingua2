@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QDialog, QDialogButtonBox, QPlainTextEdit, QVBoxLa
 
 NAMES = {"set_language": translation_source('AiChat', '言語設定の変更'), "edit_units": translation_source('AiChat', '訳文・翻訳メモの変更'), "edit_glossary": translation_source('AiChat', '用語集の変更'), "edit_term": translation_source('AiChat', '用語の変更'),
          "edit_tone": translation_source('AiChat', '口調の変更'), "set_preferences": translation_source('AiChat', '用語集・口調の適用'), "start_translation": translation_source('AiChat', '翻訳'),
-         "translation": translation_source('AiChat', '翻訳'), "review_units": translation_source('AiChat', 'AIレビュー・候補比較'), "review": translation_source('AiChat', 'AIレビュー・候補比較'),
+         "translation": translation_source('AiChat', '翻訳'), "review_units": translation_source('AiChat', 'AIレビュー'), "review": translation_source('AiChat', 'AIレビュー'),
          "source_changes": translation_source('AiChat', '原文の差分確認'), "apply_source_update": translation_source('AiChat', '原文の取り込み'), "source_update": translation_source('AiChat', '原文の取り込み'),
          "save_project": translation_source('AiChat', 'プロジェクト保存'), "export_plan": translation_source('AiChat', '書き出し内容の確認'), "start_export": translation_source('AiChat', '書き出し'),
          "export": translation_source('AiChat', '書き出し'), "external_resources_list": translation_source('AiChat', '外部資料の一覧'), "external_resources_read": translation_source('AiChat', '外部資料の取得'),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from base64 import b64encode
 from pathlib import Path
 
@@ -47,7 +48,7 @@ def apply_inherited_translations(
 
     if not inherited_language:
         raise ValueError("継承する訳文の言語を選択してください。")
-    values: dict[str, str] = {}
+    values: dict[str, TranslationRecord] = {}
     slots: set[str] = set()
     for path in _inherited_files(adapter, inherited_paths):
         check_cancelled()
@@ -58,16 +59,17 @@ def apply_inherited_translations(
                 continue
             if unit.label in values:
                 raise ValueError(f"既存訳のキーが競合しています: {inherited_language}: {unit.label}")
-            values[unit.label] = trans.embedded_translations.get(unit.id, unit.source_text)
+            embedded = trans.embedded_translations.get(unit.id)
+            values[unit.label] = (replace(embedded) if embedded is not None else
+                                  TranslationRecord(unit.source_text, inherited_state
+                                                    if unit.source_text else UnitState.UNTRANSLATED))
     workspace = imported.inherited_workspaces.setdefault(
         inherited_language, Workspace(inherited_language,
             {unit.id: TranslationRecord() for unit in imported.project.units},
             next(iter(slots)) if len(slots) == 1 else ""))
     for unit in imported.project.units:
         if unit.label in values:
-            text = values[unit.label]
-            workspace.records[unit.id] = TranslationRecord(
-                text, inherited_state if text else UnitState.UNTRANSLATED)
+            workspace.records[unit.id] = values[unit.label]
 
 
 def _inherited_files(adapter: FileAdapter, paths: list[Path]) -> list[Path]:
@@ -146,7 +148,7 @@ def import_project(
         source_ids[source.id] = relative
         source.id = relative
     refs = {}
-    embedded: dict[str, str] = {}
+    embedded: dict[str, TranslationRecord] = {}
     for unit in imported.project.units:
         ref = imported.source_refs.get(unit.id)
         if ref is None or ref.source_id not in source_ids:
@@ -164,8 +166,8 @@ def import_project(
     imported.project.source_slot = source_slot
 
     if inherit_embedded and embedded:
-        records = {unit.id: TranslationRecord(embedded[unit.id], inherited_state)
-                   if embedded.get(unit.id) else TranslationRecord()
+        records = {unit.id: replace(embedded[unit.id])
+                   if unit.id in embedded else TranslationRecord()
                    for unit in imported.project.units}
         imported.inherited_workspaces[inherited_language] = Workspace(
             inherited_language, records, imported.project.source_slot)

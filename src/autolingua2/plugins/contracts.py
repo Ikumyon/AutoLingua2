@@ -5,10 +5,14 @@ These are the host's actual types, not copies or compatibility implementations.
 """
 from autolingua2.adapters.base import EmbeddedTranslationAdapter, FileAdapter, KeyConflictAdapter, TranslationTextAdapter
 from autolingua2.ir.translation import TranslationTextRules
+from autolingua2.services.settings.glossary_format import (
+    GlossaryFormat, GlossaryImportData, GlossaryExportData, GlossaryTerm, TermSide, DirectedTerm,
+)
 from autolingua2.ir.key_conflict import KeyEntry, KeyFile
 from autolingua2.ir import Issue, TranslationProject, TranslationSource, TranslationUnit, UnitState
 from autolingua2.ir.filter_rules import FilterRule, TagKind
 from autolingua2.ir.imported import GameProfile, GameSlot, ImportedTranslation, SourceRef
+from autolingua2.ir.workspace import TranslationRecord
 from autolingua2.ir.classification import (
     ClassificationResult, ClassifiedElement, DifferenceKind, SourceCategory, SourceGroup, TextDifference,
 )
@@ -31,6 +35,7 @@ from autolingua2.services.ai_providers.base import (
 )
 
 __all__ = [
+    "GlossaryFormat", "GlossaryImportData", "GlossaryExportData", "GlossaryTerm", "TermSide", "DirectedTerm",
     "OperationContext", "OperationContribution", "OperationTool",
     "VoiceInputCallbacks", "VoiceInputMode", "VoiceInputOperation", "VoiceInputProvider",
     "ChatImage", "ChatMessage", "ChatReply", "ChatToolCall", "object_value", "string_value",
@@ -42,7 +47,7 @@ __all__ = [
     "BaseHttpTranslator", "BaseAiProvider",
     "TranslationUsage", "usage_number",
     "Issue", "TranslationProject", "TranslationSource", "TranslationUnit", "UnitState",
-    "FilterRule", "TagKind", "GameProfile", "GameSlot", "ImportedTranslation", "SourceRef",
+    "FilterRule", "TagKind", "GameProfile", "GameSlot", "ImportedTranslation", "SourceRef", "TranslationRecord",
     "ClassificationResult", "ClassifiedElement", "DifferenceKind", "SourceCategory", "SourceGroup", "TextDifference",
 ]
 

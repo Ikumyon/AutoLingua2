@@ -113,6 +113,7 @@ from autolingua2.services.settings.settings_store import (
     DockTabPosition,
     WindowLayout,
     load_ai_settings,
+    save_ai_settings,
     load_theme_settings,
     load_ui_display_flags,
     load_window_layout,
@@ -146,6 +147,7 @@ STATUS_MATCHERS: dict[str, Callable[[TranslationUnit], bool]] = {
     "doubtful": lambda unit: unit.state == UnitState.DOUBTFUL,
     "translation_error": lambda unit: unit.state == UnitState.TRANSLATION_ERROR,
     "review_error": lambda unit: unit.state == UnitState.REVIEW_ERROR,
+    "review_issues": lambda unit: unit.state == UnitState.REVIEW_ISSUES,
     "ai_reviewed": lambda unit: unit.state == UnitState.AI_REVIEWED,
     "human_reviewed": lambda unit: unit.state == UnitState.HUMAN_REVIEWED,
     "ai_translated": lambda unit: unit.state == UnitState.AI_TRANSLATED,
@@ -666,6 +668,8 @@ class MainWindowController(QObject):
         self.button_translate_all = require_child(self.window, QPushButton, "buttonTranslateAll")
         self.label_translation_models = require_child(self.window, QLabel, "labelTranslationModels")
         self.button_translation_settings = require_child(self.window, QPushButton, "buttonTranslationSettings")
+        self.check_auto_review = require_child(self.window, QCheckBox, "checkAutoReview")
+        self.combo_review_model = require_child(self.window, QComboBox, "comboReviewModel")
         self.combo_tone = require_child(self.window, QComboBox, "comboTone")
         self.button_manage_tone = require_child(self.window, QPushButton, "buttonManageTone")
         self._refresh_tone_choices()
@@ -866,6 +870,8 @@ class MainWindowController(QObject):
         self.check_project_notification.toggled.connect(self._toggle_project_notification)
         self.button_project_notification_settings.clicked.connect(lambda: self.open_settings("source_watch"))
         self.button_translation_settings.clicked.connect(lambda: self.open_settings("translation"))
+        self.check_auto_review.toggled.connect(self._review_options_changed)
+        self.combo_review_model.currentIndexChanged.connect(self._review_options_changed)
         self.combo_tone.currentIndexChanged.connect(self._on_tone_changed)
         self.button_manage_tone.clicked.connect(lambda: self.open_settings("tone"))
         self.combo_glossary.currentIndexChanged.connect(self._on_glossary_changed)
@@ -1486,6 +1492,37 @@ class MainWindowController(QObject):
             return f"{provider.display_name} / {model.name}"
         self.label_translation_models.setText(tr("MainWindow", "高モデル：{high}\n低モデル：{low}").format(
             high=describe(self.ai_settings.high_model), low=describe(self.ai_settings.low_model)))
+        with QSignalBlocker(self.check_auto_review), QSignalBlocker(self.combo_review_model):
+            self.check_auto_review.setChecked(self.ai_settings.review_enabled)
+            self.combo_review_model.clear()
+            self.combo_review_model.addItem(tr("MainWindow", "未設定"), "")
+            for provider_id, models in self.ai_settings.models.items():
+                provider = self.provider_registry.get(provider_id)
+                if provider is None:
+                    continue
+                for model in models:
+                    if model.enabled:
+                        self.combo_review_model.addItem(f"{provider.display_name} / {model.name}",
+                                                        json.dumps([provider_id, model.model]))
+            selection = self.ai_settings.review_model
+            if selection is not None:
+                index = self.combo_review_model.findData(json.dumps([selection.provider_id, selection.model_id]))
+                if index >= 0:
+                    self.combo_review_model.setCurrentIndex(index)
+            self.combo_review_model.setEnabled(self.ai_settings.review_enabled)
+
+    def _review_options_changed(self) -> None:
+        value = self.combo_review_model.currentData()
+        selection: ModelSelection | None = None
+        if isinstance(value, str) and value:
+            provider_id, model_id = json.loads(value)
+            if not isinstance(provider_id, str) or not isinstance(model_id, str):
+                raise ValueError("校閲モデルの選択が不正です。")
+            selection = ModelSelection(provider_id, model_id)
+        self.ai_settings.review_enabled = self.check_auto_review.isChecked()
+        self.ai_settings.review_model = selection
+        self.combo_review_model.setEnabled(self.ai_settings.review_enabled)
+        save_ai_settings(self.ai_settings)
 
     def _configure_mcp(self) -> None:
         settings = load_mcp_settings()
@@ -2085,6 +2122,7 @@ class MainWindowController(QObject):
             (tr("MainWindow", "疑問あり"), UnitState.DOUBTFUL, "question"),
             (tr("MainWindow", "翻訳エラー"), UnitState.TRANSLATION_ERROR, "question"),
             (tr("MainWindow", "校閲エラー"), UnitState.REVIEW_ERROR, "question"),
+            (tr("MainWindow", "校閲指摘あり"), UnitState.REVIEW_ISSUES, "question"),
             (tr("MainWindow", "未翻訳"), UnitState.UNTRANSLATED, "circle"),
         ]
         for label, state, icon_name in options:
@@ -2878,6 +2916,8 @@ class MainWindowController(QObject):
         return previous
 
     def _confirmed_status_text(self, unit: TranslationUnit, *, show_issues: bool = True) -> str:
+        if unit.state == UnitState.REVIEW_ISSUES:
+            return tr("MainWindow", "校閲指摘あり")
         if unit.state == UnitState.TRANSLATION_ERROR:
             return tr("MainWindow", "翻訳エラー")
         if unit.state == UnitState.REVIEW_ERROR:
@@ -2916,6 +2956,7 @@ class MainWindowController(QObject):
             tr("MainWindow", "疑問あり"): STATUS_MATCHERS["doubtful"],
             tr("MainWindow", "翻訳エラー"): STATUS_MATCHERS["translation_error"],
             tr("MainWindow", "校閲エラー"): STATUS_MATCHERS["review_error"],
+            tr("MainWindow", "校閲指摘あり"): STATUS_MATCHERS["review_issues"],
             tr("MainWindow", "AIによる校閲"): STATUS_MATCHERS["ai_reviewed"],
             tr("MainWindow", "人間による校閲"): STATUS_MATCHERS["human_reviewed"],
             tr("MainWindow", "AIによる翻訳"): STATUS_MATCHERS["ai_translated"],

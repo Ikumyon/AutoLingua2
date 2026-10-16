@@ -12,7 +12,7 @@ SEARCH = {**IDS, "query": S, "file_id": S, "states": STRINGS,
           "ids": STRINGS,
           "source_changed": B, "issues_only": B, "include_hidden": B,
           "offset": {"type": "integer"}, "limit": {"type": "integer", "minimum": 1, "maximum": 100}}
-NOTES = {"type": "object", "properties": {"candidates": STRINGS, "rationale": S,
+NOTES = {"type": "object", "properties": {"rationale": S,
          "sources": STRINGS, "review": S}, "additionalProperties": False}
 OPERATION_INSTRUCTIONS = (
     "依頼の実行に必要な設定・登録・対象が不足している場合は、公開ツールで現状を確認し、"
@@ -27,9 +27,9 @@ OPERATION_INSTRUCTIONS = (
     "適用後は現在の状態を再取得し、準備を重複実行せず元の依頼を続けてください。"
     "破棄・失効した前提操作に依存する作業は続行しないでください。"
 )
-EDIT = {"type": "object", "properties": {"id": S, "revision": S, "translation": S,
+EDIT = {"type": "object", "properties": {"id": S, "revision": S, "translation": S, "context": S,
         "state": {"type": "string", "enum": ["untranslated", "ai_translated", "ai_reviewed", "doubtful",
-                                                "translation_error", "review_error"]},
+                                                "translation_error", "review_error", "review_issues"]},
         "tone_id": S, "confirm": B, "discard_draft": B, "notes": NOTES},
         "required": ["id", "revision"], "additionalProperties": False}
 
@@ -60,7 +60,7 @@ TOOLS = (
          {**IDS, "ids": STRINGS, "radius": {"type": "integer", "maximum": 10}}, ("project_id", "language", "ids")),
     tool("select_units", "指定言語と文章を画面で表示・選択し参照に追加。ファイル指定のみでも表示できる。",
          {**IDS, "ids": STRINGS, "file_id": S}, ("project_id", "language")),
-    tool("edit_units", "revisionを照合して訳文・下書き・AI状態・翻訳メモを個別または一括変更。",
+    tool("edit_units", "revisionを照合して訳文・下書き・AI状態・翻訳メモ・共有コンテキストを個別または一括変更。",
          {**IDS, "changes": {"type": "array", "items": EDIT, "maxItems": 1000}}, ("project_id", "language", "changes"), "edit"),
     tool("replace_units", "指定範囲の訳文を文字列置換。変更対象を固定した提案を生成。",
          {**SEARCH, "find": S, "replacement": S}, ("project_id", "language", "find", "replacement"), "edit"),
@@ -74,7 +74,8 @@ TOOLS = (
           "id": S, "parent_id": S, "name": S}, ("project_id", "action"), "edit"),
     tool("edit_term", "指定用語集の用語を登録・変更・削除。空のidは新規登録。",
          {**IDS, "glossary_id": S, "id": S, "delete": B, "source": S, "translation": S,
-          "part_of_speech": S, "variants": STRINGS, "memo": S, "case_sensitive": B},
+          "part_of_speech": S, "variants": STRINGS, "target_variants": STRINGS,
+          "memo": S, "case_sensitive": B, "target_case_sensitive": B},
          ("project_id", "language", "glossary_id"), "edit"),
     tool("get_tones", "個別・条件付き口調を取得。", {"project_id": S}, ("project_id",)),
     tool("edit_tone", "個別または条件付き口調の登録・変更・削除。blockはget_tonesと同じ条件分岐形式。",
@@ -84,8 +85,8 @@ TOOLS = (
          {**IDS, "glossary_id": S, "tone_id": S}, ("project_id", "language"), "edit"),
     tool("plan_work", "未翻訳・原文更新・問題の件数を集計し、対応順の作業計画を取得。",
          {**IDS}, ("project_id",)),
-    tool("review_units", "AIで意味・口調をレビュー、翻訳候補を比較、または用語候補を抽出するジョブ。",
-         {**IDS, "ids": STRINGS, "mode": {"type": "string", "enum": ["review", "compare", "terms"]},
+    tool("review_units", "AIで意味・口調をレビュー、または用語候補を抽出するジョブ。",
+         {**IDS, "ids": STRINGS, "mode": {"type": "string", "enum": ["review", "terms"]},
           "provider": S, "model": S, "instruction": S}, ("project_id", "language", "ids"), "translate"),
     tool("start_translation", "指定言語・文章を翻訳するジョブ。モデル省略時はアプリ設定を使用。",
          {**IDS, "ids": STRINGS, "provider": S, "model": S}, ("project_id", "language", "ids"), "translate"),
@@ -119,6 +120,5 @@ PROMPTS = {
     "unify_terms": "用語集と関連する既存訳を確認し、用語揺れを検索して変更案を作り、機械的検証を行ってください。",
     "source_update": "原文更新の差分と旧訳を比較し、更新取り込みと再翻訳が必要な対象を整理してください。",
     "review_translation": "対象の文脈・用語・口調を取得し、機械的検証と意味のレビューを分けて修正案を作ってください。",
-    "compare_candidates": "文脈・用語・口調に照らして複数候補を比較し、採用理由と出典を記録する案を作ってください。",
     "before_export": "訳抜け・原文更新・問題を確認し、指定言語の書き出し計画を提示してください。",
 }

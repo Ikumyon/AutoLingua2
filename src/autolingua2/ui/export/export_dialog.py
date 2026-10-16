@@ -281,8 +281,8 @@ class ExportDialog(SimpleDialogController):
         states_toggle = require_child(self.dialog, QToolButton, "buttonTranslationStates")
         states_layout = require_child(self.dialog, QGridLayout, "layoutTranslationStates")
         self._state_checkboxes: dict[UnitState, QCheckBox] = {}
-        positions = ((0, 0), (1, 0), (1, 1), (2, 0), (2, 1),
-                     (3, 0), (3, 1), (4, 0), (5, 0), (5, 1))
+        positions = ((0, 0), (1, 0), (1, 1), (2, 0), (2, 1), (3, 0),
+                     (4, 0), (4, 1), (5, 0), (6, 0), (6, 1))
         for state, (row, column) in zip(UnitState, positions, strict=True):
             checkbox = QCheckBox(tr("MainWindow", STATUS_LABELS[state]), states_widget)
             checkbox.setChecked(state in DEFAULT_TRANSLATION_STATES)

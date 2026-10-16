@@ -75,6 +75,7 @@ class StatusComboBoxDelegate(QStyledItemDelegate):
             (tr("MainWindow", "人間による翻訳"), UnitState.HUMAN_TRANSLATED, "person-edit-32"),
             (tr("MainWindow", "AIによる校閲"), UnitState.AI_REVIEWED, "robot-check"),
             (tr("MainWindow", "人間による校閲"), UnitState.HUMAN_REVIEWED, "person-check"),
+            (tr("MainWindow", "校閲指摘あり"), UnitState.REVIEW_ISSUES, "question"),
             (tr("MainWindow", "翻訳エラー"), UnitState.TRANSLATION_ERROR, "question"),
             (tr("MainWindow", "校閲エラー"), UnitState.REVIEW_ERROR, "question"),
             (tr("MainWindow", "疑問あり"), UnitState.DOUBTFUL, "question"),

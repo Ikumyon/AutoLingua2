@@ -43,13 +43,14 @@ def text_hash(value: str) -> str:
 
 def translation_conditions(languages: tuple[str, str], template: str,
                            tone: tuple[str, str, str] | None,
-                           terms: tuple[tuple[str, str, str, str, bool, tuple[str, ...]], ...]) -> str:
+                           terms: tuple[tuple[str, str, str, str, bool, tuple[str, ...], tuple[str, ...], bool], ...]) -> str:
     return json.dumps({
         "languages": sorted(language.replace("_", "-").lower() for language in languages),
         "template": template, "tone": tone,
         "terms": sorted((source.replace("_", "-").lower(), target.replace("_", "-").lower(),
-                         original, translated, sensitive, tuple(sorted(variants)))
-                        for source, target, original, translated, sensitive, variants in terms),
+                         original, translated, sensitive, tuple(sorted(variants)),
+                         tuple(sorted(target_variants)), target_sensitive)
+                        for source, target, original, translated, sensitive, variants, target_variants, target_sensitive in terms),
     }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 

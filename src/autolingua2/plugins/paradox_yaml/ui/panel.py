@@ -149,7 +149,7 @@ class ParadoxCreationPanel(QWidget):
 
     def _browse_file(self) -> None:
         parent = self
-        file_filter = tr("ParadoxPlugin", "Paradox YAML / ParaTranz JSON (*.yml *.yaml *.json);;すべてのファイル (*.*)")
+        file_filter = tr("ParadoxPlugin", "Paradox YAML (*.yml *.yaml);;すべてのファイル (*.*)")
         files, _ = QFileDialog.getOpenFileNames(parent, tr("ParadoxPlugin", "翻訳対象のYAMLファイルを選択"), "", file_filter)
         for f in files:
             self._run(lambda: self.context.creation.add_target_path(Path(f)))

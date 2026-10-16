@@ -16,7 +16,6 @@ class ConfirmedTranslation:
 
 @dataclass(slots=True)
 class TranslationNotes:
-    candidates: list[str] = field(default_factory=list)
     rationale: str = ""
     sources: list[str] = field(default_factory=list)
     review: str = ""

@@ -122,8 +122,7 @@ def project_documents(service: WorkspaceService) -> dict[str, object]:
                                 "context": unit.context,
                                 "source_changed": entry.source_changed,
                                 "tone": _tone_document(entry.tone),
-                                "notes": {"candidates": entry.notes.candidates,
-                                          "rationale": entry.notes.rationale,
+                                "notes": {"rationale": entry.notes.rationale,
                                           "sources": entry.notes.sources, "review": entry.notes.review},
                                 "pending_confirmation": {
                                     "translation": pending.target_text, "tone": _tone_document(pending.tone),
@@ -226,7 +225,7 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
                 if key in seen:
                     raise ValueError(f"同じファイルにキーが重複しています: {path}: {key}")
                 original = text(required(row, "original"))
-                context = text(row.get("context", PurePosixPath(path).name))
+                context = text(row.get("context", ""))
                 seen[key] = (original, context)
                 unit_id = f"{path}#{key}"
                 source_changed = row.get("source_changed", False)
@@ -242,16 +241,16 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
                     pending = ConfirmedTranslation(text(required(pending_fields, "translation")),
                                                    _restore_tone(required(pending_fields, "tone")))
                 notes = record(row.get("notes", {}))
+                # Discard removed candidate translations when reading existing projects.
                 if set(notes) - {"candidates", "rationale", "sources", "review"}:
                     raise ValueError("翻訳メモの項目が不正です。")
                 workspace.records[unit_id] = TranslationRecord(
                     text(required(row, "translation")), UnitState(text(required(row, "state"))),
                     source_changed, tone, pending,
                     notes=TranslationNotes(
-                        [text(value) for value in array(notes.get("candidates", []))],
-                        text(notes.get("rationale", "")),
-                        [text(value) for value in array(notes.get("sources", []))],
-                        text(notes.get("review", "")),
+                        rationale=text(notes.get("rationale", "")),
+                        sources=[text(value) for value in array(notes.get("sources", []))],
+                        review=text(notes.get("review", "")),
                     ),
                 )
                 if name == names[0]:

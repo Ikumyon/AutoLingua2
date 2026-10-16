@@ -10,6 +10,7 @@ from PySide6.QtGui import QIcon, QSyntaxHighlighter, QTextDocument
 from PySide6.QtWidgets import QWidget
 
 from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter, ImportedTranslation, VoiceInputProvider
+from .contracts import GlossaryFormat
 from autolingua2.infrastructure.encoding import detect_encoding, read_text_auto
 from autolingua2.infrastructure.platform import current_platform
 from autolingua2.services.settings.settings_store import AiModel, AiSetupValues, load_plugin_settings, save_plugin_settings
@@ -179,6 +180,7 @@ class PluginContribution:
     exporters: list[TranslationExporter] = field(default_factory=list)
     voice_input: VoiceInputProvider | None = None
     operations: tuple[OperationContribution, ...] = ()
+    glossary_formats: tuple[GlossaryFormat, ...] = ()
 
 
 class PluginContext:

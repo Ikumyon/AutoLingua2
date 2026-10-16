@@ -8,6 +8,7 @@ from PySide6.QtCore import QRunnable, QThreadPool
 
 from autolingua2.ir import TranslationProject
 from autolingua2.ir.imported import ImportedTranslation, SourceRef
+from autolingua2.ir.workspace import TranslationRecord
 from .base import FileAdapter
 
 
@@ -144,7 +145,7 @@ def load_paths(paths: list[Path], adapter: FileAdapter) -> ImportedTranslation:
 def merge_imports(imports: list[ImportedTranslation]) -> ImportedTranslation:
     project = TranslationProject()
     source_refs: dict[str, SourceRef] = {}
-    embedded_translations: dict[str, str] = {}
+    embedded_translations: dict[str, TranslationRecord] = {}
     for imported in imports:
         if set(source_refs).intersection(imported.source_refs):
             raise ValueError("Duplicate translation unit IDs")

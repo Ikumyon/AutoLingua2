@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>GlossaryImportDialog</class>
+ <widget class="QDialog" name="GlossaryImportDialog">
+  <property name="windowTitle"><string>用語集を取り込む</string></property>
+  <layout class="QVBoxLayout" name="layoutImport">
+   <item><layout class="QHBoxLayout" name="layoutFormat">
+    <item><widget class="QLabel" name="labelFormat"><property name="text"><string>形式：</string></property></widget></item>
+    <item><widget class="QComboBox" name="comboImportFormat"/></item>
+   </layout></item>
+   <item><layout class="QHBoxLayout" name="layoutDirection">
+    <item><widget class="QLabel" name="labelImportDirection"><property name="text"><string/></property></widget></item>
+    <item><widget class="QPushButton" name="buttonSwapImport"><property name="text"><string>⇄ 入れ替え</string></property></widget></item>
+   </layout></item>
+   <item><widget class="QLabel" name="labelDetails"><property name="text"><string/></property><property name="textFormat"><enum>Qt::TextFormat::PlainText</enum></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QRadioButton" name="radioMerge"><property name="text"><string>選択した用語集へ統合</string></property><property name="checked"><bool>true</bool></property></widget></item>
+   <item><widget class="QRadioButton" name="radioNew"><property name="text"><string>選択した用語集の配下に新規作成</string></property></widget></item>
+   <item><widget class="QLabel" name="labelExplanation"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

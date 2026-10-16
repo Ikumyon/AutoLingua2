@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 from .project import TranslationProject
 from .classification import ClassificationResult
-from .workspace import Workspace
+from .workspace import TranslationRecord, Workspace
 
 
 @dataclass(slots=True)
@@ -22,7 +22,7 @@ class ImportedTranslation:
     classification: ClassificationResult | None = None
     excluded_unit_ids: set[str] = field(default_factory=set)
     inherited_workspaces: dict[str, Workspace] = field(default_factory=dict)
-    embedded_translations: dict[str, str] = field(default_factory=dict)
+    embedded_translations: dict[str, TranslationRecord] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

@@ -27,6 +27,7 @@ class BmFontCharListExporter:
     """Exporter that plans a single-line Unicode-sorted character list text file for BMFont."""
 
     id = "bmfont_chars"
+    exchange = False
     name = "BMFont 使用文字一覧 (*.txt)"
 
     def plan(self, workspaces: list[ImportedTranslation], settings: dict[str, object]) -> list[ExportFile]:

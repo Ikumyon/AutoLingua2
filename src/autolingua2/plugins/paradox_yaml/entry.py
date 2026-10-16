@@ -1,6 +1,6 @@
 from autolingua2.plugins.api import PluginContext, PluginContribution, UIContribution
 from .parser import ParadoxYamlAdapter
-from .parser.exporter import ParadoxYamlExporter, ParaTranzJsonExporter
+from .parser.exporter import ParadoxYamlExporter
 from .ui.export_settings import ParadoxExportSettings
 from .ui.eu4 import ParadoxPalette, presentation
 from .ui.panel import ParadoxCreationAdapter
@@ -31,5 +31,5 @@ def register(context: PluginContext) -> None:
         id="paradox_yaml",
         parser=adapter,
         ui=ui,
-        exporters=[ParadoxYamlExporter(), ParaTranzJsonExporter()],
+        exporters=[ParadoxYamlExporter()],
     ))

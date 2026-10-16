@@ -28,6 +28,7 @@ from .api import (
     AiSetupOption,
 )
 from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter, VoiceInputProvider
+from .contracts import GlossaryFormat
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,7 @@ class PluginManager:
         self._contexts: dict[str, PluginContext] = {}
         self._parsers: dict[str, FileAdapter] = {}
         self._exporters: dict[str, TranslationExporter] = {}
+        self._glossary_formats: dict[str, GlossaryFormat] = {}
         self._export_settings: dict[str, ExportSettingsPanel] = {}
         self._providers: dict[str, AiProviderPlugin] = {}
         self._voice_inputs: dict[str, VoiceInputProvider] = {}
@@ -115,6 +117,10 @@ class PluginManager:
     @property
     def exporters(self) -> Mapping[str, TranslationExporter]:
         return MappingProxyType(self._exporters)
+
+    @property
+    def glossary_formats(self) -> Mapping[str, GlossaryFormat]:
+        return MappingProxyType(self._glossary_formats)
 
     @property
     def export_settings(self) -> Mapping[str, ExportSettingsPanel]:
@@ -177,6 +183,7 @@ class PluginManager:
             ("exporter", any(key.startswith(f"{plugin_id}:") for key in self._exporters)),
             ("voice_input", plugin_id in self._voice_inputs),
             ("operations", plugin_id in self._operations),
+            ("glossary_format", any(key.startswith(f"{plugin_id}:") for key in self._glossary_formats)),
         ) if registered)
 
     def report_error(self, label: str, error: Exception) -> None:
@@ -201,7 +208,8 @@ class PluginManager:
             parser, provider, ui = contribution.parser, contribution.provider, contribution.ui
             voice_input = contribution.voice_input
             if (parser is None and provider is None and ui is None
-                    and voice_input is None and not contribution.exporters and not contribution.operations):
+                    and voice_input is None and not contribution.exporters and not contribution.operations
+                    and not contribution.glossary_formats):
                 raise ValueError("Plugin has no capabilities")
             operation_names: set[str] = set()
             for operation in contribution.operations:
@@ -212,8 +220,17 @@ class PluginManager:
                     raise ValueError("Invalid or duplicate public operation")
                 operation_names.add(operation.tool.name)
             exporter_ids: set[str] = set()
+            format_ids: set[str] = set()
+            for glossary_format in contribution.glossary_formats:
+                if (not isinstance(glossary_format, GlossaryFormat) or not glossary_format.id.strip()
+                        or not glossary_format.name.strip() or glossary_format.id in format_ids
+                        or f"{plugin_id}:{glossary_format.id}" in self._glossary_formats
+                        or not callable(glossary_format.decode) or not callable(glossary_format.encode)):
+                    raise ValueError("Invalid or duplicate glossary format")
+                format_ids.add(glossary_format.id)
             for exporter in contribution.exporters:
                 if (not isinstance(exporter, TranslationExporter) or not exporter.id.strip()
+                        or not isinstance(exporter.exchange, bool)
                         or not exporter.name.strip() or exporter.id in exporter_ids
                         or f"{plugin_id}:{exporter.id}" in self._exporters):
                     raise ValueError("Invalid or duplicate exporter")
@@ -292,6 +309,8 @@ class PluginManager:
             context._change_language(self._language)
             # Publish only after validation and initial language callbacks succeed.
             self._contexts[plugin_id] = context
+            for glossary_format in contribution.glossary_formats:
+                self._glossary_formats[f"{plugin_id}:{glossary_format.id}"] = glossary_format
             for exporter in contribution.exporters:
                 self._exporters[f"{plugin_id}:{exporter.id}"] = exporter
             if ui is not None:
@@ -342,6 +361,7 @@ class PluginManager:
         self._contexts.clear()
         self._parsers.clear()
         self._exporters.clear()
+        self._glossary_formats.clear()
         self._export_settings.clear()
         self._providers.clear()
         self._voice_inputs.clear()

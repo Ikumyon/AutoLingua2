@@ -1,0 +1,7 @@
+{
+  "id": "paratranz",
+  "name": "ParaTranz JSON",
+  "kind": "python",
+  "entry": "entry.py",
+  "description": "Game-independent ParaTranz JSON import and export"
+}

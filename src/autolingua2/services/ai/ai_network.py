@@ -190,6 +190,7 @@ class AiNetworkClient(QObject):
         terms: tuple[tuple[str, str], ...] = (),
         structured: bool = False,
         purpose: Literal["game", "ui"] = "game",
+        review_feedback: tuple[tuple[str, str, str], ...] = (),
     ) -> None:
         """指定されたプロバイダとモデルを用いて単一テキストを完全非同期で翻訳します。"""
         if not self.translation_slots.acquire(request_id):
@@ -198,6 +199,7 @@ class AiNetworkClient(QObject):
                 source_language_name=source_language_name, target_language_name=target_language_name,
                 tone=tone, reference_translation=reference_translation, changes=changes, terms=terms, structured=structured,
                 purpose=purpose,
+                review_feedback=review_feedback,
             ))
             self.translation_slots.notify_ready()
             return
@@ -228,6 +230,8 @@ class AiNetworkClient(QObject):
                     "id": request_id, "source_language": source_description, "target_language": target_description,
                     "tone": tone, "terms": terms, "target_text": text, "reference_translation": reference_translation,
                     "changes": [{"before": before, "after": after} for before, after in changes],
+                    "review_feedback": [{"source": source, "translation": translation, "review": review}
+                                        for source, translation, review in review_feedback],
                 }, ensure_ascii=False)
             elif reference_translation is not None:
                 system_prompt += (

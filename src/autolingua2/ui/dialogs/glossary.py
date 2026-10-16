@@ -14,13 +14,17 @@ from PySide6.QtWidgets import (
 )
 
 from autolingua2.extensions import ExtensionEntrance
-from autolingua2.ir.glossary import Glossary, GlossaryTerm, PARTS_OF_SPEECH, glossary_chain
+from autolingua2.ir.glossary import (
+    DirectedTerm, Glossary, GlossaryTerm, TermSide, PARTS_OF_SPEECH,
+    edited_term, glossary_chain, orient_term,
+)
 from autolingua2.ir.text_search import SearchSyntaxError, TextSearch
 from autolingua2.services.settings.glossary_store import GlossaryStore
 from autolingua2.ui.components.drop_zone import DropZone
 from autolingua2.ui.components.searchable_combo_box import enable_combo_search
 from autolingua2.ui.resources.i18n import tr
 from .base import SimpleDialogController, require_child
+from .glossary_io import GlossaryExportDialog, GlossaryImportDialog
 
 
 ID_ROLE = Qt.ItemDataRole.UserRole
@@ -48,7 +52,7 @@ class GlossaryNameDelegate(QStyledItemDelegate):
 
 
 class GlossaryTermDialog(SimpleDialogController):
-    def __init__(self, store: GlossaryStore, term: GlossaryTerm, glossary_name: str,
+    def __init__(self, store: GlossaryStore, term: DirectedTerm, glossary_name: str,
                  inherited: bool, parent: QWidget) -> None:
         super().__init__("dialogs/GlossaryTermDialog.ui", parent)
         self.store = store
@@ -60,8 +64,19 @@ class GlossaryTermDialog(SimpleDialogController):
         self.variants = require_child(self.dialog, QListWidget, "listTermVariants")
         self.memo = require_child(self.dialog, QPlainTextEdit, "editTermMemo")
         self.case_sensitive = require_child(self.dialog, QCheckBox, "checkTermCaseSensitive")
+        self.target_variant = require_child(self.dialog, QLineEdit, "editTargetVariant")
+        self.target_variants = require_child(self.dialog, QListWidget, "listTargetVariants")
+        self.target_sensitive = require_child(self.dialog, QCheckBox, "checkTargetCaseSensitive")
+        self.target_variants.addItems(list(term.target_variants))
+        self.target_sensitive.setChecked(term.target_case_sensitive)
+        self.target_variant.returnPressed.connect(self._add_target_variant)
+        require_child(self.dialog, QPushButton, "buttonAddTargetVariant").clicked.connect(self._add_target_variant)
+        require_child(self.dialog, QPushButton, "buttonRemoveTargetVariant").clicked.connect(self._remove_target_variant)
+        require_child(self.dialog, QLabel, "labelSource").setText(tr("Glossary", "原文：") + term.source_language)
+        require_child(self.dialog, QLabel, "labelTranslation").setText(tr("Glossary", "訳：") + term.target_language)
         self.part.addItems([tr("Glossary", part) for part in PARTS_OF_SPEECH])
-        self.part.setCurrentIndex(PARTS_OF_SPEECH.index(term.part_of_speech))
+        self.part.setCurrentIndex(PARTS_OF_SPEECH.index(term.part_of_speech)
+                                  if term.part_of_speech in PARTS_OF_SPEECH else -1)
         self.source.setText(term.source)
         self.translation.setText(term.translation)
         self.variants.addItems(list(term.variants))
@@ -92,21 +107,43 @@ class GlossaryTermDialog(SimpleDialogController):
         if row >= 0:
             self.variants.takeItem(row)
 
+    def _add_target_variant(self) -> None:
+        value = self.target_variant.text().strip()
+        if value and not self.target_variants.findItems(value, Qt.MatchFlag.MatchExactly):
+            self.target_variants.addItem(value)
+        self.target_variant.clear()
+
+    def _remove_target_variant(self) -> None:
+        row = self.target_variants.currentRow()
+        if row >= 0:
+            self.target_variants.takeItem(row)
+
     def _save(self) -> None:
+        part_index = self.part.currentIndex()
+        if part_index < 0:
+            QMessageBox.warning(self.dialog, tr("Glossary", "用語を保存できません"),
+                                tr("Glossary", "品詞を選択してください。"))
+            self.part.setFocus()
+            return
         # Include an unfinished variant instead of silently discarding it on Save.
         self._add_variant()
+        self._add_target_variant()
         variants: list[str] = []
         for row in range(self.variants.count()):
             item = self.variants.item(row)
             if item is not None:
                 variants.append(item.text())
-        candidate = replace(
-            self.term, part_of_speech=PARTS_OF_SPEECH[self.part.currentIndex()],
-            source=self.source.text(), translation=self.translation.text(),
-            variants=tuple(variants), memo=self.memo.toPlainText(),
-            case_sensitive=self.case_sensitive.isChecked())
+        target_variants: list[str] = []
+        for row in range(self.target_variants.count()):
+            item = self.target_variants.item(row)
+            if item is not None:
+                target_variants.append(item.text())
+        candidate = edited_term(self.term,
+            TermSide(self.source.text(), tuple(variants), self.case_sensitive.isChecked()),
+            TermSide(self.translation.text(), tuple(target_variants), self.target_sensitive.isChecked()),
+            PARTS_OF_SPEECH[part_index], self.memo.toPlainText())
         try:
-            self.term = self.store.save_term(candidate)
+            self.store.save_term(candidate)
         except STORAGE_ERRORS as exc:
             QMessageBox.warning(self.dialog, tr("Glossary", "用語を保存できません"), str(exc))
             return
@@ -119,8 +156,10 @@ class GlossaryPageController:
                  glossary_id: str = "", source_language: str = "", target_language: str = "") -> None:
         self.widget = widget
         self.store = GlossaryStore()
+        self.glossary_formats = entrance.plugins.glossary_formats
         self.glossaries: list[Glossary] = []
-        self.rows: list[GlossaryTerm] = []
+        self.rows: list[DirectedTerm] = []
+        self.language_names = languages
         self.games = require_child(widget, QComboBox, "comboGlossaryGame")
         self.tree = require_child(widget, QTreeWidget, "treeGlossaries")
         self.tree_search = require_child(widget, QLineEdit, "editGlossarySearch")
@@ -130,11 +169,15 @@ class GlossaryPageController:
         self.search_error.hide()
         self.source_language = require_child(widget, QComboBox, "comboGlossarySourceLanguage")
         self.target_language = require_child(widget, QComboBox, "comboGlossaryTargetLanguage")
+        self.swap_languages = require_child(widget, QPushButton, "buttonSwapGlossaryLanguages")
+        self.swap_languages.clicked.connect(self._swap_languages)
         self.name = require_child(widget, QLineEdit, "editGlossaryName")
         self.parent = require_child(widget, QLabel, "labelGlossaryParent")
         self.parent.setTextFormat(Qt.TextFormat.PlainText)
         self.add_glossary = require_child(widget, QPushButton, "buttonAddGlossary")
         self.delete_glossary = require_child(widget, QPushButton, "buttonDeleteGlossary")
+        self.export_glossary = require_child(widget, QPushButton, "buttonExportGlossary")
+        self.export_glossary.clicked.connect(self._export_glossary)
         self.add_term = require_child(widget, QPushButton, "buttonAddTerm")
         self.edit_term = require_child(widget, QPushButton, "buttonEditTerm")
         self.delete_term = require_child(widget, QPushButton, "buttonDeleteTerm")
@@ -142,7 +185,7 @@ class GlossaryPageController:
         self.import_drop.allowed_extensions = {".json"}
         self.import_drop.allow_multiple = False
         self.import_drop.dialog_filter = "JSON (*.json)"
-        self.import_drop.set_hint_text(tr("Glossary", "ParaTranz JSONをドロップ"))
+        self.import_drop.set_hint_text(tr("Glossary", "用語集JSONをドロップ（取り込み時に形式を選択）"))
         self.import_drop.add_button(tr("Glossary", "ファイルを選択"), self._select_import_file)
         self.import_drop.files_dropped.connect(self._import_paths)
         self.import_drop.multiple_files_rejected.connect(self._reject_multiple_import_files)
@@ -152,7 +195,7 @@ class GlossaryPageController:
         splitter.setStretchFactor(1, 3)
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        for column in range(1, 5):
+        for column in range(1, 6):
             header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
             self.table.setColumnWidth(column, 200)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -181,8 +224,8 @@ class GlossaryPageController:
         self.tree.currentItemChanged.connect(self._selection_changed)
         self.tree_search.textChanged.connect(self._filter_tree)
         self.term_search.textChanged.connect(self._refresh_terms)
-        self.source_language.currentIndexChanged.connect(self._language_changed)
-        self.target_language.currentIndexChanged.connect(self._language_changed)
+        self.source_language.currentIndexChanged.connect(lambda: self._language_changed(True))
+        self.target_language.currentIndexChanged.connect(lambda: self._language_changed(False))
         self.add_glossary.clicked.connect(self._add_glossary)
         self.delete_glossary.clicked.connect(self._delete_glossary)
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -284,8 +327,8 @@ class GlossaryPageController:
     def _term_add_reason(self, glossary: Glossary | None) -> str:
         if glossary is None:
             return tr("Glossary", "用語集を選択してください")
-        if not (self.source_language.currentData() and self.target_language.currentData()):
-            return tr("Glossary", "原語と訳語を選択してください")
+        if glossary_chain(self.glossaries, glossary.id)[0].languages is None:
+            return tr("Glossary", "最上位の親で2言語を設定してください")
         return ""
 
     def _update_term_actions(self) -> None:
@@ -293,16 +336,17 @@ class GlossaryPageController:
         reason = self._term_add_reason(glossary)
         self.add_term.setEnabled(not reason)
         self.add_term.setToolTip(reason)
-        self.import_drop.setEnabled(not reason)
-        self.import_drop.set_hint_text(reason or tr("Glossary", "ParaTranz JSONをドロップ"))
-        self.import_drop.setToolTip(reason)
+        import_reason = tr("Glossary", "用語集を選択してください") if glossary is None else ""
+        self.import_drop.setEnabled(glossary is not None)
+        self.import_drop.set_hint_text(import_reason or tr("Glossary", "用語集JSONをドロップ（取り込み時に形式を選択）"))
+        self.import_drop.setToolTip(import_reason)
 
     def _reject_multiple_import_files(self) -> None:
         self._error(ValueError(tr("Glossary", "JSONファイルは1つずつ取り込んでください。")))
 
     def _select_import_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self.widget, tr("Glossary", "ParaTranz JSONを取り込む"), "", "JSON (*.json)")
+            self.widget, tr("Glossary", "用語集JSONを取り込む"), "", "JSON (*.json)")
         if path:
             self._import_paths([Path(path)])
 
@@ -311,27 +355,91 @@ class GlossaryPageController:
             self._reject_multiple_import_files()
             return
         glossary = self._selected_glossary()
-        reason = self._term_add_reason(glossary)
-        if reason:
-            self._error(ValueError(reason))
-            return
         if glossary is None:
-            raise ValueError("用語集を選択してください")
+            self._error(ValueError(tr("Glossary", "用語集を選択してください")))
+            return
         try:
-            added, updated = self.store.import_paratranz_terms(
-                paths[0], glossary.id, str(self.source_language.currentData() or ""),
-                str(self.target_language.currentData() or ""))
+            chain = glossary_chain(self.glossaries, glossary.id)
+            destination = " / ".join(g.name for g in chain)
+            dialog = GlossaryImportDialog(paths[0], destination, self.widget, self.glossary_formats,
+                chain[0].languages, str(self.source_language.currentData() or ""))
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            document = dialog.document
+            if document is None:
+                raise ValueError(tr("Glossary", "取り込む用語集を確認してください。"))
+            result = self.store.import_document(document, glossary.id, dialog.mode, combine=dialog.combine)
         except STORAGE_ERRORS as exc:
             self._error(exc)
             return
-        self._refresh_terms()
+        self._game_changed(glossary_id=result.glossary_id)
         QMessageBox.information(
             self.widget, tr("Glossary", "取り込み完了"),
-            tr("Glossary", "追加：{added}件\n更新：{updated}件").format(added=added, updated=updated))
+            tr("Glossary", "作成用語集：{created}件\n追加用語：{added}件\n更新用語：{updated}件").format(
+                created=result.created, added=result.added, updated=result.updated))
 
-    def _language_changed(self, *_args: object) -> None:
+    def _export_glossary(self) -> None:
+        glossary = self._selected_glossary()
+        if glossary is None:
+            return
+        try:
+            terms = [term for item in self.glossaries for term in self.store.list_terms(item.id)]
+            GlossaryExportDialog(self.glossaries, terms, glossary, self.widget,
+                                 str(self.source_language.currentData() or ""), self.glossary_formats).exec()
+        except STORAGE_ERRORS as exc:
+            self._error(exc)
+
+    def _sync_languages(self) -> None:
+        glossary = self._selected_glossary()
+        if glossary is None:
+            self.swap_languages.setEnabled(False)
+            return
+        root = glossary_chain(self.glossaries, glossary.id)[0]
+        source = str(self.source_language.currentData() or "")
+        target = str(self.target_language.currentData() or "")
+        if root.languages is None and glossary.id == root.id and source and target and source != target:
+            try:
+                self.store.set_root_languages(root.id, source, target)
+            except STORAGE_ERRORS as exc:
+                self._error(exc)
+                return
+            root = replace(root, languages=(source, target))
+            self.glossaries = [root if g.id == root.id else g for g in self.glossaries]
+        languages = root.languages
+        choices = languages if languages is not None else tuple(self.language_names)
+        if languages is not None:
+            source = source if source in languages else languages[0]
+            target = languages[1] if source == languages[0] else languages[0]
+        for combo, value in ((self.source_language, source), (self.target_language, target)):
+            with QSignalBlocker(combo):
+                combo.clear()
+                for code in choices:
+                    combo.addItem(f"{self.language_names.get(code, code)} [{code}]", code)
+                combo.setCurrentIndex(combo.findData(value))
+            combo.setEnabled(languages is not None or glossary.id == root.id)
+        self.swap_languages.setEnabled(languages is not None)
+        self.table.setHorizontalHeaderLabels([
+            tr("Glossary", "品詞"), tr("Glossary", "原文：") + source, tr("Glossary", "訳：") + target,
+            tr("Glossary", "原文の他形態"), tr("Glossary", "訳の他形態"), tr("Glossary", "メモ")])
+
+    def _language_changed(self, source_changed: bool) -> None:
+        glossary = self._selected_glossary()
+        if glossary is None:
+            return
+        languages = glossary_chain(self.glossaries, glossary.id)[0].languages
+        if languages is not None:
+            changed = self.source_language if source_changed else self.target_language
+            other = self.target_language if source_changed else self.source_language
+            opposite = languages[1] if changed.currentData() == languages[0] else languages[0]
+            with QSignalBlocker(other):
+                other.setCurrentIndex(other.findData(opposite))
+        self._sync_languages()
         self._update_term_actions()
         self._refresh_terms()
+
+    def _swap_languages(self) -> None:
+        target = self.target_language.currentData()
+        self.source_language.setCurrentIndex(self.source_language.findData(target))
 
     def _glossary_menu(self, position: QPoint) -> None:
         item = self.tree.itemAt(position)
@@ -427,9 +535,11 @@ class GlossaryPageController:
     def _selection_changed(self, *_args: object) -> None:
         glossary = self._selected_glossary()
         self.add_glossary.setEnabled(glossary is not None)
+        self.export_glossary.setEnabled(glossary is not None)
         reason = self._glossary_delete_reason(glossary)
         self.delete_glossary.setEnabled(not reason)
         self.delete_glossary.setToolTip(reason)
+        self._sync_languages()
         self._update_term_actions()
         self.name.setEnabled(glossary is not None)
         self.name.setText(glossary.name if glossary is not None else "")
@@ -466,18 +576,20 @@ class GlossaryPageController:
             return
         terms = [term for term in terms if search.matches_fields({
             "source": (term.source,), "target": (term.translation,),
-            "variant": term.variants, "memo": (term.memo,),
+            "variant": (*term.variants, *term.target_variants), "memo": (term.memo,),
         })]
         by_id = {g.id: g for g in self.glossaries}
         for term in terms:
             start = len(self.rows)
-            variants = term.variants or ("",)
-            self.rows.extend([term] * len(variants))
+            span = max(1, len(term.variants), len(term.target_variants))
+            self.rows.extend([term] * span)
             self.table.setRowCount(len(self.rows))
-            for offset, variant in enumerate(variants):
+            for offset in range(span):
+                variant = term.variants[offset] if offset < len(term.variants) else ""
+                target_variant = term.target_variants[offset] if offset < len(term.target_variants) else ""
                 for column, text in enumerate((tr("Glossary", term.part_of_speech), term.source,
-                                               term.translation, variant, term.memo)):
-                    if offset and column != 3:
+                                               term.translation, variant, target_variant, term.memo)):
+                    if offset and column not in (3, 4):
                         continue
                     item = QTableWidgetItem(text)
                     item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
@@ -485,9 +597,9 @@ class GlossaryPageController:
                         item.setForeground(self.table.palette().brush(QPalette.ColorRole.PlaceholderText))
                         item.setToolTip(tr("Glossary", "継承元：") + by_id[term.glossary_id].name)
                     self.table.setItem(start + offset, column, item)
-            if len(variants) > 1:
-                for column in (0, 1, 2, 4):
-                    self.table.setSpan(start, column, len(variants), 1)
+            if span > 1:
+                for column in (0, 1, 2, 5):
+                    self.table.setSpan(start, column, span, 1)
         self._resize_rows()
 
     def _resize_rows(self) -> None:
@@ -496,9 +608,9 @@ class GlossaryPageController:
         row = 0
         while row < len(self.rows):
             term = self.rows[row]
-            span = max(1, len(term.variants))
+            span = max(1, len(term.variants), len(term.target_variants))
             required = 0
-            for column in (0, 1, 2, 4):
+            for column in (0, 1, 2, 5):
                 item = self.table.item(row, column)
                 if item is None:
                     continue
@@ -513,7 +625,7 @@ class GlossaryPageController:
                     self.table.setRowHeight(row + offset, self.table.rowHeight(row + offset) + extra)
             row += span
 
-    def _selected_term(self) -> GlossaryTerm | None:
+    def _selected_term(self) -> DirectedTerm | None:
         row = self.table.currentRow()
         return self.rows[row] if 0 <= row < len(self.rows) else None
 
@@ -523,10 +635,10 @@ class GlossaryPageController:
         self.delete_term.setEnabled(term is not None and glossary is not None and term.glossary_id == glossary.id)
         if term is not None:
             start = self.rows.index(term)
-            end = start + max(1, len(term.variants)) - 1
+            end = start + max(1, len(term.variants), len(term.target_variants)) - 1
             with QSignalBlocker(self.table):
                 self.table.clearSelection()
-                self.table.setRangeSelected(QTableWidgetSelectionRange(start, 0, end, 4), True)
+                self.table.setRangeSelected(QTableWidgetSelectionRange(start, 0, end, 5), True)
 
     def _open_term(self, edit: bool) -> None:
         glossary = self._selected_glossary()
@@ -537,10 +649,13 @@ class GlossaryPageController:
             return
         inherited = term is not None and term.glossary_id != glossary.id
         if term is None:
-            term = GlossaryTerm("", glossary.id, str(self.source_language.currentData() or ""),
-                                str(self.target_language.currentData() or ""), PARTS_OF_SPEECH[0], "", "")
+            languages = glossary_chain(self.glossaries, glossary.id)[0].languages
+            if languages is None:
+                return
+            record = GlossaryTerm("", glossary.id, PARTS_OF_SPEECH[0], TermSide(""), TermSide(""))
+            term = orient_term(record, languages, str(self.source_language.currentData()))
         elif inherited:
-            term = replace(term, id="", glossary_id=glossary.id)
+            term = replace(term, term=replace(term.term, id="", glossary_id=glossary.id))
         dialog = GlossaryTermDialog(self.store, term, glossary.name, inherited, self.widget)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._refresh_terms()

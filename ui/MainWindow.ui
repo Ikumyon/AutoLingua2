@@ -1739,6 +1739,19 @@ QTableCornerButton::section {
       </widget>
      </item>
      <item>
+      <widget class="QCheckBox" name="checkAutoReview">
+       <property name="text"><string>翻訳後にAIで校閲する</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="labelReviewModel">
+       <property name="text"><string>校閲モデル：</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="comboReviewModel"/>
+     </item>
+     <item>
       <widget class="QLabel" name="labelToneChoice">
        <property name="text">
         <string>口調：</string>

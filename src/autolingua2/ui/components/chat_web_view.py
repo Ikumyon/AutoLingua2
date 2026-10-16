@@ -154,7 +154,7 @@ class ChatWebView(QWebEngineView):
         labels.update({f"status:{key}": tr("AiChat", value) for key, value in STATUSES.items()})
         labels.update({f"field:{key}": tr("AiChat", value) for key, value in {
             "target_text": translation_source('AiChat', '訳文'), "translation": translation_source('AiChat', '訳文'), "source": translation_source('AiChat', '原文・用語'), "name": translation_source('AiChat', '名称'),
-            "prompt": translation_source('AiChat', '口調'), "review": translation_source('AiChat', 'レビュー'), "rationale": translation_source('AiChat', '採用理由'), "candidates": translation_source('AiChat', '候補'),
+            "prompt": translation_source('AiChat', '口調'), "review": translation_source('AiChat', 'レビュー'), "rationale": translation_source('AiChat', '採用理由'),
             "memo": translation_source('AiChat', 'メモ'), "notes": translation_source('AiChat', '翻訳メモ'), "terms": translation_source('AiChat', '用語候補'), "path": translation_source('AiChat', '保存先'),
         }.items()})
         base_color = palette.color(QPalette.ColorRole.Base)

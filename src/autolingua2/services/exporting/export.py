@@ -38,7 +38,7 @@ def plan_export_translation(workspaces: list[ImportedTranslation], exporter: Tra
             for unit in workspace.project.units
         ]),
     ) for workspace in workspaces]
-    files = exporter.plan(prepared, plugin_settings)
+    files = exporter.plan(workspaces if exporter.exchange else prepared, plugin_settings)
     if not files:
         raise ValueError("出力するファイルがありません。")
     outputs: list[tuple[Path, bytes]] = []

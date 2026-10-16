@@ -18,6 +18,7 @@ class ExportFile:
 class TranslationExporter(Protocol):
     id: str
     name: str
+    exchange: bool  # True preserves records; False receives host-selected output text.
 
     def plan(self, workspaces: list[ImportedTranslation], settings: dict[str, object]) -> list[ExportFile]:
         """Plan all workspaces together, preserving each workspace's output language."""
