@@ -147,6 +147,7 @@ class DropZone(QWidget):
                 self._set_hover(False)
                 return True
             if isinstance(event, (QDragEnterEvent, QDragMoveEvent, QDropEvent)):
+                is_drop = event.type() == QEvent.Type.Drop
                 if not self.isEnabled():
                     self._set_hover(False)
                     event.ignore()
@@ -158,20 +159,20 @@ class DropZone(QWidget):
                 if not self.allow_multiple and len(local_paths) > 1:
                     self._set_hover(False)
                     # Accept the drag without highlighting so the drop can explain the rejection.
-                    if isinstance(event, QDropEvent):
+                    if is_drop:
                         event.ignore()
                         self.multiple_files_rejected.emit()
                     else:
                         event.acceptProposedAction()
                     return True
                 paths = self._filter_paths(local_paths)
-                if isinstance(event, QDropEvent) or not paths:
+                if is_drop or not paths:
                     self._set_hover(False)
                 if not paths:
                     event.ignore()
                     return True
                 event.acceptProposedAction()
-                if isinstance(event, QDropEvent):
+                if is_drop:
                     self.files_dropped.emit(paths)
                 else:
                     self._set_hover(True)

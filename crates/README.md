@@ -1,6 +1,6 @@
 # Rust構成
 
-リポジトリ直下の `Cargo.toml` と `Cargo.lock` で、2つのクレートを管理します。
+リポジトリ直下の `Cargo.toml` と `Cargo.lock` で、4つのクレートを管理します。
 Cargoの成果物はリポジトリ直下の `target/` に出力します。
 
 ## クレート

@@ -1,20 +1,8 @@
-from typing import TypeVar
-
-from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QDialog, QMessageBox, QPushButton, QWidget
 
 from autolingua2.ui.i18n import tr
 from autolingua2.ui.ui_loader import load_ui as load_ui
-
-
-ChildType = TypeVar("ChildType", bound=QObject)
-
-
-def require_child(parent: QObject, child_type: type[ChildType], name: str) -> ChildType:
-    child = parent.findChild(child_type, name)
-    if child is None:
-        raise RuntimeError(f"UI部品が見つかりません: {name} ({child_type.__name__})")
-    return child
+from autolingua2.ui.ui_loader import require_child as require_child
 
 
 class SimpleDialogController:

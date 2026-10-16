@@ -70,7 +70,7 @@ def imported_from_dict(value: object) -> ImportedTranslation:
 
     project = TranslationProject(
         name=string_field(project_data, "name"),
-        icon_path=string_field(project_data, "icon_path"),
+        thumbnail=string_field(project_data, "thumbnail"),
         game_id=string_field(project_data, "game_id"),
         source_language=string_field(project_data, "source_language"),
         source_slot=string_field(project_data, "source_slot"),

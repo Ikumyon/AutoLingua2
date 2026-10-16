@@ -221,20 +221,23 @@ class InitialSetupController(QObject):
         require_child(loaded, QPushButton, "buttonSkip").clicked.connect(self._skip)
         loaded.installEventFilter(self)
         settings = load_ai_settings(self.registry)
-        options = entrance.plugins.ai_setup_options
-        require_child(loaded, QLabel, "labelNoOptions").setVisible(not options)
-        layout = require_child(loaded, QVBoxLayout, "layoutOptions")
+        options = tuple(sorted(entrance.plugins.ai_setup_options, key=lambda o: 0 if o.provider_id == "chatgpt" else 1))
+        options_container = require_child(self.choose_page, QWidget, "optionsContainer")
+        require_child(self.choose_page, QLabel, "labelNoOptions").setVisible(not options)
+        layout = require_child(options_container, QVBoxLayout, "layoutOptions")
         for option in options:
-            radio = QRadioButton(option.title, loaded)
+            radio = QRadioButton(option.title, options_container)
             self._group.addButton(radio)
             layout.addWidget(radio)
             if option.description:
-                description = QLabel(option.description, loaded)
+                description = QLabel(option.description, options_container)
                 description.setWordWrap(True)
                 layout.addWidget(description)
             radio.toggled.connect(lambda checked, item=option: self._choose(item) if checked else None)
             if option.provider_id == settings.provider_id:
                 radio.setChecked(True)
+        if self._group.buttons() and self._group.checkedButton() is None:
+            self._group.buttons()[0].setChecked(True)
         layout.addStretch()
         self.stack.currentChanged.connect(self._navigation)
         self._navigation()

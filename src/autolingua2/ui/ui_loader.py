@@ -3,12 +3,31 @@ from __future__ import annotations
 from importlib import import_module
 from pathlib import PurePosixPath
 import sys
-from typing import Protocol, runtime_checkable
+from typing import Protocol, TypeVar, runtime_checkable
 
 from PySide6.QtCore import QEvent, QFile, QIODeviceBase, QObject
 from PySide6.QtWidgets import QWidget
 
 from autolingua2.infrastructure.filesystem import UI_DIR
+
+
+ChildType = TypeVar("ChildType", bound=QObject)
+
+
+def require_child(parent: QObject, child_type: type[ChildType], name: str) -> ChildType:
+    child = parent.findChild(child_type, name)
+    if child is None:
+        raise RuntimeError(f"UI部品が見つかりません: {name} ({child_type.__name__})")
+    return child
+
+
+def _initialize_search_bars(widget: QWidget) -> None:
+    from autolingua2.ui.components.search_bar import SearchBar
+
+    if isinstance(widget, SearchBar):
+        widget.initialize_ui()
+    for search_bar in widget.findChildren(SearchBar):
+        search_bar.initialize_ui()
 
 
 @runtime_checkable
@@ -54,6 +73,7 @@ def load_ui(name: str, parent: QWidget | None = None) -> QWidget:
         widget = root_class(parent)
         form.setupUi(widget)
         _FormBinding(widget, form)
+        _initialize_search_bars(widget)
         return widget
 
     # カスタム部品もこの窓口を利用するため、開発用の登録は読み込み時に行う。
@@ -63,6 +83,8 @@ def load_ui(name: str, parent: QWidget | None = None) -> QWidget:
     from autolingua2.ui.components.chat_web_view import ChatWebView
     from autolingua2.ui.components.combo_menu_button import ComboMenuButton
     from autolingua2.ui.components.drop_zone import DropZone
+    from autolingua2.ui.components.script_editor import ScriptEditor
+    from autolingua2.ui.components.search_bar import SearchBar
 
     path = UI_DIR.joinpath(*relative.parts)
     file = QFile(str(path))
@@ -70,7 +92,7 @@ def load_ui(name: str, parent: QWidget | None = None) -> QWidget:
         raise RuntimeError(f"UIファイルを開けません: {path}")
     try:
         loader = QUiLoader()
-        for custom_widget in (ComboMenuButton, ChatComposer, ChatReferenceTable, ChatWebView, DropZone):
+        for custom_widget in (ComboMenuButton, ChatComposer, ChatReferenceTable, ChatWebView, DropZone, ScriptEditor, SearchBar):
             loader.registerCustomWidget(custom_widget)
         loader.setLanguageChangeEnabled(True)
         widget = loader.load(file, parent)
@@ -78,4 +100,5 @@ def load_ui(name: str, parent: QWidget | None = None) -> QWidget:
         file.close()
     if widget is None:
         raise RuntimeError(f"UIファイルを読み込めません: {path}")
+    _initialize_search_bars(widget)
     return widget

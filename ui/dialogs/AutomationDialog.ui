@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AutomationDialog</class>
+ <widget class="QDialog" name="AutomationDialog">
+  <property name="windowTitle"><string>自動化スクリプト</string></property>
+  <property name="minimumSize"><size><width>760</width><height>560</height></size></property>
+  <layout class="QVBoxLayout" name="layoutMain">
+   <item><layout class="QHBoxLayout" name="layoutFiles">
+    <item><widget class="QPushButton" name="buttonNew"><property name="text"><string>新規</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonOpen"><property name="text"><string>開く</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonSave"><property name="text"><string>保存</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonSaveAs"><property name="text"><string>名前を付けて保存</string></property></widget></item>
+   </layout></item>
+   <item><widget class="QLabel" name="labelFile"><property name="text"><string>未保存</string></property><property name="textFormat"><enum>Qt::PlainText</enum></property></widget></item>
+   <item><layout class="QHBoxLayout" name="layoutSearch">
+    <property name="spacing"><number>6</number></property>
+    <item><widget class="SearchBar" name="searchBar">
+     <property name="placeholderText" stdset="0"><string>スクリプト本文を検索</string></property>
+    </widget></item>
+    <item><widget class="QPushButton" name="buttonSearchPrevious"><property name="text"><string/></property><property name="accessibleName"><string>前の一致箇所</string></property><property name="toolTip"><string>前の一致箇所</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonSearchNext"><property name="text"><string/></property><property name="accessibleName"><string>次の一致箇所</string></property><property name="toolTip"><string>次の一致箇所</string></property></widget></item>
+   </layout></item>
+   <item><widget class="QWidget" name="replacePanel"><layout class="QHBoxLayout" name="layoutReplace">
+    <property name="leftMargin"><number>0</number></property>
+    <property name="topMargin"><number>0</number></property>
+    <property name="rightMargin"><number>0</number></property>
+    <property name="bottomMargin"><number>0</number></property>
+    <item><widget class="QLineEdit" name="editReplace"><property name="placeholderText"><string>置換後の文字列</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonReplace"><property name="text"><string>置換</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonReplaceAll"><property name="text"><string>すべて置換</string></property></widget></item>
+   </layout></widget></item>
+   <item><widget class="QLabel" name="labelSearchResult"><property name="text"><string>検索文字列を入力してください</string></property><property name="textFormat"><enum>Qt::PlainText</enum></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="ScriptEditor" name="editScript"><property name="lineWrapMode"><enum>QPlainTextEdit::NoWrap</enum></property></widget></item>
+   <item><widget class="QLabel" name="labelState"><property name="text"><string>待機中</string></property><property name="textFormat"><enum>Qt::PlainText</enum></property></widget></item>
+   <item><widget class="QPlainTextEdit" name="editLog"><property name="readOnly"><bool>true</bool></property><property name="maximumHeight"><number>130</number></property></widget></item>
+   <item><layout class="QHBoxLayout" name="layoutActions">
+    <item><widget class="QPushButton" name="buttonStart"><property name="text"><string>開始</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonStop"><property name="text"><string>停止</string></property><property name="enabled"><bool>false</bool></property></widget></item>
+    <item><spacer name="spacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item>
+    <item><widget class="QLabel" name="labelCursorPosition"><property name="text"><string>行 1 / 全1行・列 1</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonClose"><property name="text"><string>閉じる</string></property></widget></item>
+   </layout></item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>SearchBar</class>
+   <extends>QWidget</extends>
+   <header>autolingua2.ui.components.search_bar</header>
+  </customwidget>
+  <customwidget>
+   <class>ScriptEditor</class>
+   <extends>QPlainTextEdit</extends>
+   <header>autolingua2.ui.components.script_editor</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

@@ -11,7 +11,7 @@ import sys
 from typing import Callable
 
 from PySide6.QtCore import QByteArray, QEasingCurve, QEvent, QModelIndex, QObject, QPoint, QPropertyAnimation, QSize, Qt, QSignalBlocker, QTimer, QLocale, QItemSelection, QItemSelectionModel
-from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QContextMenuEvent, QIcon, QMouseEvent, QSyntaxHighlighter
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QContextMenuEvent, QIcon, QMouseEvent, QPixmap, QSyntaxHighlighter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QSizePolicy,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -52,11 +53,13 @@ from PySide6.QtWidgets import (
 from autolingua2.ui.page_scrubber import RangeScrubberWidget
 
 from autolingua2.adapters.base import EmbeddedTranslationAdapter, FileAdapter
-from autolingua2.services.project_io import detect_inherited_language
+from autolingua2.services.project_io import detect_inherited_language, read_project_thumbnail
 from autolingua2.services.language_tags import qt_language_options
 from autolingua2.ir.imported import ImportedTranslation
 from autolingua2.ui.creation_contract import CreationActions, CreationAdapter
 from autolingua2.ui.creation_panel import CommonCreationAdapter
+from autolingua2.ui.components.searchable_combo_box import enable_combo_search
+from autolingua2.ui.components.search_bar import SearchBar
 from autolingua2.extensions import ExtensionEntrance
 from autolingua2.infrastructure.filesystem import PROJECT_ROOT
 from autolingua2.infrastructure.platform import current_platform, log_directory
@@ -72,6 +75,7 @@ from autolingua2.ir.tone import DEFAULT_TONE_ID, ConditionalTone, Tone, ToneItem
 from autolingua2.ir.glossary import Glossary, glossary_chain
 from autolingua2.ui.dialogs.glossary import STORAGE_ERRORS
 from autolingua2.ui.dialogs.workspace_language import WorkspaceLanguageDialog
+from autolingua2.ui.dialogs.automation import AutomationDialogController
 from autolingua2.services.ai_network import AiNetworkClient
 from autolingua2.services.ai_chat import ChatFile, ChatReference
 from autolingua2.services.application_operations import ApplicationOperations
@@ -221,6 +225,7 @@ class MainWindowController(QObject):
         self.platform = platform_driver
         self.entrance = entrance
         self._initial_setup_dialog: QDialog | None = None
+        self._settings_dialog: SettingsDialogController | None = None
         self.plugins = entrance.plugins
         self._known_plugin_errors = len(self.plugins.errors)
         self.io_worker: OperationWorker | None = None
@@ -258,6 +263,8 @@ class MainWindowController(QObject):
         self.status_count_label: QLabel | None = None
 
         self.selected_icon_path: Path | None = None
+        self._selected_thumbnail = ""
+        self._project_icon_pixmap: QPixmap | None = None
         self._project_icon_is_manual = False
         self.target_paths: list[Path] = []
         self.target_item_widgets: dict[Path, tuple[QLabel, QListWidgetItem]] = {}
@@ -339,6 +346,20 @@ class MainWindowController(QObject):
         self.plugins.on_display_changed(self._on_plugin_display_changed)
         self._configure_text_presentation()
         self._connect_actions()
+        from autolingua2.ui.shortcuts import ShortcutManager
+        app = QApplication.instance()
+        if not isinstance(app, QApplication):
+            raise RuntimeError("QApplication is not running")
+        self.shortcuts = ShortcutManager(app)
+        save_menu = self.button_save_split.menu()
+        if save_menu is None:
+            raise RuntimeError("保存メニューがありません")
+        self.shortcuts.register_main_window(self.window, self.page_focus, save_menu)
+        self.shortcuts.edit_requested.connect(self._open_shortcut_settings)
+        self.shortcuts.load()
+        if self.shortcuts.errors:
+            QTimer.singleShot(0, lambda: QMessageBox.warning(
+                self.window, tr("MainWindow", "ショートカット設定"), "\n".join(self.shortcuts.errors)))
         self._set_initial_state()
         self.window.installEventFilter(self)
         language_events().changed.connect(self._on_ui_language_changed)
@@ -408,6 +429,7 @@ class MainWindowController(QObject):
             else:
                 self._save_window_layout()
             self.plugins.remove_display_listener(self._on_plugin_display_changed)
+            self.automation_dialog.shutdown()
             self.chat_dock.close()
             self.mcp_server.close()
             self.mcp_client.close()
@@ -446,6 +468,16 @@ class MainWindowController(QObject):
         if watched is getattr(self, "frame_segment_mode", None):
             if event.type() in {QEvent.Type.Resize, QEvent.Type.Show}:
                 self._sync_segment_indicator_pos(animate=False)
+        if watched is getattr(self, "frame_icon_drop", None):
+            if event.type() in {QEvent.Type.Enter, QEvent.Type.Leave, QEvent.Type.Resize, QEvent.Type.Show}:
+                if event.type() in {QEvent.Type.Resize, QEvent.Type.Show}:
+                    side = self.frame_icon_drop.width()
+                    if self.frame_icon_drop.height() != side:
+                        self.frame_icon_drop.setFixedHeight(side)
+                self._sync_project_icon_actions()
+        if watched is getattr(self, "label_icon_preview", None):
+            if event.type() in {QEvent.Type.Resize, QEvent.Type.Show}:
+                self._resize_project_icon_preview()
         return False
 
     def _drop_inherited_paths(self, paths: list[Path]) -> None:
@@ -471,6 +503,8 @@ class MainWindowController(QObject):
     def _refresh_drop_actions(self) -> None:
         self.button_browse_icon.setText(tr("MainWindow", "選択..."))
         self.button_browse_icon.setToolTip(tr("MainWindow", "アイコン画像ファイルを選択"))
+        self.button_edit_icon.setIcon(self.icon_manager.get_icon("pencil"))
+        self.button_edit_icon.setToolTip(tr("MainWindow", "アイコン画像ファイルを選択"))
         self.button_clear_icon.setText("✕")
         self.button_clear_icon.setToolTip(tr("MainWindow", "アイコンを解除"))
         self.button_inherit_folder.setText(tr("MainWindow", "フォルダ追加"))
@@ -482,16 +516,18 @@ class MainWindowController(QObject):
         self.table = require_child(self.window, QTableWidget, "tableTranslations")
         self.list_focus_units = require_child(self.window, QListWidget, "listFocusUnits")
         self.list_focus_units.setIconSize(QSize(16, 16))
-        self.search = require_child(self.window, QLineEdit, "editSearch")
-        self.search_case = require_child(self.window, QToolButton, "buttonSearchCase")
-        self.search_word = require_child(self.window, QToolButton, "buttonSearchWord")
-        self.search_regex = require_child(self.window, QToolButton, "buttonSearchRegex")
-        self.button_toggle_replace = require_child(self.window, QToolButton, "buttonToggleReplace")
-        self.replace_panel = require_child(self.window, QWidget, "replacePanel")
-        self.replace_panel.hide()
+        self.search_bar = require_child(self.window, SearchBar, "searchBar")
+        self.search_bar.set_icons(self.icon_manager.get_icon)
+        self.search = self.search_bar.editor
+        self.search_case = self.search_bar.case_button
+        self.search_word = self.search_bar.word_button
+        self.search_regex = self.search_bar.regex_button
+        self.search_bar.bind_replace_panel(require_child(self.window, QWidget, "replacePanel"))
         self.replace_text = require_child(self.window, QLineEdit, "editReplace")
         self.button_replace = require_child(self.window, QPushButton, "buttonReplace")
         self.button_replace_all = require_child(self.window, QPushButton, "buttonReplaceAll")
+        self.button_replace.setIcon(self.icon_manager.get_icon("replace"))
+        self.button_replace_all.setIcon(self.icon_manager.get_icon("replace-all"))
         self.label_search_result = require_child(self.window, QLabel, "labelSearchResult")
         self._text_search = TextSearch("")
         self._search_error = ""
@@ -705,11 +741,38 @@ class MainWindowController(QObject):
         self.frame_icon_drop.auto_file_dialog = False
         self.frame_icon_drop.set_hint_text("")
         self.frame_icon_drop.set_content_widget(self.label_icon_preview)
+        icon_frame = self.frame_icon_drop.frame_drop_zone
+        icon_frame.setStyleSheet(
+            icon_frame.styleSheet()
+            + '\nQFrame#frameDropZone[hasIcon="true"] { border: none; }'
+        )
         self.button_browse_icon = self.frame_icon_drop.add_button("", self._browse_project_icon)
-        self.button_clear_icon = self.frame_icon_drop.add_button("", self.clear_project_icon)
         self.button_browse_icon.setObjectName("buttonBrowseIcon")
+        require_child(self.frame_icon_drop.header, QHBoxLayout, "layoutDropInner").addStretch()
+        self.icon_hover_actions = QWidget(self.frame_icon_drop)
+        icon_actions_layout = QHBoxLayout(self.icon_hover_actions)
+        icon_actions_layout.setContentsMargins(0, 0, 0, 0)
+        icon_actions_layout.setSpacing(4)
+        self.button_edit_icon = QToolButton(self.icon_hover_actions)
+        self.button_edit_icon.setObjectName("buttonEditIcon")
+        self.button_edit_icon.clicked.connect(self._browse_project_icon)
+        self.button_clear_icon = QToolButton(self.icon_hover_actions)
         self.button_clear_icon.setObjectName("buttonClearIcon")
-        self.button_clear_icon.setMaximumSize(24, 24)
+        self.button_clear_icon.clicked.connect(self.clear_project_icon)
+        for button in (self.button_edit_icon, self.button_clear_icon):
+            button.setFixedSize(28, 28)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setStyleSheet(
+                "QToolButton { border: 1px solid palette(mid); border-radius: 14px;"
+                " background-color: palette(button); color: palette(button-text); padding: 0px; }"
+                "QToolButton:hover { background-color: palette(midlight); }"
+            )
+            icon_actions_layout.addWidget(button)
+        self.icon_hover_actions.adjustSize()
+        self.icon_hover_actions.hide()
+        self.frame_icon_drop.installEventFilter(self)
+        self.label_icon_preview.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.label_icon_preview.installEventFilter(self)
         self.edit_icon_path = require_child(self.window, QLineEdit, "editIconPath")
         self.edit_project_name = require_child(self.window, QLineEdit, "editProjectName")
         self.combo_game = require_child(self.window, QComboBox, "comboGame")
@@ -719,6 +782,10 @@ class MainWindowController(QObject):
             self.combo_source_language.addItem(f"{name} ({code})", code)
         source_index = self.combo_source_language.findData("en-US")
         self.combo_source_language.setCurrentIndex(max(0, source_index))
+        enable_combo_search(self.combo_source_language)
+        source_editor = self.combo_source_language.lineEdit()
+        if source_editor is not None:
+            source_editor.setPlaceholderText(tr("MainWindow", "言語名・コードで検索"))
         self.combo_target_slot = require_child(self.window, QComboBox, "comboTargetSlot")
         self.combo_target_language = require_child(self.window, QComboBox, "comboTargetLanguage")
         self.button_add_language = require_child(self.window, QPushButton, "buttonAddLanguage")
@@ -747,6 +814,10 @@ class MainWindowController(QObject):
         for code, name in qt_language_options():
             self.combo_inherit_language.addItem(f"{name} ({code})", code)
         self.combo_inherit_language.currentIndexChanged.connect(self._on_inherited_language_changed)
+        enable_combo_search(self.combo_inherit_language)
+        inherit_editor = self.combo_inherit_language.lineEdit()
+        if inherit_editor is not None:
+            inherit_editor.setPlaceholderText(tr("MainWindow", "言語名・コードで検索"))
         self._init_inherited_state_choices()
 
         self.button_create_project = require_child(self.window, QPushButton, "buttonCreateProject")
@@ -761,17 +832,19 @@ class MainWindowController(QObject):
 
     def _connect_actions(self) -> None:
         file_menu = require_child(self.window, QMenu, "menuFile")
-        for title, callback in (
-            (translation_source('MainWindow', "プロジェクトを開く…"), self.open_project),
-            ("プロジェクトを保存", self.save_project),
-            (translation_source('MainWindow', "プロジェクトを別名で保存…"), self.save_project_as),
-            (translation_source('MainWindow', "翻訳元の更新を確認…"), self.check_source_updates),
+        for command_id, title, callback in (
+            ("actionOpenProject", translation_source('MainWindow', "プロジェクトを開く…"), self.open_project),
+            ("actionSaveProject", "プロジェクトを保存", self.save_project),
+            ("actionSaveProjectAs", translation_source('MainWindow', "プロジェクトを別名で保存…"), self.save_project_as),
+            ("actionCheckSourceUpdates", translation_source('MainWindow', "翻訳元の更新を確認…"), self.check_source_updates),
         ):
             action = QAction(tr("MainWindow", title), self.window)
+            action.setObjectName(command_id)
             action.triggered.connect(callback)
             file_menu.insertAction(self.action_new_project, action)
         file_menu.insertSeparator(self.action_new_project)
         export_action = QAction(tr("MainWindow", "訳文を出力…"), self.window)
+        export_action.setObjectName("actionExportTranslation")
         export_action.triggered.connect(self.save_translation)
         file_menu.insertAction(self.action_exit, export_action)
         self.action_new_project.triggered.connect(self.show_new_project_page)
@@ -793,12 +866,18 @@ class MainWindowController(QObject):
         self.combo_glossary.currentIndexChanged.connect(self._on_glossary_changed)
         self.button_manage_glossary.clicked.connect(lambda: self.open_settings("glossary"))
         self.action_glossary = QAction(tr("MainWindow", "用語集…"), self.window)
+        self.action_glossary.setObjectName("actionGlossary")
         self.action_glossary.triggered.connect(lambda: self.open_settings("glossary"))
         glossary_menu = require_child(self.window, QMenu, "menuTranslate")
         glossary_menu.addSeparator()
         glossary_menu.addAction(self.action_glossary)
         self.action_problems.triggered.connect(self.open_problems_dialog)
         self.action_about.triggered.connect(lambda: SimpleDialogController("dialogs/AboutDialog.ui", self.window).exec())
+        self.automation_dialog = AutomationDialogController(self.window, self.icon_manager.get_icon)
+        automation_action = QAction(tr("MainWindow", "自動化スクリプト…"), self.window)
+        automation_action.setObjectName("actionAutomation")
+        automation_action.triggered.connect(self.automation_dialog.show)
+        glossary_menu.addAction(automation_action)
 
         self.action_list_mode.triggered.connect(self.show_list_mode)
         self.action_dashboard_mode.triggered.connect(self.show_dashboard_mode)
@@ -838,7 +917,6 @@ class MainWindowController(QObject):
         self.search.textChanged.connect(self.apply_filters)
         for button in (self.search_case, self.search_word, self.search_regex):
             button.toggled.connect(self.apply_filters)
-        self.button_toggle_replace.toggled.connect(self._toggle_replace)
         self.button_replace.clicked.connect(lambda: self._replace_matches(all_matches=False))
         self.button_replace_all.clicked.connect(lambda: self._replace_matches(all_matches=True))
         self.status_filter.currentTextChanged.connect(self.apply_filters)
@@ -871,11 +949,14 @@ class MainWindowController(QObject):
         is_debug = "--debug" in sys.argv
         restart_label = tr("MainWindow", "通常モードで再起動") if is_debug else tr("MainWindow", "デバッグモードで再起動")
         action_restart = help_menu.addAction(restart_label)
+        action_restart.setObjectName("actionRestartMode")
         action_restart.triggered.connect(self._restart_application_mode)
 
         action_open_plugins = help_menu.addAction(tr("MainWindow", "プラグインフォルダを開く"))
+        action_open_plugins.setObjectName("actionOpenPluginsFolder")
         action_open_plugins.triggered.connect(lambda: self._open_folder(PROJECT_ROOT / "plugins"))
         action_logs = help_menu.addAction(tr("MainWindow", "ログフォルダを開く"))
+        action_logs.setObjectName("actionOpenLogsFolder")
         action_logs.triggered.connect(lambda: self._open_folder(log_directory()))
 
     def _open_update_dialog(self, initial_data: dict | None = None) -> None:
@@ -1203,6 +1284,12 @@ class MainWindowController(QObject):
             set_status(message)
 
     def open_settings(self, initial_category: str | None = None) -> None:
+        if self._settings_dialog is not None:
+            if initial_category is not None:
+                self._settings_dialog.select_category(initial_category)
+            self._settings_dialog.dialog.raise_()
+            self._settings_dialog.dialog.activateWindow()
+            return
         controller = SettingsDialogController(
             self.entrance, self.window, self.ai_settings.provider_id,
             self.ai_settings.models, self.ai_settings.selected_models, self.ai_settings.api_keys, self.ai_settings.concurrency,
@@ -1220,9 +1307,15 @@ class MainWindowController(QObject):
         controller.watch_page.update_requested.connect(self.request_source_update)
         if initial_category is not None:
             controller.select_category(initial_category)
+            if initial_category == "shortcuts":
+                controller.shortcut_page.select_command(getattr(self, "_pending_shortcut_command", ""))
             if initial_category == "source_watch" and self.project.source_root:
                 controller.watch_page.select_project(str(Path(self.project.source_root).resolve()))
-        controller.exec()
+        self._settings_dialog = controller
+        try:
+            controller.exec()
+        finally:
+            self._settings_dialog = None
 
         self._refresh_glossary_choices()
         self._refresh_tone_choices()
@@ -1232,6 +1325,19 @@ class MainWindowController(QObject):
         from autolingua2.services.settings_store import initial_setup_seen
         if not initial_setup_seen():
             self.open_initial_setup()
+
+    def _open_shortcut_settings(self, command_id: str) -> None:
+        if self._settings_dialog is not None:
+            self._settings_dialog.select_category("shortcuts")
+            self._settings_dialog.shortcut_page.select_command(command_id)
+            self._settings_dialog.dialog.raise_()
+            self._settings_dialog.dialog.activateWindow()
+            return
+        self._pending_shortcut_command = command_id
+        try:
+            self.open_settings("shortcuts")
+        finally:
+            self._pending_shortcut_command = ""
 
     def open_initial_setup(self) -> None:
         from .dialogs.initial_setup import InitialSetupController
@@ -1263,6 +1369,10 @@ class MainWindowController(QObject):
         _, icon_theme = load_theme_settings()
         self.icon_manager.set_current_iconset(icon_theme)
         self.chat_dock.refresh_icons()
+        self.search_bar.set_icons(self.icon_manager.get_icon)
+        self.button_replace.setIcon(self.icon_manager.get_icon("replace"))
+        self.button_replace_all.setIcon(self.icon_manager.get_icon("replace-all"))
+        self.automation_dialog.refresh_icons()
         self._refresh_drop_actions()
         self.chat_dock.refresh_voice_input()
         self._configure_mcp()
@@ -1650,13 +1760,51 @@ class MainWindowController(QObject):
         if pixmap.isNull():
             QMessageBox.warning(self.window, tr("MainWindow", "エラー"), tr("MainWindow", "有効な画像ファイルではありません。"))
             return False
+        try:
+            thumbnail = read_project_thumbnail(path)
+        except OSError as exc:
+            QMessageBox.warning(self.window, tr("MainWindow", "エラー"), str(exc))
+            return False
         self.selected_icon_path = path.resolve()
+        self._selected_thumbnail = thumbnail
         self._project_icon_is_manual = manual
-        scaled = pixmap.scaled(90, 90, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-        self.label_icon_preview.setPixmap(scaled)
+        self._project_icon_pixmap = pixmap
+        self._resize_project_icon_preview()
         self.edit_icon_path.setText(path.name)
         self.edit_icon_path.setToolTip(str(self.selected_icon_path))
+        self._sync_project_icon_actions()
         return True
+
+    def _resize_project_icon_preview(self) -> None:
+        pixmap = self._project_icon_pixmap
+        if pixmap is None:
+            return
+        size = self.label_icon_preview.contentsRect().size()
+        if size.isEmpty():
+            return
+        self.label_icon_preview.setPixmap(pixmap.scaled(
+            size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
+        ))
+
+    def _sync_project_icon_actions(self) -> None:
+        has_icon = self.selected_icon_path is not None
+        frame = self.frame_icon_drop.frame_drop_zone
+        if frame.property("hasIcon") != has_icon:
+            frame.setProperty("hasIcon", has_icon)
+            style = frame.style()
+            if style is not None:
+                style.unpolish(frame)
+                style.polish(frame)
+            frame.update()
+        self.button_browse_icon.setVisible(not has_icon)
+        self.frame_icon_drop.header.setVisible(not has_icon)
+        actions = self.icon_hover_actions
+        actions.move(
+            max(0, self.frame_icon_drop.width() - actions.width() - 8),
+            max(0, self.frame_icon_drop.height() - actions.height() - 8),
+        )
+        actions.setVisible(has_icon and self.frame_icon_drop.underMouse())
+        actions.raise_()
 
     def _browse_project_icon(self) -> None:
         file_filter = tr("MainWindow", "画像ファイル (*.png *.jpg *.jpeg *.webp *.ico *.bmp);;すべてのファイル (*.*)")
@@ -1666,11 +1814,14 @@ class MainWindowController(QObject):
 
     def clear_project_icon(self) -> None:
         self.selected_icon_path = None
+        self._selected_thumbnail = ""
+        self._project_icon_pixmap = None
         self._project_icon_is_manual = False
         self.label_icon_preview.clear()
-        self.label_icon_preview.setText(tr("MainWindow", "アイコン画像\nDnD / 選択"))
+        self.label_icon_preview.setText(tr("MainWindow", "アイコン画像\n未設定"))
         self.edit_icon_path.clear()
         self.edit_icon_path.setToolTip("")
+        self._sync_project_icon_actions()
 
     def _update_path_label(self, path: Path, lbl: QLabel) -> None:
         current_src = str(self.combo_source_slot.currentData() or "")
@@ -1925,7 +2076,7 @@ class MainWindowController(QObject):
             return
         self._import_metadata = dict(
             name=self.edit_project_name.text().strip() or "Untitled",
-            icon_path=str(self.selected_icon_path or ""),
+            thumbnail=self._selected_thumbnail,
             game_id=game.id,
             target_language="",
         )
@@ -2292,10 +2443,6 @@ class MainWindowController(QObject):
 
     def refresh_all(self) -> None:
         self.apply_filters()
-
-    def _toggle_replace(self, visible: bool) -> None:
-        self.replace_panel.setVisible(visible)
-        self.button_toggle_replace.setText("▼" if visible else "▶")
 
     def _replace_matches(self, *, all_matches: bool) -> None:
         workspace = self.active_workspace

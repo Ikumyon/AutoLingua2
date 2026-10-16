@@ -24,6 +24,7 @@ from .settings_general import GeneralSettingsPageController
 from .settings_tone import TonePageController
 from .source_watch import WatchPageController
 from .settings_mcp import McpSettingsPage
+from .settings_shortcuts import ShortcutSettingsPage
 from autolingua2.services.mcp_server import McpServer
 
 
@@ -59,6 +60,10 @@ class SettingsDialogController(SimpleDialogController):
         self._category_items: dict[str, QTreeWidgetItem] = {}
 
         self._mount_pages()
+        self.shortcut_page = ShortcutSettingsPage(self._stack)
+        self._stack.addWidget(self.shortcut_page.widget)
+        self._add_category("shortcuts", tr("SettingsDialog", "ショートカットキー"),
+                           self.shortcut_page.widget, self._category_items["application"])
         self.mcp_page = McpSettingsPage(mcp_server, self._stack)
         self._stack.addWidget(self.mcp_page)
         self._add_category("mcp", tr("SettingsDialog", "MCP"), self.mcp_page, self._category_items["application"])
@@ -249,6 +254,11 @@ class SettingsDialogController(SimpleDialogController):
                 self.select_category("filter_rules")
                 self._save_aborted()
                 return
+            self._saving_category = "shortcuts"
+            if not self.shortcut_page.validate():
+                self.select_category("shortcuts")
+                self._save_aborted()
+                return
             self._saving_category = "ai"
             self.ai_page.validate_for_save()
         except Exception as error:
@@ -287,6 +297,8 @@ class SettingsDialogController(SimpleDialogController):
             for provider, widget in self._plugin_settings_widgets:
                 self._saving_category = provider.id
                 provider.save_settings(widget)
+            self._saving_category = "shortcuts"
+            self.shortcut_page.save()
             self._saving_category = "application"
             if self._on_saved is not None:
                 self._on_saved(self)

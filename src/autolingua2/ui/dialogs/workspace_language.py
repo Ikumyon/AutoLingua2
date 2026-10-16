@@ -44,6 +44,7 @@ class WorkspaceLanguageDialog(SimpleDialogController):
             self.table.setItem(row, 1, QTableWidgetItem(language.code))
             added = language.code in self.service.workspaces
             button = QPushButton(tr("WorkspaceLanguageDialog", translation_source('WorkspaceLanguageDialog', '追加済み · 削除') if added else translation_source('WorkspaceLanguageDialog', '追加')))
+            button.setObjectName("buttonRemove" if added else "buttonAdd")
             button.clicked.connect(lambda checked=False, code=language.code: self.toggle(code))
             self.table.setCellWidget(row, 2, button)
 

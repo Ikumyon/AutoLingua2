@@ -230,11 +230,13 @@ class FocusEditorController(QObject):
 
         action_save_next = QAction(self.host.icon_manager.get_icon("save"), tr("MainWindow", "保存して次へ (人間による翻訳)"), self.host.window)
         action_save_next.setShortcut("Ctrl+Return")
+        action_save_next.setObjectName("focus.save_next")
         action_save_next.triggered.connect(self.save_and_next)
         menu.addAction(action_save_next)
 
         action_save_stay = QAction(self.host.icon_manager.get_icon("file"), tr("MainWindow", "保存 (留まる)"), self.host.window)
         action_save_stay.setShortcut("Ctrl+S")
+        action_save_stay.setObjectName("focus.save_stay")
         action_save_stay.triggered.connect(self.save_stay)
         menu.addAction(action_save_stay)
 
@@ -242,36 +244,44 @@ class FocusEditorController(QObject):
 
         action_human_trans = QAction(self.host.icon_manager.get_icon("person-edit-32"), tr("MainWindow", "人間による翻訳として保存"), self.host.window)
         action_human_trans.triggered.connect(lambda: self.save_with_state(UnitState.HUMAN_TRANSLATED))
+        action_human_trans.setObjectName("focus.human_translated")
         menu.addAction(action_human_trans)
 
         action_human_rev = QAction(self.host.icon_manager.get_icon("person-check"), tr("MainWindow", "人間による校閲として保存"), self.host.window)
         action_human_rev.triggered.connect(lambda: self.save_with_state(UnitState.HUMAN_REVIEWED))
+        action_human_rev.setObjectName("focus.human_reviewed")
         menu.addAction(action_human_rev)
 
         action_ai_trans = QAction(self.host.icon_manager.get_icon("robot-edit"), tr("MainWindow", "AIによる翻訳として保存"), self.host.window)
         action_ai_trans.triggered.connect(lambda: self.save_with_state(UnitState.AI_TRANSLATED))
+        action_ai_trans.setObjectName("focus.ai_translated")
         menu.addAction(action_ai_trans)
 
         action_ai_rev = QAction(self.host.icon_manager.get_icon("robot-check"), tr("MainWindow", "AIによる校閲として保存"), self.host.window)
         action_ai_rev.triggered.connect(lambda: self.save_with_state(UnitState.AI_REVIEWED))
+        action_ai_rev.setObjectName("focus.ai_reviewed")
         menu.addAction(action_ai_rev)
 
         action_doubtful = QAction(self.host.icon_manager.get_icon("question"), tr("MainWindow", "疑問ありとして保存"), self.host.window)
         action_doubtful.triggered.connect(lambda: self.save_with_state(UnitState.DOUBTFUL))
+        action_doubtful.setObjectName("focus.doubtful")
         menu.addAction(action_doubtful)
 
         action_locked = QAction(self.host.icon_manager.get_icon("lock"), tr("MainWindow", "ロックとして保存"), self.host.window)
         action_locked.triggered.connect(self.save_as_locked)
+        action_locked.setObjectName("focus.locked")
         menu.addAction(action_locked)
 
         action_hidden = QAction(self.host.icon_manager.get_icon("eye-slash"), tr("MainWindow", "非表示として保存"), self.host.window)
         action_hidden.triggered.connect(self.save_as_hidden)
+        action_hidden.setObjectName("focus.hidden")
         menu.addAction(action_hidden)
 
         menu.addSeparator()
 
         action_untranslated = QAction(self.host.icon_manager.get_icon("brush-cleaning"), tr("MainWindow", "未翻訳に戻す"), self.host.window)
         action_untranslated.triggered.connect(self.save_as_untranslated)
+        action_untranslated.setObjectName("focus.untranslated")
         menu.addAction(action_untranslated)
 
         self.host.button_save_split.setMenu(menu)

@@ -12,7 +12,7 @@ from autolingua2.extensions import ExtensionEntrance
 from autolingua2.services.language_tags import normalize_language, qt_language_options, system_language
 from autolingua2.services.settings_store import load_ai_settings, load_ui_language, save_ui_language
 from autolingua2.services.ui_translation import UiTranslationService, coverage, export_ts
-from autolingua2.ui.components.searchable_combo_box import enable_combo_search
+from autolingua2.ui.components.searchable_combo_box import ComboAction, enable_combo_search
 from autolingua2.ui.i18n import tr
 from .base import load_ui, require_child
 
@@ -51,8 +51,9 @@ class SelfTranslationController(QObject):
             self.target.addItem(f"{name} [{tag}]", tag)
         enable_combo_search(
             self.target,
-            action_text=tr("SelfTranslation", "＋一覧にない言語を指定…"),
-            on_action=self._open_custom,
+            action=ComboAction(
+                tr("SelfTranslation", "＋一覧にない言語を指定…"), self._open_custom, position="bottom",
+            ),
         )
         os_tag = system_language()
         self.custom_button.setChecked(self.target.findData(os_tag) < 0)

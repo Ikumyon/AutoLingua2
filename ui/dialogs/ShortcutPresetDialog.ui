@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ShortcutPresetDialog</class>
+ <widget class="QDialog" name="ShortcutPresetDialog">
+  <property name="windowTitle"><string>新規ショートカットセット</string></property>
+  <property name="minimumSize"><size><width>440</width><height>0</height></size></property>
+  <layout class="QVBoxLayout" name="layoutRoot">
+   <item><layout class="QFormLayout" name="formMetadata">
+    <item row="0" column="0"><widget class="QLabel" name="labelName"><property name="text"><string>名前</string></property></widget></item>
+    <item row="0" column="1"><widget class="QLineEdit" name="editName"/></item>
+    <item row="1" column="0"><widget class="QLabel" name="labelDescription"><property name="text"><string>説明</string></property></widget></item>
+    <item row="1" column="1"><widget class="QLineEdit" name="editDescription"/></item>
+    <item row="2" column="0"><widget class="QLabel" name="labelAuthor"><property name="text"><string>作者</string></property></widget></item>
+    <item row="2" column="1"><widget class="QLineEdit" name="editAuthor"><property name="text"><string>User</string></property></widget></item>
+    <item row="3" column="0"><widget class="QLabel" name="labelTags"><property name="text"><string>タグ（カンマ区切り）</string></property></widget></item>
+    <item row="3" column="1"><widget class="QLineEdit" name="editTags"/></item>
+   </layout></item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection><sender>buttonBox</sender><signal>accepted()</signal><receiver>ShortcutPresetDialog</receiver><slot>accept()</slot></connection>
+  <connection><sender>buttonBox</sender><signal>rejected()</signal><receiver>ShortcutPresetDialog</receiver><slot>reject()</slot></connection>
+ </connections>
+</ui>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ShortcutPage</class>
+ <widget class="QWidget" name="ShortcutPage">
+  <layout class="QVBoxLayout" name="layoutRoot">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item><layout class="QHBoxLayout" name="layoutSets">
+    <item><widget class="QLabel" name="labelSet"><property name="text"><string>セット：</string></property></widget></item>
+    <item><widget class="QComboBox" name="comboSet"/></item>
+    <item><widget class="QPushButton" name="buttonNewSet"><property name="text"><string>新規セット</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonDeleteSet"><property name="text"><string>セット削除</string></property></widget></item>
+   </layout></item>
+   <item><widget class="QLineEdit" name="editSearch"><property name="placeholderText"><string>操作名・場所・キー・有効範囲で検索...</string></property><property name="clearButtonEnabled"><bool>true</bool></property></widget></item>
+   <item><layout class="QHBoxLayout" name="layoutIndex">
+    <item><widget class="QLabel" name="labelIndex"><property name="text"><string>索引機能（ツールチップ）：</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonIndexOn"><property name="text"><string>ON</string></property><property name="checkable"><bool>true</bool></property><property name="autoExclusive"><bool>true</bool></property></widget></item>
+    <item><widget class="QPushButton" name="buttonIndexOff"><property name="text"><string>OFF</string></property><property name="checkable"><bool>true</bool></property><property name="autoExclusive"><bool>true</bool></property></widget></item>
+    <item><spacer name="spacerIndex"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+   </layout></item>
+   <item><widget class="QLabel" name="labelErrors"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="textFormat"><enum>Qt::PlainText</enum></property></widget></item>
+   <item><widget class="QTreeWidget" name="treeShortcuts">
+    <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+    <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
+    <column><property name="text"><string>コマンド</string></property></column>
+    <column><property name="text"><string>ショートカット</string></property></column>
+    <column><property name="text"><string>有効範囲</string></property></column>
+   </widget></item>
+   <item><widget class="QLabel" name="labelSelected"><property name="text"><string>選択中のコマンド：なし</string></property><property name="textFormat"><enum>Qt::PlainText</enum></property></widget></item>
+   <item><widget class="QLabel" name="labelLocation"><property name="text"><string>場所：</string></property><property name="textFormat"><enum>Qt::PlainText</enum></property></widget></item>
+   <item><layout class="QHBoxLayout" name="layoutBindings">
+    <item><widget class="QListWidget" name="listKeys"><property name="maximumHeight"><number>90</number></property></widget></item>
+    <item><layout class="QVBoxLayout" name="layoutKeyButtons">
+     <item><widget class="QPushButton" name="buttonAddKey"><property name="text"><string>キーを追加</string></property></widget></item>
+     <item><widget class="QPushButton" name="buttonChangeKey"><property name="text"><string>変更</string></property></widget></item>
+     <item><widget class="QPushButton" name="buttonRemoveKey"><property name="text"><string>削除</string></property></widget></item>
+    </layout></item>
+   </layout></item>
+   <item><widget class="QGroupBox" name="groupConflict">
+    <property name="title"><string>競合ショートカット</string></property>
+    <layout class="QVBoxLayout" name="layoutConflict">
+     <item><widget class="QLabel" name="labelConflict"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="textFormat"><enum>Qt::PlainText</enum></property></widget></item>
+     <item><layout class="QHBoxLayout" name="layoutConflictButtons">
+      <item><widget class="QPushButton" name="buttonGoConflict"><property name="text"><string>競合先に移動</string></property></widget></item>
+      <item><widget class="QPushButton" name="buttonReplace"><property name="text"><string>置き換える</string></property></widget></item>
+     </layout></item>
+    </layout>
+   </widget></item>
+   <item><layout class="QHBoxLayout" name="layoutRestore">
+    <item><widget class="QPushButton" name="buttonUndo"><property name="text"><string>取り消し</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonClear"><property name="text"><string>消去</string></property></widget></item>
+    <item><widget class="QPushButton" name="buttonReset"><property name="text"><string>既定に戻す</string></property></widget></item>
+   </layout></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

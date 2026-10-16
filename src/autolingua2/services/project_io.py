@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from base64 import b64encode
 from pathlib import Path
 
 from autolingua2.adapters.base import EmbeddedTranslationAdapter, FileAdapter
@@ -13,6 +14,11 @@ from autolingua2.infrastructure.operations import check_cancelled
 from autolingua2.services.key_conflicts import ConflictConfirmation, resolve_key_conflicts
 from autolingua2.services.project_archive import relative_path
 from autolingua2.services.source_classification import classify_sources
+
+
+def read_project_thumbnail(path: Path) -> str:
+    """元ファイルの場所に依存しない、保存用の画像データを読み込む。"""
+    return b64encode(path.read_bytes()).decode("ascii")
 
 
 def detect_inherited_language(adapter: FileAdapter, paths: list[Path]) -> str | None:

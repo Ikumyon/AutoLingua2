@@ -75,10 +75,10 @@ class _Parser:
             field = prefix[1].casefold()
             self.index += len(prefix[0])
         value_start = self.index
-        if text[self.index:self.index + 4].casefold() == "exp:":
-            self.index += 4
+        if text[self.index:self.index + 6].casefold() == "regex:":
+            self.index += 6
             if self.index == len(text) or text[self.index] != "/":
-                raise SearchSyntaxError("正規表現は exp:/パターン/ の形式で指定してください", value_start)
+                raise SearchSyntaxError("正規表現は regex:/パターン/ の形式で指定してください", value_start)
             self.index += 1
             pattern_start = self.index
             while self.index < len(text):

@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 GROUP_TRANSLATION_TABLE = "translation_table"
 GROUP_UI = "ui"
+GROUP_SHORTCUTS = "shortcuts"
 GROUP_AI = "ai"
 GROUP_VOICE_INPUT = "voice_input"
 GROUP_MCP = "mcp"
@@ -91,7 +92,23 @@ def save_translation_table_columns(layout: ColumnLayout) -> None:
 
 
 DEFAULT_UI_LANGUAGE = "system"
-DEFAULT_AI_PROVIDER = "openai"
+
+
+def load_shortcut_preferences() -> tuple[str, bool]:
+    values = _read_settings_file().get(GROUP_SHORTCUTS, {})
+    if not isinstance(values, dict):
+        return "default", False
+    selected = values.get("selected", "default")
+    indexed = values.get("index_mode", False)
+    return selected if isinstance(selected, str) else "default", indexed is True
+
+
+def save_shortcut_preferences(selected: str, index_mode: bool) -> None:
+    settings = _read_settings_file()
+    settings[GROUP_SHORTCUTS] = {"selected": selected, "index_mode": index_mode}
+    _write_settings_file(settings)
+
+DEFAULT_AI_PROVIDER = "chatgpt"
 
 
 @dataclass(slots=True)

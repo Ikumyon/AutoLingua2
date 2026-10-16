@@ -61,6 +61,11 @@ def main() -> int:
         startup.check()
         startup.phase("window", "メイン画面を構築しています…")
         window = MainWindowController(entrance, platform_driver=current_platform)
+        if "--debug" in sys.argv:
+            from .ui.components.debug_tooltips import DebugTooltips
+
+            debug_tooltips = DebugTooltips(app, entrance.icons.get_icon)
+            window.shortcuts.changed.connect(debug_tooltips.refresh_shortcut)
         window.show()
         is_ready = False
         notification_project: str | None = None

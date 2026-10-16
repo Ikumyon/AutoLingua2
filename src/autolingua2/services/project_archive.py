@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from base64 import b64decode
 from collections.abc import Mapping
 from io import BytesIO
 import json
@@ -87,6 +88,7 @@ def project_documents(service: WorkspaceService) -> dict[str, object]:
             "format_version": 1, "name": project.name, "plugin_id": project.adapter_id,
             "game_id": project.game_id, "source_slot": project.source_slot,
             "memory_id": project.memory_id,
+            "thumbnail": project.thumbnail,
             "source_language": project.source_language,
             "active_language": project.target_language,
             "source_root": project.source_root, "files": project.loaded_files,
@@ -164,11 +166,13 @@ def _restore(documents: dict[str, object]) -> ProjectArchive:
     paths = _relative_files(root, files, folders)
     project = TranslationProject(
         name=text(required(metadata, "name")), adapter_id=text(required(metadata, "plugin_id"), nonempty=True),
+        thumbnail=text(metadata.get("thumbnail", "")),
         game_id=text(required(metadata, "game_id")), source_slot=text(required(metadata, "source_slot")),
         source_language=text(required(metadata, "source_language"), nonempty=True),
         source_root=root, loaded_files=files, loaded_folders=folders,
         sources=[TranslationSource(path, PurePosixPath(path).name) for path in paths],
     )
+    b64decode(project.thumbnail, validate=True)
     memory_id = metadata.get("memory_id")
     if memory_id is None:
         # Existing archives acquire a stable identity until saved with the new field.

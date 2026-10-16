@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from PySide6.QtCore import QDir, QEvent, QModelIndex, QObject, Qt, QTimer
-from PySide6.QtGui import QKeyEvent, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QKeyEvent
 from PySide6.QtWidgets import (
     QComboBox, QFileSystemModel, QGroupBox, QHeaderView, QInputDialog,
     QHBoxLayout, QLineEdit, QMenu, QMessageBox, QPushButton, QSplitter, QStackedWidget,
@@ -51,10 +51,14 @@ class _AddressBar(QObject):
         self._ancestors.clicked.connect(self._show_ancestors)
         self._model.directoryLoaded.connect(self._directory_loaded)
         self._model.rowsInserted.connect(self._children_inserted)
-        for key in ("Ctrl+L", "Alt+D"):
-            shortcut = QShortcut(QKeySequence(key), dialog)
-            shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-            shortcut.activated.connect(self._begin_edit)
+        from autolingua2.ui.shortcuts import ShortcutManager
+        manager = ShortcutManager.current()
+        action = QAction(dialog)
+        action.setObjectName("actionEditExportAddress")
+        action.triggered.connect(self._begin_edit)
+        manager.register(manager.commands["export.address"], action, dialog)
+        manager.bind_widget(self._blank, "export.address")
+        manager.bind_widget(self._stack, "export.address")
 
     def set_path(self, path: Path) -> None:
         self._path = path

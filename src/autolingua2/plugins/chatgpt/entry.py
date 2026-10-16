@@ -25,8 +25,8 @@ def register(context: PluginContext) -> None:
             ui=UIContribution(
                 ai_setup=AiSetupOption(
                     provider_id="chatgpt",
-                    title="ChatGPT",
-                    description="ブラウザで ChatGPT にサインインして利用します。",
+                    title="ChatGPT (おすすめ)",
+                    description="ブラウザで ChatGPT にサインインして利用します（APIキー不要）。",
                     mode="auth",
                     create_panel=create_setup_panel,
                 ),

@@ -17,7 +17,7 @@ class TranslationSource:
 @dataclass(slots=True)
 class TranslationProject:
     name: str = ""
-    icon_path: str = ""
+    thumbnail: str = ""
     game_id: str = ""
     source_language: str = ""
     source_slot: str = ""
@@ -37,8 +37,8 @@ class TranslationProject:
         self.sources.extend(other.sources)
         if not self.name and other.name:
             self.name = other.name
-        if not self.icon_path and other.icon_path:
-            self.icon_path = other.icon_path
+        if not self.thumbnail and other.thumbnail:
+            self.thumbnail = other.thumbnail
         if not self.game_id and other.game_id:
             self.game_id = other.game_id
         if not self.source_language and other.source_language:

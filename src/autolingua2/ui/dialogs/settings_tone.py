@@ -16,7 +16,7 @@ from autolingua2.ir.tone import (
     delete_tone, remove_nested_branches, tone_references, validate_tones,
 )
 from autolingua2.services.tone_store import ToneStore
-from autolingua2.ui.components.searchable_combo_box import SearchableActionComboBox
+from autolingua2.ui.components.searchable_combo_box import ComboAction, SearchableComboBox
 from autolingua2.ui.icons import IconManager
 from autolingua2.ui.i18n import tr
 from .base import require_child
@@ -37,8 +37,10 @@ class TonePageController:
         selection_layout = selection_container.layout()
         if selection_layout is None:
             raise RuntimeError("口調選択のレイアウトがありません。")
-        self.combo = SearchableActionComboBox(
-            tr('TonePage', "＋新しい口調…"), tr('TonePage', "該当する口調がありません。"), selection_container,
+        self.combo = SearchableComboBox(
+            selection_container,
+            action=ComboAction(tr('TonePage', "＋新しい口調…"), self._begin_create, position="top"),
+            empty_text=tr('TonePage', "該当する口調がありません。"),
             search_role=Qt.ItemDataRole.UserRole + 1,
         )
         self.combo.setObjectName("comboManagedTone")
@@ -71,7 +73,6 @@ class TonePageController:
         except (OSError, ValueError) as exc:
             self.load_error = str(exc)
         self.combo.currentIndexChanged.connect(self._selected)
-        self.combo.actionRequested.connect(self._begin_create)
         self.kind.currentIndexChanged.connect(self._add_tone)
         self.tree.currentItemChanged.connect(self._branch_selected)
         self.name.textChanged.connect(self._name_changed)
