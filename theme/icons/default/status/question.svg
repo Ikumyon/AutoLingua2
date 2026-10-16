@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 80 80"><title>question</title><path fill="none" stroke="#eb5757" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M39.5 49.6v-.57v0c0-3.5 1.844-6.742 4.854-8.53l2.609-1.55A12.34 12.34 0 0 0 53 28.34v0C53 21.526 47.475 16 40.66 16H39.5C32.044 16 26 22.044 26 29.5v.762M39.5 60.4v2.4"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>question</title>
+  <defs>
+    <linearGradient id="qGrad" x1="6" y1="3" x2="18" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f472b6"/>
+      <stop offset="0.5" stop-color="#ec4899"/>
+      <stop offset="1" stop-color="#be185d"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <path stroke="url(#qGrad)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M8.2 8.5a3.8 3.8 0 1 1 5.9 3.16c-1.15.77-2.1 1.7-2.1 3.09v.5"/>
+    <circle cx="12" cy="19.2" r="1.5" fill="url(#qGrad)"/>
+  </g>
+</svg>

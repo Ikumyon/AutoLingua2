@@ -1,1 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 80 80"><title>file</title><g fill="none"><path fill="#ffffff" stroke="#cbd5e1" stroke-width="2" fill-rule="evenodd" d="M45.17 15.176a4 4 0 0 0-2.828-1.171L24 14.003a4 4 0 0 0-4 4v44a4 4 0 0 0 4 4h32a4 4 0 0 0 4-4V31.66a4 4 0 0 0-1.172-2.83l-.2-.2c.459.527.09 1.37-.628 1.37H48a4 4 0 0 1-4-4V16c0-.71.826-1.08 1.353-.642z" clip-rule="evenodd"/><path fill="#cbd5e1" stroke="#cbd5e1" stroke-width="2" d="M58.586 28.586L45.414 15.414A.828.828 0 0 0 44 16v10a4 4 0 0 0 4 4h10a.828.828 0 0 0 .586-1.414"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>file</title>
+  <defs>
+    <linearGradient id="filePage" x1="5" y1="2" x2="19" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="0.6" stop-color="#e0f2fe"/>
+      <stop offset="1" stop-color="#93c5fd"/>
+    </linearGradient>
+    <linearGradient id="fileFold" x1="13" y1="2" x2="19" y2="9" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3bd5ff"/>
+      <stop offset="1" stop-color="#0078d4"/>
+    </linearGradient>
+    <linearGradient id="fileLine" x1="8" y1="11" x2="16" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0094f0"/>
+      <stop offset="1" stop-color="#2052cb"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <path fill="url(#filePage)" d="M7 2.5A2.5 2.5 0 0 0 4.5 5v14A2.5 2.5 0 0 0 7 21.5h10a2.5 2.5 0 0 0 2.5-2.5V8.83a2.5 2.5 0 0 0-.73-1.77l-3.83-3.83A2.5 2.5 0 0 0 13.17 2.5H7Z"/>
+    <path fill="url(#fileFold)" d="M13.5 2.57V6.5a2 2 0 0 0 2 2h3.93a2.5 2.5 0 0 0-.66-1.44l-3.83-3.83a2.5 2.5 0 0 0-1.44-.66Z"/>
+    <rect x="8" y="11" width="8" height="1.6" rx="0.8" fill="url(#fileLine)" fill-opacity="0.75"/>
+    <rect x="8" y="14.2" width="8" height="1.6" rx="0.8" fill="url(#fileLine)" fill-opacity="0.75"/>
+    <rect x="8" y="17.4" width="5" height="1.6" rx="0.8" fill="url(#fileLine)" fill-opacity="0.75"/>
+  </g>
+</svg>

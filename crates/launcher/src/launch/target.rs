@@ -64,6 +64,7 @@ impl Target {
             .env("AUTOLINGUA_BOOT_TOKEN", credential)
             .env("AUTOLINGUA_LAUNCHER", std::env::current_exe()?)
             .env_remove("AUTOLINGUA_RESTART_TICKET").env_remove("AUTOLINGUA_RESTART_PID")
+            .env_remove("AUTOLINGUA_UPDATE_CLEANUP_PID")
             .env("PYINSTALLER_RESET_ENVIRONMENT", "1")
             .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::from(log_file()?));
         if let Some(info) = update_info {

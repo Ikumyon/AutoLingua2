@@ -447,7 +447,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "autolingua-launcher"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "autolingua2-native",
  "chrono",
@@ -458,14 +458,15 @@ dependencies = [
 
 [[package]]
 name = "autolingua-source-watcher"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "autolingua2-native",
+ "winres",
 ]
 
 [[package]]
 name = "autolingua-updater"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "autolingua2-native",
  "chrono",
@@ -476,13 +477,14 @@ dependencies = [
  "slint",
  "slint-build",
  "ureq",
+ "windows-sys 0.59.0",
  "winres",
  "zip",
 ]
 
 [[package]]
 name = "autolingua2-native"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "chardetng",
  "encoding_rs",

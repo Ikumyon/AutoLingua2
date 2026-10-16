@@ -10,6 +10,7 @@ from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 
 from autolingua2.plugins.contracts import (
+    HOST_APP_VERSION,
     BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
     object_value, string_value, ChatContextExceeded,
 )
@@ -91,7 +92,7 @@ class ChatGptTranslator(BaseHttpTranslator):
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
             "Authorization": f"Bearer {self.api_key}",
-            "User-Agent": "Autolingua Desktop/0.1.0",
+            "User-Agent": f"Autolingua Desktop/{HOST_APP_VERSION}",
         }
 
     def build_payload(
@@ -263,7 +264,7 @@ class ChatGptModelFetcher(QObject):
 
         request = QNetworkRequest(QUrl("https://api.openai.com/v1/models"))
         request.setRawHeader(b"Authorization", f"Bearer {token.strip()}".encode("utf-8"))
-        request.setRawHeader(b"User-Agent", b"Autolingua Desktop/0.1.0")
+        request.setRawHeader(b"User-Agent", f"Autolingua Desktop/{HOST_APP_VERSION}".encode("utf-8"))
         request.setTransferTimeout(int(timeout_sec * 1000))
 
         reply = self._nam.get(request)

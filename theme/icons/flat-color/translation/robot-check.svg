@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 32 32">
+  <title>robot-check</title>
+  <g fill="none">
+    <path stroke="#38bdf8" stroke-width="2.1" stroke-linecap="round" d="M14.5 5.5V9"/>
+    <circle cx="14.5" cy="4.2" r="2.3" fill="#fef08a"/>
+    <rect x="3" y="13.5" width="3.2" height="6.5" rx="1.4" fill="#67e8f9"/>
+    <rect x="22.8" y="13.5" width="3.2" height="6.5" rx="1.4" fill="#67e8f9"/>
+    <rect x="5.8" y="8.8" width="17.4" height="15.2" rx="3.3" fill="#0094f0"/>
+    <rect x="9.8" y="23.5" width="9.4" height="3.2" rx="1.1" fill="#ffa43d"/>
+    <circle cx="10.8" cy="15.5" r="2.1" fill="#fef08a"/>
+    <circle cx="18.2" cy="15.5" r="2.1" fill="#fef08a"/>
+    <rect x="11.2" y="19.8" width="6.6" height="1.5" rx="0.75" fill="#bae6fd"/>
+    <circle cx="23.5" cy="23.5" r="7" fill="#10b981"/>
+    <path stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="m20 23.6 2.3 2.3 4.7-4.7"/>
+  </g>
+</svg>

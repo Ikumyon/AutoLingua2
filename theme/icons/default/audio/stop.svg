@@ -1,1 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><title>stop</title><rect x="5" y="5" width="14" height="14" rx="1" fill="#eb5757"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>stop</title>
+  <defs>
+    <linearGradient id="stopGrad" x1="4" y1="4" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff7875"/>
+      <stop offset="0.55" stop-color="#f43f5e"/>
+      <stop offset="1" stop-color="#be123c"/>
+    </linearGradient>
+    <radialGradient id="stopHighlight" cx="8" cy="7" r="12" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fecdd3" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#fecdd3" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g fill="none">
+    <rect x="4" y="4" width="16" height="16" rx="3.5" fill="url(#stopGrad)"/>
+    <rect x="4" y="4" width="16" height="16" rx="3.5" fill="url(#stopHighlight)"/>
+  </g>
+</svg>

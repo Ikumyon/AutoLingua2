@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 32 32">
+  <title>robot-edit</title>
+  <g fill="none">
+    <path stroke="#38bdf8" stroke-width="2.1" stroke-linecap="round" d="M14.5 5.5V9"/>
+    <circle cx="14.5" cy="4.2" r="2.3" fill="#fef08a"/>
+    <rect x="3" y="13.5" width="3.2" height="6.5" rx="1.4" fill="#67e8f9"/>
+    <rect x="22.8" y="13.5" width="3.2" height="6.5" rx="1.4" fill="#67e8f9"/>
+    <rect x="5.8" y="8.8" width="17.4" height="15.2" rx="3.3" fill="#0094f0"/>
+    <rect x="9.8" y="23.5" width="9.4" height="3.2" rx="1.1" fill="#ffa43d"/>
+    <circle cx="10.8" cy="15.5" r="2.1" fill="#fef08a"/>
+    <circle cx="18.2" cy="15.5" r="2.1" fill="#fef08a"/>
+    <rect x="11.2" y="19.8" width="6.6" height="1.5" rx="0.75" fill="#bae6fd"/>
+    <path fill="#ffa43d" d="m21.539 29.469l7.61-7.543v-4.074h-4.073l-7.567 7.64l.308 3.695z"/>
+    <path fill="#ffd394" d="m21.539 29.47l.223-.223s-1.726-.661-2.535-1.47c-.809-.81-1.47-2.534-1.47-2.534l-.248.249a2.66 2.66 0 0 0-.686 1.206l-.79 3.051a1 1 0 0 0 1.217 1.22l3.02-.778a2.8 2.8 0 0 0 1.269-.722"/>
+    <path fill="#f97dbd" d="m27.937 23.14l2.211-2.214a2.88 2.88 0 0 0 .072-4.017a2.88 2.88 0 0 0-4.144-.057l-2.238 2.241z"/>
+    <path fill="#ff921f" d="M25.094 17.838a5.43 5.43 0 0 0 4.106 4.038l-1.55 1.551a5.43 5.43 0 0 1-4.106-4.04z"/>
+  </g>
+</svg>

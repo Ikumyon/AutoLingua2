@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>brush-cleaning</title>
+  <g fill="none">
+    <path fill="#c084fc" d="M12 2a2.5 2.5 0 0 0-2.5 2.5V9a1 1 0 0 1-1 1h7a1 1 0 0 1-1-1V4.5A2.5 2.5 0 0 0 12 2Z"/>
+    <path fill="#fbbf24" d="M5.2 13.5h13.6l1.85 6.4A1.75 1.75 0 0 1 18.97 22H5.03a1.75 1.75 0 0 1-1.68-2.1l1.85-6.4Z"/>
+    <rect x="4" y="9.8" width="16" height="4.2" rx="1.8" fill="#3bd5ff"/>
+  </g>
+</svg>

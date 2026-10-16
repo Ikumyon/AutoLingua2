@@ -1,1 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-replace-all preview-icon"><path d="M14 14a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1"/><path d="M14 4a1 1 0 0 1 1-1"/><path d="M15 10a1 1 0 0 1-1-1"/><path d="M19 14a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1"/><path d="M21 4a1 1 0 0 0-1-1"/><path d="M21 9a1 1 0 0 1-1 1"/><path d="m3 7 3 3 3-3"/><path d="M6 10V5a2 2 0 0 1 2-2h2"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>replace-all</title>
+  <defs>
+    <linearGradient id="rpaArrow" x1="3" y1="3" x2="12" y2="11" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3bd5ff"/>
+      <stop offset="1" stop-color="#0078d4"/>
+    </linearGradient>
+    <linearGradient id="rpaTopBox" x1="13" y1="3" x2="21" y2="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c084fc"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="rpaBotBox1" x1="3" y1="13" x2="11" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4ade80"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="rpaBotBox2" x1="12" y1="13" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fde047"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <path stroke="url(#rpaArrow)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" d="m3 7.5 3 3 3-3M6 10.5V5.5A2.5 2.5 0 0 1 8.5 3H11"/>
+    <rect x="13.5" y="3" width="7.5" height="7.5" rx="2" fill="url(#rpaTopBox)" fill-opacity="0.85"/>
+    <rect x="3" y="13.5" width="7.5" height="7.5" rx="2" fill="url(#rpaBotBox1)"/>
+    <path stroke="url(#rpaBotBox2)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" d="M13.5 14a1.5 1.5 0 0 1 1.5 1.5v4A1.5 1.5 0 0 1 13.5 21M18.5 14a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5"/>
+  </g>
+</svg>

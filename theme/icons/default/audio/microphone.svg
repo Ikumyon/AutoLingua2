@@ -1,4 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4dabf7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <rect x="9" y="2" width="6" height="12" rx="3"/>
-  <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>microphone</title>
+  <defs>
+    <linearGradient id="micBody" x1="8" y1="2" x2="16" y2="14" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b47cff"/>
+      <stop offset="0.5" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#5b21b6"/>
+    </linearGradient>
+    <radialGradient id="micGlow" cx="10" cy="5" r="7" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f5d0fe" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#f5d0fe" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="micStand" x1="5" y1="10" x2="19" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3bd5ff"/>
+      <stop offset="1" stop-color="#0078d4"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <path fill="url(#micStand)" d="M6 10a1 1 0 0 1 1 1v1a5 5 0 0 0 10 0v-1a1 1 0 1 1 2 0v1a7 7 0 0 1-6 6.93V20h2.5a1 1 0 1 1 0 2h-7a1 1 0 1 1 0-2H11v-2.07A7 7 0 0 1 5 12v-1a1 1 0 0 1 1-1Z"/>
+    <rect x="8.5" y="2" width="7" height="13" rx="3.5" fill="url(#micBody)"/>
+    <rect x="8.5" y="2" width="7" height="13" rx="3.5" fill="url(#micGlow)"/>
+  </g>
 </svg>

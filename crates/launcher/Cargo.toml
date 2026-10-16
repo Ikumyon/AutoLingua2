@@ -1,6 +1,6 @@
 [package]
 name = "autolingua-launcher"
-version = "0.1.0"
+publish = false
 edition = "2024"
 
 [dependencies]

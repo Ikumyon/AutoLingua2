@@ -1,1 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-replace preview-icon"><path d="M14 4a1 1 0 0 1 1-1"/><path d="M15 10a1 1 0 0 1-1-1"/><path d="M21 4a1 1 0 0 0-1-1"/><path d="M21 9a1 1 0 0 1-1 1"/><path d="m3 7 3 3 3-3"/><path d="M6 10V5a2 2 0 0 1 2-2h2"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>replace</title>
+  <defs>
+    <linearGradient id="rpArrow" x1="3" y1="3" x2="12" y2="11" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3bd5ff"/>
+      <stop offset="1" stop-color="#0078d4"/>
+    </linearGradient>
+    <linearGradient id="rpTopBox" x1="13" y1="3" x2="21" y2="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c084fc"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="rpBotBox" x1="3" y1="13" x2="11" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4ade80"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <path stroke="url(#rpArrow)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" d="m3 7.5 3 3 3-3M6 10.5V5.5A2.5 2.5 0 0 1 8.5 3H11"/>
+    <rect x="13.5" y="3" width="7.5" height="7.5" rx="2" fill="url(#rpTopBox)" fill-opacity="0.85"/>
+    <rect x="3" y="13.5" width="8" height="8" rx="2" fill="url(#rpBotBox)"/>
+  </g>
+</svg>

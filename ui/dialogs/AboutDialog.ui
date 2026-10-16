@@ -22,7 +22,7 @@
    </item>
    <item>
     <widget class="QLabel" name="labelVersion">
-     <property name="text"><string>Version 0.1.0</string></property>
+     <property name="text"><string notr="true"></string></property>
      <property name="alignment"><set>Qt::AlignCenter</set></property>
     </widget>
    </item>

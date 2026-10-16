@@ -1,0 +1,32 @@
+/* 検索欄: メイン画面とスクリプトエディタで共用 */
+QFrame#frameSearch {
+    background-color: palette(base);
+    border: 1px solid #383838;
+    border-bottom: 1px solid #a0a0a0;
+    border-radius: 6px;
+}
+
+QFrame#frameSearch[focused="true"] {
+    border-bottom: 1px solid #4cc2ff;
+}
+
+QFrame#frameSearch QLineEdit#editSearch {
+    background-color: transparent;
+    border: none;
+}
+
+QFrame#frameSearch QToolButton {
+    border: none;
+    border-radius: 4px;
+}
+
+QFrame#frameSearch QToolButton:hover {
+    background-color: #4cc2ff;
+    color: #202020;
+}
+
+QFrame#frameSearch QToolButton:checked,
+QFrame#frameSearch QToolButton:pressed {
+    background-color: #4cc2ff;
+    color: #202020;
+}

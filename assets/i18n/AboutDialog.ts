@@ -15,10 +15,6 @@
       <translation>Paradoxゲーム向けローカライズ翻訳ツール</translation>
     </message>
     <message>
-      <source>Version 0.1.0</source>
-      <translation>Version 0.1.0</translation>
-    </message>
-    <message>
       <source>閉じる</source>
       <translation>閉じる</translation>
     </message>

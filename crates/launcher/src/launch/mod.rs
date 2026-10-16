@@ -12,6 +12,27 @@ use std::time::{Duration, Instant};
 
 pub fn run(ui: &Ui, cancel: &AtomicBool) -> io::Result<()> {
     let target = Target::resolve()?;
+    if let Some(pid) = std::env::var_os("AUTOLINGUA_UPDATE_CLEANUP_PID") {
+        let pid: u32 = pid.to_str().ok_or_else(|| error("Invalid updater PID"))?
+            .parse().map_err(error)?;
+        // ランチャーの起動前にアップデーターが終了している場合もある。
+        if let Ok(updater) = bootstrap::ProcessWatch::open(pid) {
+            let deadline = Instant::now() + Duration::from_secs(30);
+            while updater.alive()? {
+                if cancel.load(Ordering::Acquire) { return Ok(()); }
+                if Instant::now() >= deadline {
+                    return Err(error("アップデーターが終了しなかったため、更新作業フォルダを削除できません。"));
+                }
+                thread::sleep(Duration::from_millis(25));
+            }
+        }
+        let root = std::fs::canonicalize(&target.root)?;
+        let updates = root.join(".data").join("updates");
+        if std::fs::canonicalize(&updates)? != updates {
+            return Err(error("更新作業フォルダがインストール先の外部を参照しています。"));
+        }
+        std::fs::remove_dir_all(&updates)?;
+    }
     let context = Context::new(target.development.as_deref())?;
     let restart = std::env::var("AUTOLINGUA_RESTART_TICKET").ok();
     let start = Instant::now();
@@ -74,7 +95,8 @@ fn check_for_updates(root: &std::path::Path) -> Option<String> {
     ];
     let updater = candidates.into_iter().find(|p| p.is_file())?;
     let mut cmd = std::process::Command::new(updater);
-    cmd.arg("check").arg("--project-root").arg(root);
+    cmd.arg("check").arg("--project-root").arg(root)
+        .arg("--current-version").arg(include_str!("../../../../VERSION").trim());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

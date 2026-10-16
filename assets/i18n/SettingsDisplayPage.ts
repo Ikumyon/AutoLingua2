@@ -3,6 +3,14 @@
   <context>
     <name>SettingsDisplayPage</name>
     <message>
+      <source> px</source>
+      <translation> px</translation>
+    </message>
+    <message>
+      <source>アイコンサイズ</source>
+      <translation>アイコンサイズ</translation>
+    </message>
+    <message>
       <source>アイコンセット</source>
       <translation>アイコンセット</translation>
     </message>

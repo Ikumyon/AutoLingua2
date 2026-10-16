@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from autolingua2 import __version__
 from autolingua2.infrastructure.filesystem import PROJECT_ROOT
 from autolingua2.ui.dialogs import load_ui, require_child
 
@@ -54,7 +55,8 @@ class UpdateCheckWorker(QThread):
             self.failed_check.emit("アップデーター実行ファイル (autolingua-updater) が見つかりません。")
             return
 
-        cmd = [str(updater_exe), "check", "--project-root", str(PROJECT_ROOT)]
+        cmd = [str(updater_exe), "check", "--project-root", str(PROJECT_ROOT),
+               "--current-version", __version__]
         creationflags = 0
         if sys.platform == "win32":
             creationflags = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
@@ -64,6 +66,7 @@ class UpdateCheckWorker(QThread):
                 cmd,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 check=False,
                 creationflags=creationflags,
                 cwd=str(PROJECT_ROOT),
@@ -74,6 +77,17 @@ class UpdateCheckWorker(QThread):
                 return
 
             data = json.loads(stdout)
+            if not isinstance(data, dict):
+                self.failed_check.emit("更新確認からの応答がJSONオブジェクトではありません。")
+                return
+            error = data.get("error")
+            if result.returncode != 0 or error:
+                detail = error if isinstance(error, str) and error else result.stderr.strip()
+                self.failed_check.emit(detail or f"更新確認に失敗しました（終了コード: {result.returncode}）。")
+                return
+            if not isinstance(data.get("has_update"), bool) or not isinstance(data.get("current_version"), str):
+                self.failed_check.emit("更新確認からの応答に必要なバージョン情報がありません。")
+                return
             self.finished_check.emit(data)
         except Exception as e:
             self.failed_check.emit(f"更新確認処理の実行に失敗しました: {e}")

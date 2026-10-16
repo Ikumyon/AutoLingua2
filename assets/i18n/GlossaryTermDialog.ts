@@ -11,8 +11,12 @@
       <translation>メモ</translation>
     </message>
     <message>
-      <source>他形態</source>
-      <translation>他形態</translation>
+      <source>原文の他形態</source>
+      <translation>原文の他形態</translation>
+    </message>
+    <message>
+      <source>原文の大文字・小文字を区別する</source>
+      <translation>原文の大文字・小文字を区別する</translation>
     </message>
     <message>
       <source>原語</source>
@@ -21,10 +25,6 @@
     <message>
       <source>品詞</source>
       <translation>品詞</translation>
-    </message>
-    <message>
-      <source>大文字・小文字を区別する</source>
-      <translation>大文字・小文字を区別する</translation>
     </message>
     <message>
       <source>指定訳</source>
@@ -39,8 +39,20 @@
       <translation>用語を追加／編集</translation>
     </message>
     <message>
+      <source>訳の他形態</source>
+      <translation>訳の他形態</translation>
+    </message>
+    <message>
+      <source>訳の大文字・小文字を区別する</source>
+      <translation>訳の大文字・小文字を区別する</translation>
+    </message>
+    <message>
       <source>選択した他形態を削除</source>
       <translation>選択した他形態を削除</translation>
+    </message>
+    <message>
+      <source>選択した訳の他形態を削除</source>
+      <translation>選択した訳の他形態を削除</translation>
     </message>
     <message>
       <source>＋</source>

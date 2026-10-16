@@ -18,7 +18,7 @@ from urllib.parse import unquote
 
 from PySide6.QtCore import QObject, QThread, QTimer, Signal
 
-from autolingua2.adapters.base import FileAdapter, TranslationTextAdapter
+from autolingua2.adapters.base import FileAdapter, SupportedLanguagesAdapter, TranslationTextAdapter
 from autolingua2.infrastructure.operations import OperationCancelled
 from autolingua2.ir.filter_rules import TagRules
 from autolingua2.ir.glossary import GlossaryTerm, TermSide, edited_term, glossary_chain, orient_term
@@ -368,7 +368,7 @@ class ApplicationOperations(QObject):
                       "native_output_slots": [asdict(slot) for slot in game.slots if slot.language_code == code]}
                      for game in adapter.supported_games]
             parsers.append({"plugin_id": plugin_id,
-                            "declared_input_support": any(tag == code for tag, _ in adapter.supported_languages),
+                            "declared_input_support": isinstance(adapter, SupportedLanguagesAdapter) and any(tag == code for tag, _ in adapter.supported_languages),
                             "games": games})
         workspace = service.workspaces.get(code)
         project = service.imported.project

@@ -1,4 +1,4 @@
-/* Model list row status colors */
+/* AIモデル一覧 行ステータス表示 (ModelRowWidget) */
 
 ModelRowWidget[status="valid"] {
     background-color: rgba(40, 167, 69, 0.15);

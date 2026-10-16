@@ -1,0 +1,9 @@
+/* 自動化スクリプトの構文ハイライト色 (ScriptEditor) */
+ScriptEditor {
+    qproperty-keywordColor: #569cd6;
+    qproperty-typeColor: #4ec9b0;
+    qproperty-functionColor: #dcdcaa;
+    qproperty-stringColor: #6aab73;
+    qproperty-numberColor: #b48ead;
+    qproperty-commentColor: #808080;
+}

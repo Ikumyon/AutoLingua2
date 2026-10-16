@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QCoreApplication, QObject, Qt
-from PySide6.QtWidgets import QComboBox, QDialog, QListWidget, QListWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtCore import QCoreApplication, QObject, QSize, Qt
+from PySide6.QtWidgets import (
+    QComboBox, QDialog, QListWidget, QListWidgetItem, QSlider, QSpinBox,
+    QVBoxLayout, QWidget,
+)
 
 from autolingua2.extensions import ExtensionEntrance
 from autolingua2.services.settings.settings_store import (
@@ -145,3 +148,15 @@ class GeneralSettingsPageController(QObject):
 
         if self.list_icon_themes.count() > 0:
             self.list_icon_themes.setCurrentRow(selected_icon_row)
+
+        slider = require_child(self.dialog, QSlider, "sliderAppearanceIconSize")
+        spin = require_child(self.dialog, QSpinBox, "spinAppearanceIconSize")
+        slider.valueChanged.connect(spin.setValue)
+        spin.valueChanged.connect(slider.setValue)
+        spin.valueChanged.connect(self._set_appearance_icon_size)
+        self._set_appearance_icon_size(spin.value())
+
+    def _set_appearance_icon_size(self, size: int) -> None:
+        for view in (self.list_themes, self.list_icon_themes):
+            view.setIconSize(QSize(size, size))
+            view.doItemsLayout()

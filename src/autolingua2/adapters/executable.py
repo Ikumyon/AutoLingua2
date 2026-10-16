@@ -53,7 +53,7 @@ class ExecutableAdapter:
 
         self.supported_languages: list[tuple[str, str]] = []
         codes: set[str] = set()
-        for item in array(required(description, "supported_languages")):
+        for item in array(description.get("supported_languages", [])):
             pair = array(item)
             if len(pair) != 2:
                 raise ValueError("Languages must contain [code, name] pairs")
@@ -62,8 +62,6 @@ class ExecutableAdapter:
                 raise ValueError(f"Duplicate language: {code}")
             codes.add(code)
             self.supported_languages.append((code, name))
-        if not codes:
-            raise ValueError("At least one supported language is required")
 
         self.supported_games: list[GameProfile] = []
         game_ids: set[str] = set()
@@ -79,7 +77,7 @@ class ExecutableAdapter:
                 slot = record(slot_value)
                 slot_id = text(required(slot, "slot_id"), nonempty=True)
                 language = text(required(slot, "language_code"), nonempty=True)
-                if slot_id in slot_ids or language not in codes:
+                if slot_id in slot_ids or (codes and language not in codes):
                     raise ValueError("Invalid slot ID or language")
                 slot_ids.add(slot_id)
                 slots.append(GameSlot(slot_id, text(required(slot, "name"), nonempty=True), language))
@@ -110,7 +108,7 @@ class ExecutableAdapter:
         if any(not self.can_load(p) for p in files):
             raise ValueError("解析結果に非対応または存在しないファイルが含まれています。")
         language = text(required(result, "source_language"), nonempty=True)
-        if language not in dict(self.supported_languages):
+        if self.supported_languages and language not in dict(self.supported_languages):
             raise ValueError("解析結果の翻訳元言語が不正です。")
         suggestions = {
             key: text(value) for key, value in record(result.get("suggestions", {})).items()

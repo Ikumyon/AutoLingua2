@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 import json
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 from autolingua2.ir.validation import record, required, text, string_field
@@ -62,8 +63,8 @@ class ThemeManager:
                 description = ""
 
             qss_files = sorted(item.glob("*.qss"))
-            qss_file = item / "style.qss"
-            qss_path = qss_file if qss_file.is_file() else (qss_files[0] if qss_files else None)
+            base_file = item / "base.qss"
+            qss_path = base_file if base_file.is_file() else (qss_files[0] if qss_files else None)
 
             preview_file = item / "preview.png"
             preview_path = preview_file if preview_file.is_file() else None
@@ -95,8 +96,14 @@ class ThemeManager:
             # Fallback to system
             theme = themes.get("system")
 
+        # Restore Qt's native palette before applying the theme's color overrides.
+        app.setStyleSheet("")
+        if theme is not None and theme.type == "light":
+            app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+        else:
+            app.styleHints().unsetColorScheme()
+
         if not theme:
-            app.setStyleSheet("")
             self._current_theme_id = "system"
             return True
 

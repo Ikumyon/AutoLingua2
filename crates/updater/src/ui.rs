@@ -23,6 +23,41 @@ pub struct GuiParams {
     pub is_internal_apply: bool,
 }
 
+pub fn run_preview() -> Result<(), String> {
+    let dialog = UpdateProgressDialog::new().map_err(|e| format!("UIの初期化に失敗しました: {e}"))?;
+    dialog.set_download_status("更新画面のプレビュー".into());
+    dialog.set_download_version(include_str!("../../../VERSION").trim().into());
+    dialog.set_ready_version(include_str!("../../../VERSION").trim().into());
+    dialog.set_apply_version(include_str!("../../../VERSION").trim().into());
+    dialog.set_download_percent(70);
+    dialog.set_download_bytes("120 MB / 170 MB".into());
+    dialog.set_download_speed_and_time("表示確認のみ。更新処理は実行しません。".into());
+    dialog.set_process_log("プレビューを表示しています。".into());
+    dialog.set_apply_percent(45);
+    dialog.set_apply_phase("更新ファイルを配置しています（プレビュー）".into());
+    dialog.set_error_detail("これは表示確認用のエラーです。更新処理は実行していません。".into());
+    let timer = slint::Timer::default();
+    let weak = dialog.as_weak();
+    timer.start(slint::TimerMode::Repeated, std::time::Duration::from_secs(3), move || {
+        if let Some(dialog) = weak.upgrade() {
+            dialog.set_page((dialog.get_page() + 1) % 4);
+        }
+    });
+    let weak = dialog.as_weak();
+    dialog.on_cancel_download(move || {
+        if let Some(dialog) = weak.upgrade() {
+            let _ = dialog.window().hide();
+        }
+    });
+    let weak = dialog.as_weak();
+    dialog.on_close_requested(move || {
+        if let Some(dialog) = weak.upgrade() {
+            let _ = dialog.window().hide();
+        }
+    });
+    dialog.run().map_err(|e| format!("UIループの実行に失敗しました: {e}"))
+}
+
 pub fn run_gui(params: GuiParams) -> Result<(), String> {
     let dialog = UpdateProgressDialog::new().map_err(|e| format!("UIの初期化に失敗しました: {e}"))?;
     let logger = ProcessLogger::new();

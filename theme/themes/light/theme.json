@@ -1,0 +1,6 @@
+{
+  "id": "light",
+  "name_key": "theme.light.name",
+  "description_key": "theme.light.description",
+  "type": "light"
+}

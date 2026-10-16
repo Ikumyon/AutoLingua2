@@ -57,9 +57,15 @@ fn main() {
     let subcmd = args.next();
 
     match subcmd.as_deref() {
+        Some("preview") => {
+            if let Err(err) = ui::run_preview() {
+                eprintln!("UI Error: {err}");
+                std::process::exit(1);
+            }
+        }
         Some("check") | Some("--check") => {
             let mut project_root = None;
-            let mut current_version = env!("CARGO_PKG_VERSION").to_string();
+            let mut current_version = include_str!("../../../VERSION").trim().to_string();
             let mut custom_url = None;
 
             while let Some(arg) = args.next() {
@@ -105,7 +111,7 @@ fn main() {
         Some("gui") | Some("--gui") => {
             let mut project_root = None;
             let mut download_url = String::new();
-            let mut current_version = env!("CARGO_PKG_VERSION").to_string();
+            let mut current_version = include_str!("../../../VERSION").trim().to_string();
             let mut new_version = "—".to_string();
             let mut sha256 = None;
             let mut parent_pid = 0u32;
@@ -166,6 +172,7 @@ fn main() {
                         forwarded.extend(all_raw_args);
                         if let Err(e) = apply::handoff_to_temp_updater(&root, &forwarded) {
                             eprintln!("一時アップデーターの起動に失敗しました: {e}");
+                            std::process::exit(1);
                         }
                     }
                 }

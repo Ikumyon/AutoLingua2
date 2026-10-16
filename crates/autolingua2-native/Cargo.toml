@@ -1,6 +1,6 @@
 [package]
 name = "autolingua2-native"
-version = "0.1.0"
+publish = false
 edition = "2021"
 
 [lib]

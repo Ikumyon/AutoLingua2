@@ -5,6 +5,21 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import PySide6
 
+version_info = None
+if sys.platform == 'win32':
+    from PyInstaller.utils.win32.versioninfo import FixedFileInfo, StringFileInfo, StringStruct, StringTable, VSVersionInfo
+    app_version = Path('VERSION').read_text(encoding='utf-8').strip()
+    version_parts = tuple(int(part) for part in app_version.split('.'))
+    if len(version_parts) != 3:
+        raise ValueError('VERSION must contain major.minor.patch')
+    version_info = VSVersionInfo(
+        ffi=FixedFileInfo(filevers=version_parts + (0,), prodvers=version_parts + (0,)),
+        kids=[StringFileInfo([StringTable('040904B0', [
+            StringStruct('FileVersion', app_version),
+            StringStruct('ProductVersion', app_version),
+        ])])],
+    )
+
 lrelease_binary = next(Path(PySide6.__file__).parent.glob('lrelease*'))
 if not Path('assets/chat/index.html').is_file():
     raise RuntimeError('Build the chat frontend first: cd web && npm run build')
@@ -31,7 +46,7 @@ a = Analysis(
     ['main.py'],
     pathex=['src', '.', 'build/native'],
     binaries=[(str(lrelease_binary), 'PySide6')],
-    datas=[('assets/images/app.ico', 'assets/images'),
+    datas=[('VERSION', '.'), ('assets/images/app.ico', 'assets/images'),
            ('assets/images/app.png', 'assets/images'), ('assets/i18n', 'assets/i18n'),
            ('assets/chat', 'assets/chat')]
           + plugin_datas,
@@ -62,6 +77,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon='assets/images/app.ico',
+    version=version_info,
 )
 coll = COLLECT(
     exe,

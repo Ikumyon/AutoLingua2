@@ -63,6 +63,10 @@
       <translation>省略された階層</translation>
     </message>
     <message>
+      <source>訳文を使用するステータス</source>
+      <translation>訳文を使用するステータス</translation>
+    </message>
+    <message>
       <source>訳文を出力</source>
       <translation>訳文を出力</translation>
     </message>

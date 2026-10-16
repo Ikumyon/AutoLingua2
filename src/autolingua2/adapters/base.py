@@ -16,7 +16,6 @@ class FileAdapter(Protocol):
     suffixes: set[str]
     default_filter_rules: list[FilterRule]
     supported_games: list[GameProfile]
-    supported_languages: list[tuple[str, str]]
 
     def can_load(self, path: Path) -> bool:
         ...
@@ -29,6 +28,13 @@ class FileAdapter(Protocol):
 
     def filter_source_files(self, paths: list[Path], source_slot: str) -> list[Path]:
         ...
+
+
+@runtime_checkable
+class SupportedLanguagesAdapter(FileAdapter, Protocol):
+    """Optional language declarations for formats with a fixed language list."""
+
+    supported_languages: list[tuple[str, str]]
 
 
 @runtime_checkable

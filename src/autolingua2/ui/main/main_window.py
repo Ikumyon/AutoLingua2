@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from autolingua2 import __version__
 from autolingua2.ui.resources.i18n import translation_source
 
 import json
@@ -52,7 +53,7 @@ from PySide6.QtWidgets import (
 
 from autolingua2.ui.main.page_scrubber import RangeScrubberWidget
 
-from autolingua2.adapters.base import EmbeddedTranslationAdapter, FileAdapter
+from autolingua2.adapters.base import EmbeddedTranslationAdapter, FileAdapter, SupportedLanguagesAdapter
 from autolingua2.services.projects.project_io import detect_inherited_language, read_project_thumbnail
 from autolingua2.services.settings.language_tags import qt_language_options
 from autolingua2.ir.imported import ImportedTranslation
@@ -883,7 +884,7 @@ class MainWindowController(QObject):
         glossary_menu.addSeparator()
         glossary_menu.addAction(self.action_glossary)
         self.action_problems.triggered.connect(self.open_problems_dialog)
-        self.action_about.triggered.connect(lambda: SimpleDialogController("dialogs/AboutDialog.ui", self.window).exec())
+        self.action_about.triggered.connect(self._open_about_dialog)
         self.automation_dialog = AutomationDialogController(self.window, self.icon_manager.get_icon)
         automation_action = QAction(tr("MainWindow", "自動化スクリプト…"), self.window)
         automation_action.setObjectName("actionAutomation")
@@ -955,7 +956,7 @@ class MainWindowController(QObject):
         action_update = help_menu.addAction(tr("MainWindow", "更新を確認…"))
         action_update.setObjectName("actionCheckForUpdates")
         action_update.setEnabled(True)
-        action_update.triggered.connect(self._open_update_dialog)
+        action_update.triggered.connect(lambda checked=False: self._open_update_dialog())
 
         is_debug = "--debug" in sys.argv
         restart_label = tr("MainWindow", "通常モードで再起動") if is_debug else tr("MainWindow", "デバッグモードで再起動")
@@ -969,6 +970,11 @@ class MainWindowController(QObject):
         action_logs = help_menu.addAction(tr("MainWindow", "ログフォルダを開く"))
         action_logs.setObjectName("actionOpenLogsFolder")
         action_logs.triggered.connect(lambda: self._open_folder(log_directory()))
+
+    def _open_about_dialog(self) -> None:
+        controller = SimpleDialogController("dialogs/AboutDialog.ui", self.window)
+        require_child(controller.dialog, QLabel, "labelVersion").setText(f"Version {__version__}")
+        controller.exec()
 
     def _open_update_dialog(self, initial_data: dict | None = None) -> None:
         from autolingua2.ui.dialogs.update import UpdateDialogController
@@ -1762,7 +1768,7 @@ class MainWindowController(QObject):
                         combo.addItem(f"{slot.slot_id} ({slot.name})", slot.slot_id)
                     initial = game.default_slot_id if combo is self.combo_source_slot and previous is None else previous
                     combo.setCurrentIndex(max(0, combo.findData(initial or "")))
-            for code, name in adapter.supported_languages:
+            for code, name in adapter.supported_languages if isinstance(adapter, SupportedLanguagesAdapter) else ():
                 if self.combo_source_language.findData(code) < 0:
                     self.combo_source_language.addItem(f"{name} ({code})", code)
 
@@ -1943,7 +1949,7 @@ class MainWindowController(QObject):
                 source_paths = []
         self._embedded_sources = (isinstance(adapter, EmbeddedTranslationAdapter)
                                   and any(adapter.contains_translations(path) for path in source_paths))
-        if adapter is not None:
+        if isinstance(adapter, SupportedLanguagesAdapter):
             for code, name in adapter.supported_languages:
                 if self.combo_inherit_language.findData(code) < 0:
                     self.combo_inherit_language.addItem(f"{name} ({code})", code)

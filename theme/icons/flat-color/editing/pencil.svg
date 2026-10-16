@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>pencil</title>
+  <g fill="none">
+    <path fill="#ffa43d" d="M8.6 19.8 18.8 9.6 14.4 5.2 4.2 15.4l.4 4z"/>
+    <path fill="#ffd394" d="M8.6 19.8 4.2 15.4l-1.1 4.1a1.2 1.2 0 0 0 1.4 1.4l4.1-1.1Z"/>
+    <path fill="#2d3436" d="M3.1 19.5a1.2 1.2 0 0 0 1.4 1.4l1.5-.4-2.5-2.5-.4 1.5Z"/>
+    <path fill="#f97dbd" d="m18.8 9.6 1.9-1.9a3.1 3.1 0 0 0-4.4-4.4l-1.9 1.9 4.4 4.4Z"/>
+    <path fill="#ff921f" d="m13.2 6.4 1.4-1.4 4.4 4.4-1.4 1.4-4.4-4.4Z"/>
+  </g>
+</svg>

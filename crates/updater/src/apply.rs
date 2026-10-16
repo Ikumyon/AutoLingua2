@@ -47,6 +47,9 @@ pub fn handoff_to_temp_updater(
         command.creation_flags(DETACHED_PROCESS);
     }
 
+    platform::reset_inherited_library_directory()
+        .map_err(|e| format!("一時アップデーターのDLL検索先の初期化に失敗しました: {e}"))?;
+
     command
         .spawn()
         .map_err(|e| format!("一時アップデーターの起動に失敗しました: {e}"))?;
@@ -90,7 +93,12 @@ pub fn copy_recursive(src: &Path, dst: &Path) -> io::Result<()> {
         if let Some(parent) = dst.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::copy(src, dst)?;
+        fs::copy(src, dst).map_err(|err| {
+            io::Error::new(
+                err.kind(),
+                format!("{} -> {}: {err}", src.display(), dst.display()),
+            )
+        })?;
     }
     Ok(())
 }
@@ -124,9 +132,6 @@ where
         .map_err(|e| format!("ファイルの配置・上書き置換に失敗しました: {e}"))?;
 
     log_fn("すべてのファイルを正常に更新・配置しました");
-
-    // クリーンアップ
-    let _ = fs::remove_dir_all(extracted_dir);
 
     // 新ランチャーの自動起動
     let launcher_path = project_root.join(platform::launcher_executable_name());

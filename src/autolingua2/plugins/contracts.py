@@ -3,7 +3,8 @@
 Internal model locations may change; plugin authors should import these names here.
 These are the host's actual types, not copies or compatibility implementations.
 """
-from autolingua2.adapters.base import EmbeddedTranslationAdapter, FileAdapter, KeyConflictAdapter, TranslationTextAdapter
+from autolingua2 import __version__ as HOST_APP_VERSION
+from autolingua2.adapters.base import EmbeddedTranslationAdapter, FileAdapter, KeyConflictAdapter, SupportedLanguagesAdapter, TranslationTextAdapter
 from autolingua2.ir.translation import TranslationTextRules
 from autolingua2.services.settings.glossary_format import (
     GlossaryFormat, GlossaryImportData, GlossaryExportData, GlossaryTerm, TermSide, DirectedTerm,
@@ -35,13 +36,14 @@ from autolingua2.services.ai_providers.base import (
 )
 
 __all__ = [
+    "HOST_APP_VERSION",
     "GlossaryFormat", "GlossaryImportData", "GlossaryExportData", "GlossaryTerm", "TermSide", "DirectedTerm",
     "OperationContext", "OperationContribution", "OperationTool",
     "VoiceInputCallbacks", "VoiceInputMode", "VoiceInputOperation", "VoiceInputProvider",
     "ChatImage", "ChatMessage", "ChatReply", "ChatToolCall", "object_value", "string_value",
     "ChatCapacity", "ChatContextExceeded",
     "ExportFile", "TranslationExporter",
-    "EmbeddedTranslationAdapter", "FileAdapter", "KeyConflictAdapter", "KeyEntry", "KeyFile",
+    "EmbeddedTranslationAdapter", "FileAdapter", "KeyConflictAdapter", "SupportedLanguagesAdapter", "KeyEntry", "KeyFile",
     "TranslationTextAdapter", "TranslationTextRules",
     "AiProviderPlugin", "TextTranslator", "TranslationProviderError",
     "BaseHttpTranslator", "BaseAiProvider",

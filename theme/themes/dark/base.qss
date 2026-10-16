@@ -1,0 +1,173 @@
+/* Colors only. Geometry and typography are provided by Qt. */
+QWidget {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+    selection-background-color: #0078d7;
+    selection-color: #ffffff;
+}
+
+QWidget:disabled {
+    color: #6c7086;
+}
+
+QLineEdit,
+QTextEdit,
+QPlainTextEdit,
+QAbstractItemView,
+QAbstractSpinBox,
+QComboBox {
+    background-color: #181825;
+    color: #cdd6f4;
+    alternate-background-color: #1e1e2e;
+}
+
+QLineEdit:disabled,
+QTextEdit:disabled,
+QPlainTextEdit:disabled,
+QAbstractItemView:disabled,
+QAbstractSpinBox:disabled,
+QComboBox:disabled {
+    background-color: #11111b;
+    color: #6c7086;
+}
+
+QAbstractItemView::item:selected {
+    background-color: #0078d7;
+    color: #ffffff;
+}
+
+QAbstractItemView::item:selected:!active {
+    background-color: #313244;
+    color: #cdd6f4;
+}
+
+QMenu,
+QToolTip {
+    background-color: #181825;
+    color: #cdd6f4;
+}
+
+QMenu::item:selected {
+    background-color: #313244;
+    color: #ffffff;
+}
+
+QMenu::item:disabled {
+    color: #6c7086;
+}
+
+QPushButton,
+QToolButton,
+QHeaderView::section,
+QTabBar::tab {
+    background-color: #313244;
+    color: #cdd6f4;
+}
+
+QPushButton:hover:enabled,
+QToolButton:hover:enabled {
+    background-color: #45475a;
+    border-color: #0078d7;
+}
+
+QPushButton:pressed:enabled,
+QPushButton:checked:enabled,
+QToolButton:pressed:enabled,
+QToolButton:checked:enabled {
+    background-color: #585b70;
+    border-color: #005499;
+}
+
+QPushButton:disabled,
+QToolButton:disabled {
+    background-color: #1e1e2e;
+    color: #6c7086;
+}
+
+QTabBar::tab:selected {
+    background-color: #181825;
+}
+
+QProgressBar::chunk {
+    background-color: #06b025;
+}
+
+QFrame#frameSearch {
+    background-color: #181825;
+    border-color: #45475a;
+}
+
+QFrame#frameSearch[focused="true"] {
+    border-color: #0078d7;
+}
+
+QFrame#frameSearch QLineEdit#editSearch {
+    background-color: transparent;
+    color: #cdd6f4;
+}
+
+QFrame#frameDropZone,
+QFrame#frameInheritDropZone,
+QFrame#frameIconDrop {
+    background-color: #181825;
+    border-color: #45475a;
+}
+
+QFrame#frameDropZone:hover:enabled,
+QFrame#frameInheritDropZone:hover,
+QFrame#frameIconDrop:hover {
+    background-color: #313244;
+    border-color: #0078d7;
+}
+
+QFrame#frameDropZone[dragOver="true"],
+QFrame#frameInheritDropZone[dragOver="true"],
+QFrame#frameIconDrop[dragOver="true"] {
+    background-color: #45475a;
+    border-color: #0078d7;
+}
+
+ModelRowWidget[status="valid"] {
+    background-color: #1c3829;
+}
+
+ModelRowWidget[status="invalid"] {
+    background-color: #3e1f24;
+}
+
+ModelRowWidget[status="disabled"] {
+    background-color: #272738;
+}
+
+RangeScrubberWidget {
+    qproperty-fillColor: #0078d7;
+    qproperty-hoverColor: #005499;
+    qproperty-bgColor: #181825;
+    qproperty-borderColor: #45475a;
+    qproperty-textColor: #cdd6f4;
+}
+
+ScriptEditor {
+    qproperty-keywordColor: #569cd6;
+    qproperty-typeColor: #4ec9b0;
+    qproperty-functionColor: #dcdcaa;
+    qproperty-stringColor: #ce9178;
+    qproperty-numberColor: #b5cea8;
+    qproperty-commentColor: #6a9955;
+}
+
+QLabel#labelSourceWatchIndicator[watchState="running"],
+QLabel#sourceWatchIndicator[watchState="running"] {
+    background-color: #107c10;
+}
+
+QLabel#labelSourceWatchIndicator[watchState="stopped"],
+QLabel#sourceWatchIndicator[watchState="stopped"] {
+    background-color: #c42b1c;
+}
+
+QLabel#labelSourceWatchIndicator[watchState="error"],
+QLabel#sourceWatchIndicator[watchState="error"] {
+    background-color: transparent;
+    color: #c42b1c;
+}

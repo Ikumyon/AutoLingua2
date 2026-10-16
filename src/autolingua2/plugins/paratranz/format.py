@@ -38,7 +38,6 @@ class ParaTranzAdapter:
     name = "ParaTranz JSON"
     suffixes = {".json"}
     supported_games = [GameProfile("generic", "汎用", [])]
-    supported_languages: list[tuple[str, str]] = []
     default_filter_rules: list[FilterRule] = []
 
     def can_load(self, path: Path) -> bool:

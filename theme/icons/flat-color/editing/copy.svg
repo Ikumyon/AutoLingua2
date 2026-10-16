@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>copy</title>
+  <g fill="none">
+    <rect x="3" y="3" width="12.5" height="13.5" rx="2.5" fill="#818cf8"/>
+    <rect x="8" y="7.5" width="13" height="13.5" rx="2.5" fill="#0094f0"/>
+    <rect x="10.8" y="11.2" width="7.4" height="1.5" rx="0.75" fill="#ffffff"/>
+    <rect x="10.8" y="14.2" width="7.4" height="1.5" rx="0.75" fill="#ffffff"/>
+    <rect x="10.8" y="17.2" width="4.8" height="1.5" rx="0.75" fill="#ffffff"/>
+  </g>
+</svg>

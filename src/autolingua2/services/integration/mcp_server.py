@@ -10,6 +10,7 @@ from uuid import uuid4
 from PySide6.QtCore import QObject, QTimer, QUrl, Signal
 from PySide6.QtNetwork import QHostAddress, QTcpServer, QTcpSocket
 
+from autolingua2 import __version__
 from autolingua2.ir.validation import record, text
 from autolingua2.services.operations.application_operations import ApplicationOperations
 from autolingua2.services.operations.operation_contract import McpSettings
@@ -246,7 +247,7 @@ class McpServer(QObject):
                     result = {"protocolVersion": PROTOCOL_VERSION,
                               "instructions": OPERATION_INSTRUCTIONS,
                               "capabilities": {"tools": {}, "resources": {}, "prompts": {}, "logging": {}},
-                              "serverInfo": {"name": "Autolingua Desktop", "version": "0.1.0"}}
+                              "serverInfo": {"name": "Autolingua Desktop", "version": __version__}}
                 else:
                     result = self._dispatch(name, params)
                 response = {"jsonrpc": "2.0", "id": request_id, "result": result}

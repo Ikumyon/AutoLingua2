@@ -1,1 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up preview-icon"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>arrow-up</title>
+  <defs>
+    <linearGradient id="arrUpGrad" x1="6" y1="4" x2="18" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3bd5ff"/>
+      <stop offset="0.55" stop-color="#0094f0"/>
+      <stop offset="1" stop-color="#2052cb"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <path stroke="url(#arrUpGrad)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M12 19.5v-14M5.5 12 12 5.5 18.5 12"/>
+  </g>
+</svg>

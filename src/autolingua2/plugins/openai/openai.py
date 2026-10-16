@@ -5,6 +5,7 @@ import json
 from urllib.parse import quote
 
 from autolingua2.plugins.contracts import (
+    HOST_APP_VERSION,
     BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
     object_value, string_value, TranslationUsage, usage_number,
 )
@@ -92,7 +93,7 @@ class OpenAiTranslator(BaseHttpTranslator):
         return {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
-            "User-Agent": "Autolingua Desktop/0.1.0",
+            "User-Agent": f"Autolingua Desktop/{HOST_APP_VERSION}",
         }
 
     def build_payload(

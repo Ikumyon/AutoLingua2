@@ -4,6 +4,7 @@ from typing import Any
 from urllib.parse import quote
 
 from autolingua2.plugins.contracts import (
+    HOST_APP_VERSION,
     BaseAiProvider, BaseHttpTranslator, ChatMessage, ChatReply, ChatToolCall,
     object_value, string_value, TranslationUsage, usage_number, ChatCapacity,
 )
@@ -107,7 +108,7 @@ class GeminiTranslator(BaseHttpTranslator):
         return {
             "Content-Type": "application/json",
             "x-goog-api-key": self.api_key,
-            "User-Agent": "Autolingua Desktop/0.1.0",
+            "User-Agent": f"Autolingua Desktop/{HOST_APP_VERSION}",
         }
 
     def build_payload(

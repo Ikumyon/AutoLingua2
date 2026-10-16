@@ -10,6 +10,7 @@ from uuid import uuid4
 from PySide6.QtCore import QByteArray, QObject, QProcess, QTimer, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 
+from autolingua2 import __version__
 from autolingua2.ir.validation import record, text
 from autolingua2.services.integration.mcp_server import MAX_BODY, PROTOCOL_VERSION
 from autolingua2.services.operations.operation_contract import ExternalMcpConnection
@@ -117,7 +118,7 @@ class McpClient(QObject):
                     self._request_ready(connection, method, params, success, failure, job_id)
             self._notification(connection, "notifications/initialized", {}, ready)
         self._send(connection, "initialize", {"protocolVersion": PROTOCOL_VERSION,
-            "capabilities": {}, "clientInfo": {"name": "Autolingua Desktop", "version": "0.1.0"}},
+            "capabilities": {}, "clientInfo": {"name": "Autolingua Desktop", "version": __version__}},
             initialized, lambda error: self._fail_connection(connection, error))
 
     def _request_ready(self, connection: ClientConnection, method: str, params: dict[str, Any],

@@ -1,7 +1,10 @@
 [package]
 name = "autolingua-source-watcher"
-version = "0.1.0"
+publish = false
 edition = "2021"
 
 [dependencies]
 autolingua2-native = { path = "../autolingua2-native", default-features = false }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>question</title>
+  <g fill="none">
+    <path stroke="#ec4899" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M8.2 8.5a3.8 3.8 0 1 1 5.9 3.16c-1.15.77-2.1 1.7-2.1 3.09v.5"/>
+    <circle cx="12" cy="19.2" r="1.5" fill="#ec4899"/>
+  </g>
+</svg>

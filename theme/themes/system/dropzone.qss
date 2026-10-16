@@ -1,4 +1,4 @@
-/* 共通 DropZone & アイコン枠 スタイル */
+/* ドラッグ＆ドロップ (DropZone) & アイコン枠 スタイル */
 QFrame#frameDropZone,
 QFrame#frameInheritDropZone,
 QFrame#frameIconDrop {

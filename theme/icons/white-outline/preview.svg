@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160" viewBox="0 0 240 160">
+<rect width="240" height="160" rx="16" fill="#202938"/>
+<g transform="translate(26 24) scale(1.8333333333333333 1.8333333333333333)">
+  <title>folder</title>
+  <g fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 7V4h7l3 3h10v13H2ZM2 10h20"/>
+  </g>
+
+</g>
+<g transform="translate(98 24) scale(1.8333333333333333 1.8333333333333333)">
+  <title>settings</title>
+  <g fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 3 4 0 .7 3 2 .9 2.8-.9 2 3.4-2.1 2.1v2l2.1 2.1-2 3.4-2.8-.9-2 .9-.7 3h-4l-.7-3-2-.9-2.8.9-2-3.4 2.1-2.1v-2L2.5 9.4l2-3.4 2.8.9 2-.9Z"/><circle cx="12" cy="12" r="3"/>
+  </g>
+
+</g>
+<g transform="translate(170 24) scale(1.8333333333333333 1.8333333333333333)">
+  <title>robot-head</title>
+  <g fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="7" width="16" height="13" rx="3"/><path d="M12 3v4M1 11v5M23 11v5M8 12h.01M16 12h.01M9 16h6M8 20v2h8v-2"/>
+  </g>
+
+</g>
+<g transform="translate(26 96) scale(1.8333333333333333 1.8333333333333333)">
+  <title>pencil</title>
+  <g fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m4 16 12-12a2 2 0 0 1 4 4L8 20l-5 1ZM14 6l4 4"/>
+  </g>
+
+</g>
+<g transform="translate(98 96) scale(1.8333333333333333 1.8333333333333333)">
+  <title>search-16</title>
+  <g fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>
+  </g>
+
+</g>
+<g transform="translate(170 96) scale(1.8333333333333333 1.8333333333333333)">
+  <title>check</title>
+  <g fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m4 12 5 5L20 6"/>
+  </g>
+
+</g>
+</svg>

@@ -1,1 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 80 80"><title>person-check</title><g fill="none"><g transform="translate(-4, -4) scale(2.4)"><path fill="url(#PC_SVGKCH4Jk8K)" d="M25.125 18.056v4.166l-8.095 7.75q-.51.027-1.03.028c-3.198 0-6.14-.823-8.315-2.207C5.523 26.417 4 24.393 4 22v-.5A3.5 3.5 0 0 1 7.5 18h17q.32.001.625.056"/><path fill="url(#PC_SVGcp1ycBLD)" d="M25.125 18.056v4.166l-8.095 7.75q-.51.027-1.03.028c-3.198 0-6.14-.823-8.315-2.207C5.523 26.417 4 24.393 4 22v-.5A3.5 3.5 0 0 1 7.5 18h17q.32.001.625.056"/><path fill="url(#PC_SVGoCl5vdmK)" fill-opacity=".75" d="M25.125 18.056v4.166l-8.095 7.75q-.51.027-1.03.028c-3.198 0-6.14-.823-8.315-2.207C5.523 26.417 4 24.393 4 22v-.5A3.5 3.5 0 0 1 7.5 18h17q.32.001.625.056"/><path fill="url(#PC_SVGTVs4bdKw)" fill-opacity=".75" d="M25.125 18.056v4.166l-8.095 7.75q-.51.027-1.03.028c-3.198 0-6.14-.823-8.315-2.207C5.523 26.417 4 24.393 4 22v-.5A3.5 3.5 0 0 1 7.5 18h17q.32.001.625.056"/><path fill="url(#PC_SVGUxDSsduC)" d="M16 16a7 7 0 1 0 0-14a7 7 0 0 0 0 14"/></g><circle cx="58" cy="58" r="18" fill="#219653"/><path fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M48 58l7 7 14-14"/><defs><linearGradient id="PC_SVGKCH4Jk8K" x1="9.707" x2="13.584" y1="19.595" y2="31.977" gradientUnits="userSpaceOnUse"><stop offset=".125" stop-color="#9c6cfe"/><stop offset="1" stop-color="#7a41dc"/></linearGradient><linearGradient id="PC_SVGcp1ycBLD" x1="16" x2="21.429" y1="16.571" y2="36.857" gradientUnits="userSpaceOnUse"><stop stop-color="#885edb" stop-opacity="0"/><stop offset="1" stop-color="#e362f8"/></linearGradient><linearGradient id="PC_SVGUxDSsduC" x1="12.329" x2="19.464" y1="3.861" y2="15.254" gradientUnits="userSpaceOnUse"><stop offset=".125" stop-color="#9c6cfe"/><stop offset="1" stop-color="#7a41dc"/></linearGradient><radialGradient id="PC_SVGoCl5vdmK" cx="0" cy="0" r="1" gradientTransform="rotate(-59.267 40.498 -1.073)scale(18.9466 9.80314)" gradientUnits="userSpaceOnUse"><stop stop-color="#0a1852" stop-opacity=".75"/><stop offset="1" stop-color="#0a1852" stop-opacity="0"/></radialGradient><radialGradient id="PC_SVGTVs4bdKw" cx="0" cy="0" r="1" gradientTransform="matrix(0 -5.5 7.25 0 26 21.5)" gradientUnits="userSpaceOnUse"><stop stop-color="#0a1852" stop-opacity=".75"/><stop offset="1" stop-color="#0a1852" stop-opacity="0"/></radialGradient></defs></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 32 32">
+  <title>person-check</title>
+  <defs>
+    <linearGradient id="pcBody1" x1="9.707" x2="13.584" y1="19.595" y2="31.977" gradientUnits="userSpaceOnUse">
+      <stop offset=".125" stop-color="#9c6cfe"/>
+      <stop offset="1" stop-color="#7a41dc"/>
+    </linearGradient>
+    <linearGradient id="pcBody2" x1="16" x2="21.429" y1="16.571" y2="36.857" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#885edb" stop-opacity="0"/>
+      <stop offset="1" stop-color="#e362f8"/>
+    </linearGradient>
+    <linearGradient id="pcHead" x1="12.329" x2="19.464" y1="3.861" y2="15.254" gradientUnits="userSpaceOnUse">
+      <stop offset=".125" stop-color="#9c6cfe"/>
+      <stop offset="1" stop-color="#7a41dc"/>
+    </linearGradient>
+    <linearGradient id="pcBadge" x1="18" y1="17" x2="29" y2="29" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4ade80"/>
+      <stop offset="0.55" stop-color="#10b981"/>
+      <stop offset="1" stop-color="#047857"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <path fill="url(#pcBody1)" d="M7.5 18A3.5 3.5 0 0 0 4 21.5v.5c0 2.393 1.523 4.417 3.685 5.793C9.86 29.177 12.802 30 16 30s6.14-.823 8.315-2.207C26.477 26.417 28 24.393 28 22v-.5A3.5 3.5 0 0 0 24.5 18h-17Z"/>
+    <path fill="url(#pcBody2)" d="M7.5 18A3.5 3.5 0 0 0 4 21.5v.5c0 2.393 1.523 4.417 3.685 5.793C9.86 29.177 12.802 30 16 30s6.14-.823 8.315-2.207C26.477 26.417 28 24.393 28 22v-.5A3.5 3.5 0 0 0 24.5 18h-17Z"/>
+    <path fill="url(#pcHead)" d="M16 16a7 7 0 1 0 0-14a7 7 0 0 0 0 14Z"/>
+    <circle cx="23.5" cy="23.5" r="7" fill="url(#pcBadge)"/>
+    <path stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="m20 23.6 2.3 2.3 4.7-4.7"/>
+  </g>
+</svg>

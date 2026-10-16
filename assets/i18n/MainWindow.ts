@@ -3,10 +3,6 @@
   <context>
     <name>MainWindow</name>
     <message>
-      <source>.*</source>
-      <translation>.*</translation>
-    </message>
-    <message>
       <source>0 / 0</source>
       <translation>0 / 0</translation>
     </message>
@@ -51,10 +47,6 @@
       <translation>AI設定パネル</translation>
     </message>
     <message>
-      <source>Aa</source>
-      <translation>Aa</translation>
-    </message>
-    <message>
       <source>Autolingua Desktop</source>
       <translation>Autolingua Desktop</translation>
     </message>
@@ -63,19 +55,15 @@
       <translation>Ctrl+N</translation>
     </message>
     <message>
-      <source>ab</source>
-      <translation>ab</translation>
-    </message>
-    <message>
       <source>key: キー / source: 原文 / target: 訳文 / context: コンテキスト / file: ファイル名
-status: 表示ステータス / exp:/パターン/フラグ: 正規表現
+status: 表示ステータス / regex:/パターン/フラグ: 正規表現
 指定なしは全体検索。AND・OR・NOT・先頭の -・括弧に対応。空白区切りはANDです。
 優先順位：括弧 → NOT・- → AND → OR。演算子は大文字小文字を区別しません。
 空白を含む語は引用符で囲みます。バックスラッシュで特殊文字をエスケープできます。
 正規表現ボタンONでは入力全体を正規表現として扱います。
 状態フィルターの範囲内で検索します。置換は単一条件で指定なし、または target: の場合に利用できます。</source>
       <translation>key: キー / source: 原文 / target: 訳文 / context: コンテキスト / file: ファイル名
-status: 表示ステータス / exp:/パターン/フラグ: 正規表現
+status: 表示ステータス / regex:/パターン/フラグ: 正規表現
 指定なしは全体検索。AND・OR・NOT・先頭の -・括弧に対応。空白区切りはANDです。
 優先順位：括弧 → NOT・- → AND → OR。演算子は大文字小文字を区別しません。
 空白を含む語は引用符で囲みます。バックスラッシュで特殊文字をエスケープできます。
@@ -93,10 +81,6 @@ status: 表示ステータス / exp:/パターン/フラグ: 正規表現
     <message>
       <source>→</source>
       <translation>→</translation>
-    </message>
-    <message>
-      <source>▶</source>
-      <translation>▶</translation>
     </message>
     <message>
       <source>▶ 全翻訳</source>
@@ -293,10 +277,6 @@ status: 表示ステータス / exp:/パターン/フラグ: 正規表現
       <translation>割合</translation>
     </message>
     <message>
-      <source>単語全体に一致する</source>
-      <translation>単語全体に一致する</translation>
-    </message>
-    <message>
       <source>原文</source>
       <translation>原文</translation>
     </message>
@@ -355,10 +335,6 @@ status: 表示ステータス / exp:/パターン/フラグ: 正規表現
     <message>
       <source>問題一覧</source>
       <translation>問題一覧</translation>
-    </message>
-    <message>
-      <source>大文字と小文字を区別する</source>
-      <translation>大文字と小文字を区別する</translation>
     </message>
     <message>
       <source>手動翻訳済み</source>
@@ -437,6 +413,10 @@ status: 表示ステータス / exp:/パターン/フラグ: 正規表現
       <translation>未選択</translation>
     </message>
     <message>
+      <source>校閲モデル：</source>
+      <translation>校閲モデル：</translation>
+    </message>
+    <message>
       <source>検索</source>
       <translation>検索</translation>
     </message>
@@ -463,10 +443,6 @@ status: 表示ステータス / exp:/パターン/フラグ: 正規表現
     <message>
       <source>正規表現では参照（\1、\g&lt;name&gt;）を使用できます</source>
       <translation>正規表現では参照（\1、\g&lt;name&gt;）を使用できます</translation>
-    </message>
-    <message>
-      <source>正規表現を使用する</source>
-      <translation>正規表現を使用する</translation>
     </message>
     <message>
       <source>状態</source>
@@ -513,10 +489,6 @@ status: 表示ステータス / exp:/パターン/フラグ: 正規表現
       <translation>置換後の文字列</translation>
     </message>
     <message>
-      <source>置換欄を開く／閉じる</source>
-      <translation>置換欄を開く／閉じる</translation>
-    </message>
-    <message>
       <source>翻訳</source>
       <translation>翻訳</translation>
     </message>
@@ -535,6 +507,10 @@ status: 表示ステータス / exp:/パターン/フラグ: 正規表現
     <message>
       <source>翻訳対象のファイルまたはフォルダを追加します（必須）</source>
       <translation>翻訳対象のファイルまたはフォルダを追加します（必須）</translation>
+    </message>
+    <message>
+      <source>翻訳後にAIで校閲する</source>
+      <translation>翻訳後にAIで校閲する</translation>
     </message>
     <message>
       <source>翻訳設定を開く…</source>

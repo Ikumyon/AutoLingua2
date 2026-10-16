@@ -1,6 +1,10 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "autolingua2"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Paradox localization translation editor"
 requires-python = ">=3.14,<3.16"
 dependencies = [
@@ -17,3 +21,6 @@ pythonpath = ["src"]
 
 [tool.pyright]
 extraPaths = ["src"]
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}

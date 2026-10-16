@@ -2,6 +2,18 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+pub fn reset_inherited_library_directory() -> io::Result<()> {
+    #[cfg(windows)]
+    {
+        // PyInstaller's DLL directory is inherited by children. Do not pass it
+        // to the temporary updater, which must not lock files being replaced.
+        if unsafe { windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW(std::ptr::null()) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    Ok(())
+}
+
 #[cfg(windows)]
 pub fn launcher_executable_name() -> &'static str {
     "AUTOlingua2.exe"
@@ -75,6 +87,7 @@ pub fn spawn_launcher(launcher_path: &Path) -> io::Result<()> {
     let parent = launcher_path.parent().unwrap_or(Path::new("."));
     let mut command = std::process::Command::new(launcher_path);
     command.current_dir(parent);
+    command.env("AUTOLINGUA_UPDATE_CLEANUP_PID", std::process::id().to_string());
 
     #[cfg(windows)]
     {

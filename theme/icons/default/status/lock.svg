@@ -1,1 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 80 80"><title>lock</title><g fill="none" fill-rule="evenodd" clip-rule="evenodd"><path fill="#f2c94c" d="M19.833 38.25c-1.012 0-1.833.82-1.833 1.833v26.334c0 1.012.82 1.833 1.833 1.833h40.334c1.012 0 1.833-.82 1.833-1.833V40.083c0-1.012-.82-1.833-1.833-1.833zM43 56.25a4.243 4.243 0 1 1-6-6a4.243 4.243 0 0 1 6 6"/><path fill="#828282" d="M40 14.25c-8.56 0-15.5 6.94-15.5 15.5v8.5h4v-8.5c0-6.351 5.149-11.5 11.5-11.5s11.5 5.149 11.5 11.5v8.5h4v-8.5c0-8.56-6.94-15.5-15.5-15.5"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>lock</title>
+  <defs>
+    <linearGradient id="lkShackle" x1="7" y1="3" x2="17" y2="11" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e2e8f0"/>
+      <stop offset="1" stop-color="#64748b"/>
+    </linearGradient>
+    <linearGradient id="lkBody" x1="5" y1="10" x2="19" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fde047"/>
+      <stop offset="0.55" stop-color="#facc15"/>
+      <stop offset="1" stop-color="#d97706"/>
+    </linearGradient>
+    <radialGradient id="lkHighlight" cx="9" cy="12" r="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fef9c3" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#fef9c3" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g fill="none">
+    <path stroke="url(#lkShackle)" stroke-width="2.5" stroke-linecap="round" d="M8 10.5V7a4 4 0 1 1 8 0v3.5"/>
+    <rect x="4.5" y="10" width="15" height="11" rx="2.5" fill="url(#lkBody)"/>
+    <rect x="4.5" y="10" width="15" height="11" rx="2.5" fill="url(#lkHighlight)"/>
+    <circle cx="12" cy="15.5" r="1.8" fill="#78350f"/>
+  </g>
+</svg>

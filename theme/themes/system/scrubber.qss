@@ -1,0 +1,8 @@
+/* スクラバー（RangeScrubberWidget）カラー定義 */
+RangeScrubberWidget {
+    qproperty-fillColor: #0d6efd;
+    qproperty-hoverColor: rgba(255, 255, 255, 36);
+    qproperty-bgColor: #2b2d30;
+    qproperty-borderColor: #3c3f41;
+    qproperty-textColor: #ffffff;
+}
