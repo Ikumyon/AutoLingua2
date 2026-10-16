@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from autolingua2.ui.resources.i18n import translation_source
 import json
+from copy import deepcopy
 
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -64,6 +65,7 @@ class AiSettingsPageController(QObject):
         self._translation_refresh_pending = False
         self.model_list.changed.connect(self._queue_translation_models_refresh)
         self._ui_ready = True
+        self._saved_settings = deepcopy(self.settings())
 
     def settings(self) -> AiSettings:
         self._save_current_ai_fields()
@@ -126,6 +128,7 @@ class AiSettingsPageController(QObject):
         for panel in self._plugin_panels.values():
             panel.save_settings()
         save_ai_settings(settings)
+        self._saved_settings = deepcopy(settings)
 
     def cancel(self) -> None:
         self._stop_connection_test()
@@ -325,11 +328,14 @@ class AiSettingsPageController(QObject):
             )
 
     def validate_for_save(self) -> None:
-        self._save_current_ai_fields()
+        settings = self.settings()
         self._validation_cancelled = False
         for provider_id, panel in self._plugin_panels.items():
             if self._setup_options[provider_id].mode == "custom" and not panel.ready:
                 raise ValueError(f"{self._setup_options[provider_id].title} の設定を完了してください。")
+        if settings == self._saved_settings:
+            self.save_ready.emit()
+            return
         api_key = self.ai_api_keys.get(self._current_provider_id, "").strip()
         provider = self.registry.get(self._current_provider_id)
 

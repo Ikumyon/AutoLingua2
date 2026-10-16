@@ -7,15 +7,18 @@ from pathlib import Path
 from PySide6.QtCore import QDir, QEvent, QModelIndex, QObject, Qt, QTimer
 from PySide6.QtGui import QAction, QKeyEvent
 from PySide6.QtWidgets import (
-    QComboBox, QFileSystemModel, QGroupBox, QHeaderView, QInputDialog,
+    QCheckBox, QComboBox, QFileSystemModel, QGridLayout, QGroupBox, QHeaderView, QInputDialog,
     QHBoxLayout, QLineEdit, QMenu, QMessageBox, QPushButton, QSplitter, QStackedWidget,
     QToolButton, QTreeView, QVBoxLayout, QWidget,
 )
 
 from autolingua2.ir.imported import ImportedTranslation
+from autolingua2.ir.state import UnitState
 from autolingua2.plugins.api import ExportSettingsPanel
 from autolingua2.services.exporting.bmfont_exporter import BmFontCharListExporter
 from autolingua2.services.exporting.export_contract import TranslationExporter
+from autolingua2.services.exporting.export import DEFAULT_TRANSLATION_STATES
+from autolingua2.ui.components.status_donut import STATUS_LABELS
 from autolingua2.ui.export.bmfont_export_panel import BmFontExportSettingsPanel
 from autolingua2.ui.dialogs.base import SimpleDialogController, require_child
 from autolingua2.ui.resources.i18n import tr
@@ -272,6 +275,23 @@ class ExportDialog(SimpleDialogController):
         self._formats = require_child(self.dialog, QComboBox, "comboFormat")
         self._settings_group = require_child(self.dialog, QGroupBox, "groupSettings")
         self._settings_layout = require_child(self.dialog, QVBoxLayout, "layoutSettings")
+        self._settings_section = require_child(self.dialog, QWidget, "sectionSettings")
+        self._settings_toggle = require_child(self.dialog, QToolButton, "buttonSettings")
+        states_widget = require_child(self.dialog, QWidget, "widgetTranslationStates")
+        states_toggle = require_child(self.dialog, QToolButton, "buttonTranslationStates")
+        states_layout = require_child(self.dialog, QGridLayout, "layoutTranslationStates")
+        self._state_checkboxes: dict[UnitState, QCheckBox] = {}
+        positions = ((0, 0), (1, 0), (1, 1), (2, 0), (2, 1),
+                     (3, 0), (3, 1), (4, 0), (5, 0), (5, 1))
+        for state, (row, column) in zip(UnitState, positions, strict=True):
+            checkbox = QCheckBox(tr("MainWindow", STATUS_LABELS[state]), states_widget)
+            checkbox.setChecked(state in DEFAULT_TRANSLATION_STATES)
+            states_layout.addWidget(checkbox, row, column)
+            self._state_checkboxes[state] = checkbox
+        for toggle, content in ((states_toggle, states_widget), (self._settings_toggle, self._settings_group)):
+            toggle.toggled.connect(content.setVisible)
+            toggle.toggled.connect(lambda expanded, button=toggle: button.setArrowType(
+                Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow))
         self._destination = require_child(self.dialog, QLineEdit, "editDestination")
         self._navigation = require_child(self.dialog, QTreeView, "treeNavigation")
         self._folders = require_child(self.dialog, QTreeView, "treeFolders")
@@ -380,7 +400,8 @@ class ExportDialog(SimpleDialogController):
             self._widget = None
         index = self._formats.currentIndex()
         self._panel = self._panels.get(self._keys[index]) if index >= 0 else None
-        self._settings_group.setVisible(self._panel is not None)
+        self._settings_section.setVisible(self._panel is not None)
+        self._settings_group.setVisible(self._panel is not None and self._settings_toggle.isChecked())
         if self._panel is not None:
             try:
                 self._widget = self._panel.create_widget(self._workspaces, self._settings_group)
@@ -413,6 +434,8 @@ class ExportDialog(SimpleDialogController):
             QMessageBox.warning(self.dialog, tr("ExportDialog", "出力設定エラー"), str(exc))
             return
         self.exporter = self._exporters[self._keys[index]]
-        self.settings = settings
+        self.settings = {**settings, "translation_states": [
+            state.value for state, checkbox in self._state_checkboxes.items() if checkbox.isChecked()
+        ]}
         self.destination = destination.resolve()
         self.dialog.accept()

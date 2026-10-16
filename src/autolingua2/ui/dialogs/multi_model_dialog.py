@@ -175,6 +175,7 @@ class MultiModelTranslationDialog(QDialog):
     def _connect_signals(self) -> None:
         self.ai_client.translation_completed.connect(self._on_translation_completed)
         self.ai_client.translation_failed.connect(self._on_translation_failed)
+        self.ai_client.translation_rejected.connect(self._on_translation_failed)
 
     def _disconnect_signals(self) -> None:
         try:

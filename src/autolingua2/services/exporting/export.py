@@ -2,10 +2,18 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
 
 from autolingua2.infrastructure.operations import check_cancelled, report_progress
 from autolingua2.ir.imported import ImportedTranslation
+from autolingua2.ir.state import UnitState
 from autolingua2.services.exporting.export_contract import TranslationExporter
+
+
+DEFAULT_TRANSLATION_STATES = frozenset({
+    UnitState.AI_TRANSLATED, UnitState.HUMAN_TRANSLATED,
+    UnitState.AI_REVIEWED, UnitState.HUMAN_REVIEWED, UnitState.LOCKED,
+})
 
 
 def plan_export_translation(workspaces: list[ImportedTranslation], exporter: TranslationExporter,
@@ -18,7 +26,19 @@ def plan_export_translation(workspaces: list[ImportedTranslation], exporter: Tra
     if not directory.is_dir():
         raise ValueError("出力先フォルダがありません。")
     check_cancelled()
-    files = exporter.plan(workspaces, settings)
+    plugin_settings = dict(settings)
+    selected = plugin_settings.pop("translation_states", [state.value for state in DEFAULT_TRANSLATION_STATES])
+    if not isinstance(selected, list) or any(not isinstance(state, str) for state in selected):
+        raise ValueError("出力する訳文のステータスが不正です。")
+    states = {UnitState(state) for state in selected}
+    prepared = [replace(workspace,
+        project=replace(workspace.project, units=[
+            replace(unit, target_text=unit.target_text
+                    if unit.state in states and unit.target_text.strip() else unit.source_text)
+            for unit in workspace.project.units
+        ]),
+    ) for workspace in workspaces]
+    files = exporter.plan(prepared, plugin_settings)
     if not files:
         raise ValueError("出力するファイルがありません。")
     outputs: list[tuple[Path, bytes]] = []

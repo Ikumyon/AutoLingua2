@@ -9,6 +9,8 @@ class UnitState(str, Enum):
     HUMAN_TRANSLATED = "human_translated"
     AI_REVIEWED = "ai_reviewed"
     HUMAN_REVIEWED = "human_reviewed"
+    TRANSLATION_ERROR = "translation_error"
+    REVIEW_ERROR = "review_error"
     DOUBTFUL = "doubtful"
     LOCKED = "locked"
     HIDDEN = "hidden"

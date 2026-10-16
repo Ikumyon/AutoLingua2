@@ -171,6 +171,7 @@ class UiTranslationService(QObject):
         self.registry = registry
         self.client = AiNetworkClient(self)
         self.client.translation_completed.connect(self._translated)
+        self.client.translation_rejected.connect(self._network_failed)
         self.client.translation_failed.connect(self._network_failed)
         self.process = QProcess(self)
         self.process.finished.connect(self._compiled)
@@ -271,11 +272,15 @@ class UiTranslationService(QObject):
             values = record(json.loads(response, object_pairs_hook=_unique_object))
             if set(values) != set(self._pending):
                 raise ValueError("AIの応答に項目の不足・重複・余分な項目があります。")
+            validated: dict[tuple[str, str, str], str] = {}
             for key, message in self._pending.items():
                 translated = text(values[key], nonempty=True)
+                if not translated.strip():
+                    raise ValueError(f"訳文が空です: {message.original}")
                 if _protected(message.original) != _protected(translated):
                     raise ValueError(f"書式指定またはHTMLが変更されています: {message.original}")
-                self._values[message.key] = translated
+                validated[message.key] = translated
+            self._values.update(validated)
             self._done += len(self._pending)
             self._pending.clear()
             self.progress.emit(self._done, self._total)

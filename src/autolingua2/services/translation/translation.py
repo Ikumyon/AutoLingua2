@@ -151,6 +151,7 @@ class TranslationService(QObject):
         self._batch_usage_start: Counter[str] = Counter()
         client.translation_completed.connect(self._completed)
         client.translation_failed.connect(self._failed)
+        client.translation_rejected.connect(self._rejected)
 
     def resolved_tone(self, unit: UnitView, selected: Tone | None, items: Sequence[ToneItem]) -> ToneItem | None:
         tone = selected if isinstance(selected, ToneItem) else None
@@ -465,7 +466,7 @@ class TranslationService(QObject):
                     raise ValueError("訳文が空です。")
             except (ValueError, KeyError) as exc:
                 self.usage_counts["validation_failures"] += 1
-                self._fail_job(job, str(exc))
+                self._fail_job(job, str(exc), state=UnitState.REVIEW_ERROR)
                 continue
             if key is not None:
                 self._cache[key] = translated
@@ -479,6 +480,14 @@ class TranslationService(QObject):
             job = self._jobs.get(job_id)
             if job is not None:
                 self._fail_job(job, error)
+
+    def _rejected(self, request_id: str, error: str) -> None:
+        job_ids, _ = self._take_request(request_id)
+        for job_id, _ in job_ids:
+            job = self._jobs.get(job_id)
+            if job is not None:
+                self.usage_counts["validation_failures"] += 1
+                self._fail_job(job, error, state=UnitState.REVIEW_ERROR)
 
     def _accept(self, job: _Job, translated: str) -> None:
         part = job.parts[len(job.results)]
@@ -498,7 +507,8 @@ class TranslationService(QObject):
             protected_translation = "".join(job.results)
             translations = {unit.id: job.protected.restore(protected_translation, unit.id) for unit in job.units}
         except ValueError as exc:
-            self._fail_job(job, str(exc))
+            self.usage_counts["validation_failures"] += 1
+            self._fail_job(job, str(exc), state=UnitState.REVIEW_ERROR)
             return
         context = job.options.text_context
         try:
@@ -529,7 +539,7 @@ class TranslationService(QObject):
             self.progress_changed.emit(self.completed, self.total)
             self._finish_batch_if_done()
 
-    def _fail_job(self, job: _Job, error: str) -> None:
+    def _fail_job(self, job: _Job, error: str, *, state: UnitState = UnitState.TRANSLATION_ERROR) -> None:
         jobs = [job]
         if job.batch and job.generation == self._batch_generation and self._planner is not None:
             for unit_id in self._planner.finish(job.unit.id, success=False):
@@ -540,9 +550,17 @@ class TranslationService(QObject):
             if self._jobs.pop(failed.id, None) is None:
                 continue
             for unit in failed.units:
-                failed.workspace.records[unit.id].translating = False
+                record = failed.workspace.records[unit.id]
+                message = error if failed is job else "参考元の翻訳に失敗しました。"
+                error_state = state if failed is job else UnitState.TRANSLATION_ERROR
+                label = "校閲エラー" if error_state == UnitState.REVIEW_ERROR else "翻訳エラー"
+                unit.target_text = f"［{label}］{message}"
+                unit.state = error_state
+                record.pending_confirmation = None
+                record.tone = None
+                record.translating = False
                 self.activity_changed.emit(failed.workspace, unit, False)
-                self.translation_failed.emit(unit, error if failed is job else "参考元の翻訳に失敗しました。", failed.batch)
+                self.translation_failed.emit(unit, message, failed.batch)
             if failed.batch:
                 self.completed += len(failed.units)
                 self.failed += len(failed.units)

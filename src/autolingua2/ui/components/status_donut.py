@@ -18,6 +18,8 @@ STATUS_LABELS: dict[UnitState, str] = {
     UnitState.HUMAN_TRANSLATED: translation_source('MainWindow', '人間による翻訳'),
     UnitState.AI_REVIEWED: translation_source('MainWindow', 'AIによる校閲'),
     UnitState.HUMAN_REVIEWED: translation_source('MainWindow', '人間による校閲'),
+    UnitState.TRANSLATION_ERROR: translation_source('MainWindow', '翻訳エラー'),
+    UnitState.REVIEW_ERROR: translation_source('MainWindow', '校閲エラー'),
     UnitState.DOUBTFUL: translation_source('MainWindow', '疑問あり'),
     UnitState.LOCKED: translation_source('MainWindow', 'ロック'),
     UnitState.HIDDEN: translation_source('MainWindow', '非表示'),
@@ -25,7 +27,7 @@ STATUS_LABELS: dict[UnitState, str] = {
 
 
 class StatusDonut(QWidget):
-    """Draw and interpolate the eight persisted translation states."""
+    """Draw and interpolate the persisted translation states."""
 
     state_clicked = Signal(object)  # UnitState, or None for the center
 
@@ -70,6 +72,8 @@ class StatusDonut(QWidget):
             UnitState.HUMAN_TRANSLATED: "#9275db",
             UnitState.AI_REVIEWED: "#20a897",
             UnitState.HUMAN_REVIEWED: "#67b64a",
+            UnitState.TRANSLATION_ERROR: "#d94f4f",
+            UnitState.REVIEW_ERROR: "#d66c37",
             UnitState.DOUBTFUL: "#e7a33c",
         }[state])
 

@@ -16,6 +16,15 @@ from autolingua2.services.translation.translation_execution import TranslationSl
 logger = logging.getLogger(__name__)
 
 
+def _unique_translation_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"翻訳応答のJSONキーが重複しています: {key}")
+        result[key] = value
+    return result
+
+
 class AiNetworkClient(QObject):
     """QtNetwork (QNetworkAccessManager) を用いた完全非同期AI通信クライアント。
 
@@ -27,6 +36,7 @@ class AiNetworkClient(QObject):
     all_validated = Signal(int, int)          # (success_count, error_count)
     translation_completed = Signal(str, str)  # (request_id, translated_text)
     translation_failed = Signal(str, str)     # (request_id, error_message)
+    translation_rejected = Signal(str, str)   # (request_id, validation_error)
     chat_completed = Signal(str, object)
     chat_failed = Signal(str, object)
     chat_capacity_received = Signal(str, object)
@@ -351,17 +361,22 @@ class AiNetworkClient(QObject):
                     else:
                         translated = translator.extract_translation(data)
                         if structured:
-                            result = json.loads(translated)
+                            result = json.loads(translated, object_pairs_hook=_unique_translation_object)
                             if (not isinstance(result, dict) or result.get("id") != request_id
                                     or not isinstance(result.get("translation"), str)
                                     or set(result) != {"id", "translation"}):
                                 raise ValueError("要求IDまたは訳文のJSON形式が不正です。")
                             translated = result["translation"]
+                            if not translated.strip():
+                                raise ValueError("訳文が空です。")
                         self.translation_completed.emit(request_id, translated)
                 except ChatContextExceeded as exc:
                     failed(str(exc), context_exceeded=True)
                 except Exception as exc:
-                    failed(f"レスポンス解析失敗: {exc}")
+                    if chat:
+                        failed(f"レスポンス解析失敗: {exc}")
+                    else:
+                        self.translation_rejected.emit(request_id, f"レスポンス検証失敗: {exc}")
             else:
                 error_message = translator._resolve_http_error(raw_text, http_status)
                 if not error_message or error_message == raw_text:

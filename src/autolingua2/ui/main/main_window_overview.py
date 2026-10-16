@@ -27,6 +27,7 @@ class OverviewController(QObject):
         window = host.window
         self.workspaces = require_child(window, QTableWidget, "tableDashboardWorkspaces")
         self.statuses = require_child(window, QTableWidget, "tableDashboardStatuses")
+        self.statuses.setRowCount(len(UnitState))
         self.project_name = require_child(window, QLabel, "labelDashboardProjectName")
         self.source_language = require_child(window, QLabel, "labelDashboardSourceLanguage")
         self.file_count = require_child(window, QLabel, "labelDashboardFileCount")

@@ -144,6 +144,8 @@ STATUS_MATCHERS: dict[str, Callable[[TranslationUnit], bool]] = {
     "has_issues": lambda unit: bool(unit.issues),
     "source_changed": lambda unit: unit.source_changed,
     "doubtful": lambda unit: unit.state == UnitState.DOUBTFUL,
+    "translation_error": lambda unit: unit.state == UnitState.TRANSLATION_ERROR,
+    "review_error": lambda unit: unit.state == UnitState.REVIEW_ERROR,
     "ai_reviewed": lambda unit: unit.state == UnitState.AI_REVIEWED,
     "human_reviewed": lambda unit: unit.state == UnitState.HUMAN_REVIEWED,
     "ai_translated": lambda unit: unit.state == UnitState.AI_TRANSLATED,
@@ -2081,6 +2083,8 @@ class MainWindowController(QObject):
             (tr("MainWindow", "AIによる校閲"), UnitState.AI_REVIEWED, "robot-check"),
             (tr("MainWindow", "AIによる翻訳"), UnitState.AI_TRANSLATED, "robot-edit"),
             (tr("MainWindow", "疑問あり"), UnitState.DOUBTFUL, "question"),
+            (tr("MainWindow", "翻訳エラー"), UnitState.TRANSLATION_ERROR, "question"),
+            (tr("MainWindow", "校閲エラー"), UnitState.REVIEW_ERROR, "question"),
             (tr("MainWindow", "未翻訳"), UnitState.UNTRANSLATED, "circle"),
         ]
         for label, state, icon_name in options:
@@ -2874,6 +2878,10 @@ class MainWindowController(QObject):
         return previous
 
     def _confirmed_status_text(self, unit: TranslationUnit, *, show_issues: bool = True) -> str:
+        if unit.state == UnitState.TRANSLATION_ERROR:
+            return tr("MainWindow", "翻訳エラー")
+        if unit.state == UnitState.REVIEW_ERROR:
+            return tr("MainWindow", "校閲エラー")
         if show_issues and unit.source_changed:
             return tr("MainWindow", "原文更新・要確認")
         if unit.hidden or unit.state == UnitState.HIDDEN:
@@ -2906,6 +2914,8 @@ class MainWindowController(QObject):
             tr("MainWindow", "ロック"): STATUS_MATCHERS["locked"],
             tr("MainWindow", "問題あり"): STATUS_MATCHERS["has_issues"],
             tr("MainWindow", "疑問あり"): STATUS_MATCHERS["doubtful"],
+            tr("MainWindow", "翻訳エラー"): STATUS_MATCHERS["translation_error"],
+            tr("MainWindow", "校閲エラー"): STATUS_MATCHERS["review_error"],
             tr("MainWindow", "AIによる校閲"): STATUS_MATCHERS["ai_reviewed"],
             tr("MainWindow", "人間による校閲"): STATUS_MATCHERS["human_reviewed"],
             tr("MainWindow", "AIによる翻訳"): STATUS_MATCHERS["ai_translated"],

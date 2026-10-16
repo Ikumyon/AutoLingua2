@@ -690,7 +690,9 @@ class ApplicationOperations(QObject):
                 candidate.tone = deepcopy(tone)
             if change.get("confirm") or "state" in change:
                 state = UnitState(change.get("state", "ai_translated" if candidate.target_text.strip() else "untranslated"))
-                if candidate.target_text.strip():
+                if state in {UnitState.TRANSLATION_ERROR, UnitState.REVIEW_ERROR}:
+                    candidate.state, candidate.pending_confirmation, candidate.tone = state, None, None
+                elif candidate.target_text.strip():
                     tone = candidate.tone or self._effective_tone(service, workspace, unit)
                     if tone is None:
                         raise ValueError("訳文の確定には口調を指定してください。")
@@ -731,6 +733,7 @@ class ApplicationOperations(QObject):
                 entry = workspace.records[unit_id]
                 previous = before[unit_id]
                 if (entry.pending_confirmation is None and entry.target_text.strip()
+                        and entry.state not in {UnitState.TRANSLATION_ERROR, UnitState.REVIEW_ERROR}
                         and (previous.target_text != entry.target_text or previous.tone != entry.tone
                              or previous.pending_confirmation is not None)):
                     try:
@@ -1293,6 +1296,10 @@ class ApplicationOperations(QObject):
             changes: list[dict[str, Any]] = []
             for unit_id, revision in self._translation_expected.items():
                 entry = workspace.records[unit_id]
+                if entry.state in {UnitState.TRANSLATION_ERROR, UnitState.REVIEW_ERROR}:
+                    changes.append({"id": unit_id, "revision": revision, "translation": entry.target_text,
+                                    "state": entry.state.value})
+                    continue
                 if unit_id in failed_ids or entry.tone is None or entry.state != UnitState.AI_TRANSLATED:
                     continue
                 changes.append({"id": unit_id, "revision": revision, "translation": entry.target_text,

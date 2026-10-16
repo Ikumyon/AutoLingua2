@@ -28,7 +28,8 @@ OPERATION_INSTRUCTIONS = (
     "破棄・失効した前提操作に依存する作業は続行しないでください。"
 )
 EDIT = {"type": "object", "properties": {"id": S, "revision": S, "translation": S,
-        "state": {"type": "string", "enum": ["untranslated", "ai_translated", "ai_reviewed", "doubtful"]},
+        "state": {"type": "string", "enum": ["untranslated", "ai_translated", "ai_reviewed", "doubtful",
+                                                "translation_error", "review_error"]},
         "tone_id": S, "confirm": B, "discard_draft": B, "notes": NOTES},
         "required": ["id", "revision"], "additionalProperties": False}
 
@@ -96,7 +97,8 @@ TOOLS = (
          {"project_id": S, "path": S}, ("project_id",), "edit"),
     tool("plan_export", "書き出し対象・内容・出力パスを事前確認。exporterはget_projectで取得。",
          {"project_id": S, "languages": STRINGS, "exporter": S, "directory": S,
-          "settings": {"type": "object"}}, ("project_id", "languages", "exporter", "directory"), "export"),
+          "settings": {"type": "object", "properties": {"translation_states": STRINGS},
+                       "additionalProperties": True}}, ("project_id", "languages", "exporter", "directory"), "export"),
     tool("start_export", "確認済み計画を書き出すジョブ。既存ファイルは上書きしない。",
          {"project_id": S, "export_id": S}, ("project_id", "export_id"), "export"),
     tool("get_operations", "変更提案・確認待ち・実行済み操作とジョブを取得。", {}),

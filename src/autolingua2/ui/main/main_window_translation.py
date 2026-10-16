@@ -109,6 +109,15 @@ class MainWindowTranslationController(QObject):
 
     def _activity_changed(self, workspace: Workspace, unit: TranslationUnit, active: bool) -> None:
         host = self.host
+        if not active and unit.state in {UnitState.TRANSLATION_ERROR, UnitState.REVIEW_ERROR}:
+            host.overview_controller.invalidate()
+            self._confirmed_values[(workspace.language_code, unit.id)] = (
+                workspace, unit.target_text, unit.state, workspace.records[unit.id].tone,
+            )
+            if host.active_workspace is workspace:
+                if host.focus_controller.current_unit is unit:
+                    host.focus_controller.refresh_focus(sync_list=False)
+                host._update_status_bar_counts()
         if host.active_workspace is workspace:
             if active:
                 host.target_text_delegate.cancel_edit(unit)
@@ -431,6 +440,8 @@ class MainWindowTranslationController(QObject):
             (UnitState.HUMAN_TRANSLATED, translation_source('MainWindow', "人間による翻訳")),
             (UnitState.AI_REVIEWED, translation_source('MainWindow', "AIによる校閲")),
             (UnitState.HUMAN_REVIEWED, translation_source('MainWindow', "人間による校閲")),
+            (UnitState.TRANSLATION_ERROR, translation_source('MainWindow', "翻訳エラー")),
+            (UnitState.REVIEW_ERROR, translation_source('MainWindow', "校閲エラー")),
             (UnitState.DOUBTFUL, translation_source('MainWindow', "疑問あり")),
         ):
             checkbox = QCheckBox(tr("MainWindow", "{label}（{count}件）").format(

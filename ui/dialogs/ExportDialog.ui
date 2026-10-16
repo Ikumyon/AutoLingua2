@@ -19,7 +19,7 @@
   <property name="windowTitle">
    <string>訳文を出力</string>
   </property>
-  <layout class="QVBoxLayout" name="layoutMain" stretch="0,0,1,0,0,0">
+  <layout class="QVBoxLayout" name="layoutMain" stretch="0,0,1,0,0,0,0">
    <item>
     <layout class="QHBoxLayout" name="layoutNavigation">
      <item>
@@ -265,11 +265,45 @@
     </layout>
    </item>
    <item>
-    <widget class="QGroupBox" name="groupSettings">
-     <property name="title">
-      <string>出力設定</string>
-     </property>
-     <layout class="QVBoxLayout" name="layoutSettings"/>
+    <widget class="QWidget" name="sectionTranslationStates">
+     <layout class="QVBoxLayout" name="layoutTranslationStatesSection">
+      <item>
+       <widget class="QToolButton" name="buttonTranslationStates">
+        <property name="text"><string>訳文を使用するステータス</string></property>
+        <property name="checkable"><bool>true</bool></property>
+        <property name="checked"><bool>true</bool></property>
+        <property name="toolButtonStyle"><enum>Qt::ToolButtonStyle::ToolButtonTextBesideIcon</enum></property>
+        <property name="arrowType"><enum>Qt::ArrowType::DownArrow</enum></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QWidget" name="widgetTranslationStates">
+        <layout class="QGridLayout" name="layoutTranslationStates"/>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QWidget" name="sectionSettings">
+     <layout class="QVBoxLayout" name="layoutSettingsSection">
+      <item>
+       <widget class="QToolButton" name="buttonSettings">
+        <property name="text"><string>出力設定</string></property>
+        <property name="checkable"><bool>true</bool></property>
+        <property name="checked"><bool>true</bool></property>
+        <property name="toolButtonStyle"><enum>Qt::ToolButtonStyle::ToolButtonTextBesideIcon</enum></property>
+        <property name="arrowType"><enum>Qt::ArrowType::DownArrow</enum></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="groupSettings">
+        <property name="title"><string/></property>
+        <property name="flat"><bool>true</bool></property>
+        <layout class="QVBoxLayout" name="layoutSettings"/>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>
