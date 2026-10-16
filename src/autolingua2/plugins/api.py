@@ -1,6 +1,6 @@
 """Public registration context and UI-capable plugin API."""
 from __future__ import annotations
-from autolingua2.services.operation_contract import OperationContribution
+from autolingua2.services.operations.operation_contract import OperationContribution
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,8 +12,8 @@ from PySide6.QtWidgets import QWidget
 from .contracts import FileAdapter, AiProviderPlugin, TranslationExporter, ImportedTranslation, VoiceInputProvider
 from autolingua2.infrastructure.encoding import detect_encoding, read_text_auto
 from autolingua2.infrastructure.platform import current_platform
-from autolingua2.services.settings_store import AiModel, AiSetupValues, load_plugin_settings, save_plugin_settings
-from autolingua2.ui.creation_contract import CreationAdapter, CreationContext
+from autolingua2.services.settings.settings_store import AiModel, AiSetupValues, load_plugin_settings, save_plugin_settings
+from autolingua2.ui.creation.creation_contract import CreationAdapter, CreationContext
 
 __all__ = [
     "PluginContext",

@@ -12,16 +12,16 @@ from PySide6.QtWidgets import (
 
 from autolingua2.extensions import ExtensionEntrance
 from autolingua2.plugins.api import AiSetupCallbacks, AiSetupOption, AiSetupPanel
-from autolingua2.services.ai_network import AiNetworkClient
+from autolingua2.services.ai.ai_network import AiNetworkClient
 from autolingua2.services.ai_providers.registry import ProviderRegistry
-from autolingua2.services.settings_store import (
+from autolingua2.services.settings.settings_store import (
     DEFAULT_UI_LANGUAGE, AiSetupValues, load_ai_settings, load_ui_language,
     mark_initial_setup_seen, save_initial_setup, save_ui_language,
 )
 from autolingua2.ui.components.ai_model_list import ModelListController
 from autolingua2.ui.components.ai_setup_panel import create_plugin_panel
-from autolingua2.ui.i18n import normalize_language, tr
-from autolingua2.ui.icons import IconManager
+from autolingua2.ui.resources.i18n import normalize_language, tr
+from autolingua2.ui.resources.icons import IconManager
 from .base import load_ui, require_child
 from .self_translation import SelfTranslationController
 

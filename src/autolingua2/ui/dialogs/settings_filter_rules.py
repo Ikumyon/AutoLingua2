@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from autolingua2.ui.i18n import translation_source
+from autolingua2.ui.resources.i18n import translation_source
 
 import re
 import uuid
@@ -15,9 +15,9 @@ from PySide6.QtWidgets import (
 
 from autolingua2.adapters.base import FileAdapter
 from autolingua2.ir.filter_rules import AdapterFilterConfig, FilterRule, TagKind
-from autolingua2.services.filter_rules import get_default_filter_config, get_filter_config
-from autolingua2.services.settings_store import save_game_filter_rules
-from autolingua2.ui.i18n import tr
+from autolingua2.services.settings.filter_rules import get_default_filter_config, get_filter_config
+from autolingua2.services.settings.settings_store import save_game_filter_rules
+from autolingua2.ui.resources.i18n import tr
 from .base import require_child
 
 

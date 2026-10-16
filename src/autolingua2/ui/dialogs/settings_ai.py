@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from autolingua2.ui.i18n import translation_source
+from autolingua2.ui.resources.i18n import translation_source
 import json
 
 from PySide6.QtCore import QObject, QTimer, Signal
@@ -10,16 +10,16 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from autolingua2.services.ai_network import AiNetworkClient
+from autolingua2.services.ai.ai_network import AiNetworkClient
 from autolingua2.services.ai_providers import ProviderRegistry
 from autolingua2.plugins.api import AiSetupCallbacks, AiSetupOption, AiSetupPanel, AiSetupValues
-from autolingua2.services.settings_store import AiModel, AiSettings, save_ai_settings
+from autolingua2.services.settings.settings_store import AiModel, AiSettings, save_ai_settings
 from autolingua2.ir.translation import LowModelRange, ModelSelection
 from autolingua2.ui.components.ai_model_row import ModelRowWidget
 from autolingua2.ui.components.ai_model_list import ModelListController
 from autolingua2.ui.components.ai_setup_panel import create_plugin_panel
-from autolingua2.ui.i18n import tr
-from autolingua2.ui.icons import IconManager
+from autolingua2.ui.resources.i18n import tr
+from autolingua2.ui.resources.icons import IconManager
 from .base import require_child
 
 

@@ -9,11 +9,11 @@ from PySide6.QtWidgets import (
 )
 
 from autolingua2.extensions import ExtensionEntrance
-from autolingua2.services.language_tags import normalize_language, qt_language_options, system_language
-from autolingua2.services.settings_store import load_ai_settings, load_ui_language, save_ui_language
-from autolingua2.services.ui_translation import UiTranslationService, coverage, export_ts
+from autolingua2.services.settings.language_tags import normalize_language, qt_language_options, system_language
+from autolingua2.services.settings.settings_store import load_ai_settings, load_ui_language, save_ui_language
+from autolingua2.services.settings.ui_translation import UiTranslationService, coverage, export_ts
 from autolingua2.ui.components.searchable_combo_box import ComboAction, enable_combo_search
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 from .base import load_ui, require_child
 
 

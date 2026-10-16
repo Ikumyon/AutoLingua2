@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 
 from autolingua2.ir import TranslationUnit, UnitState
 from autolingua2.ir.workspace import UnitView, WorkspaceUnit
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 
 def _index_unit(index: QModelIndex | QPersistentModelIndex) -> UnitView:
     unit = index.data(Qt.ItemDataRole.UserRole)

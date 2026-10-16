@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from autolingua2.ui.i18n import translation_source
+from autolingua2.ui.resources.i18n import translation_source
 
 from PySide6.QtCore import QLocale
 from PySide6.QtWidgets import (
@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from autolingua2.ir.key_conflict import KeyConflict
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 
 
 class KeyConflictDialog(QDialog):

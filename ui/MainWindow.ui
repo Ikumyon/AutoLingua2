@@ -1587,7 +1587,7 @@ QTableCornerButton::section {
         border-bottom-right-radius: 4px;
     }
     QToolButton#buttonSaveSplit::menu-arrow {
-        image: url(theme/icons/default/chevron-down.svg);
+        image: url(theme/icons/default/navigation/chevron-down.svg);
         width: 12px;
         height: 12px;
     }

@@ -12,9 +12,9 @@ from autolingua2.ir.imported import GameProfile, GameSlot, ImportedTranslation, 
 from autolingua2.ir.classification import (
     ClassificationResult, ClassifiedElement, DifferenceKind, SourceCategory, SourceGroup, TextDifference,
 )
-from autolingua2.services.export_contract import ExportFile, TranslationExporter
-from autolingua2.services.operation_contract import OperationContext, OperationContribution, OperationTool
-from autolingua2.services.voice_input_contract import (
+from autolingua2.services.exporting.export_contract import ExportFile, TranslationExporter
+from autolingua2.services.operations.operation_contract import OperationContext, OperationContribution, OperationTool
+from autolingua2.services.ai.voice_input_contract import (
     VoiceInputCallbacks, VoiceInputMode, VoiceInputOperation, VoiceInputProvider,
 )
 from autolingua2.services.ai_providers.chat import (

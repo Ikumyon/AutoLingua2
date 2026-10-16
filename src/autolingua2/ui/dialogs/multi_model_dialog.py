@@ -13,11 +13,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 from autolingua2.ui.dialogs.base import load_ui, require_child
 
 if TYPE_CHECKING:
-    from autolingua2.services.ai_network import AiNetworkClient
+    from autolingua2.services.ai.ai_network import AiNetworkClient
     from autolingua2.services.ai_providers.registry import ProviderRegistry
 
 

@@ -1,6 +1,6 @@
 """Host-side plugin management: explicit loading, validation, routing and lifecycle."""
 from __future__ import annotations
-from autolingua2.services.operation_contract import OperationContribution
+from autolingua2.services.operations.operation_contract import OperationContribution
 
 from collections.abc import Callable, Mapping
 import hashlib
@@ -16,7 +16,7 @@ from autolingua2.adapters.executable import ExecutableAdapter
 from autolingua2.adapters.validation import validate_adapter
 from autolingua2.ir.validation import required, text
 from autolingua2.services.ai_providers.registry import ProviderRegistry
-from autolingua2.ui.creation_contract import CreationAdapter, CreationContext
+from autolingua2.ui.creation.creation_contract import CreationAdapter, CreationContext
 from .api import (
     HighlighterFactory,
     PluginContext,

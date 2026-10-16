@@ -1,0 +1,604 @@
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field
+import json
+import logging
+import os
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
+from PySide6.QtCore import QIODevice, QSaveFile
+from autolingua2.ir.source_watch import WatchSettings, WatchTarget
+from autolingua2.ir.translation import LowModelRange, ModelSelection
+from autolingua2.ir.validation import array, record, required, text
+from autolingua2.infrastructure.filesystem import DATA_DIR
+from autolingua2.infrastructure.platform import qt_file_path
+from autolingua2.infrastructure import source_watch
+from autolingua2.services.settings.language_tags import normalize_language
+from autolingua2.services.operations.operation_contract import ExternalMcpConnection, McpSettings, PERMISSIONS, Permission
+
+if TYPE_CHECKING:
+    from autolingua2.services.ai_providers.registry import ProviderRegistry
+
+
+GROUP_TRANSLATION_TABLE = "translation_table"
+GROUP_UI = "ui"
+GROUP_SHORTCUTS = "shortcuts"
+GROUP_AI = "ai"
+GROUP_VOICE_INPUT = "voice_input"
+GROUP_MCP = "mcp"
+DEFAULT_VOICE_INPUT_PROVIDER = "system_voice_input"
+GROUP_FILTER_RULES = "filter_rules"
+KEY_COLUMN_ORDER = "column_order"
+KEY_HIDDEN_COLUMNS = "hidden_columns"
+KEY_UI_LANGUAGE = "language"
+KEY_THEME = "theme"
+KEY_ICON_THEME = "icon_theme"
+DEFAULT_THEME = "system"
+DEFAULT_ICON_THEME = "default"
+KEY_AI_MODEL = "model"
+KEY_AI_PROVIDER = "provider"
+KEY_AI_PROVIDERS = "providers"
+KEY_AI_API_KEY = "api_key"
+KEY_AI_SELECTED_MODEL = "selected_model"
+KEY_AI_MODELS = "models"
+KEY_AI_CONCURRENCY = "concurrency"
+KEY_INITIAL_SETUP_SEEN = "initial_setup_seen"
+KEY_WINDOW_GEOMETRY = "window_geometry"
+KEY_WINDOW_STATE = "window_state"
+KEY_SPLITTER_MAIN = "splitter_main"
+KEY_SPLITTER_FOCUS = "splitter_focus"
+KEY_AI_PANEL_VISIBLE = "ai_panel_visible"
+KEY_DOCK_TAB_POSITION = "dock_tab_position"
+KEY_DOCK_TAB_VERTICAL_TEXT = "dock_tab_vertical_text"
+DockTabPosition = Literal["top", "bottom", "left", "right"]
+SETTINGS_ENV_VAR = "AUTOLINGUA_SETTINGS_PATH"
+SETTINGS_FILE_NAME = "settings.json"
+
+
+@dataclass(slots=True)
+class ColumnLayout:
+    order: list[str]
+    hidden: set[str]
+
+
+def load_translation_table_columns(default_order: list[str], default_hidden: set[str] | None = None) -> ColumnLayout:
+    settings = _read_settings_file()
+    table_settings = settings.get(GROUP_TRANSLATION_TABLE, {})
+    if not isinstance(table_settings, dict):
+        table_settings = {}
+    has_hidden_setting = KEY_HIDDEN_COLUMNS in table_settings
+    saved_order = _string_list(table_settings.get(KEY_COLUMN_ORDER, []))
+    saved_hidden = set(_string_list(table_settings.get(KEY_HIDDEN_COLUMNS, [])))
+
+    known = set(default_order)
+    order = [column_id for column_id in saved_order if column_id in known]
+    order.extend(column_id for column_id in default_order if column_id not in order)
+    hidden_source = saved_hidden if has_hidden_setting else (default_hidden or set())
+    hidden = {column_id for column_id in hidden_source if column_id in known}
+
+    if len(hidden) >= len(default_order):
+        hidden.clear()
+
+    return ColumnLayout(order=order, hidden=hidden)
+
+
+def save_translation_table_columns(layout: ColumnLayout) -> None:
+    settings = _read_settings_file()
+    settings[GROUP_TRANSLATION_TABLE] = {
+        KEY_COLUMN_ORDER: layout.order,
+        KEY_HIDDEN_COLUMNS: sorted(layout.hidden),
+    }
+    _write_settings_file(settings)
+
+
+DEFAULT_UI_LANGUAGE = "system"
+
+
+def load_shortcut_preferences() -> tuple[str, bool]:
+    values = _read_settings_file().get(GROUP_SHORTCUTS, {})
+    if not isinstance(values, dict):
+        return "default", False
+    selected = values.get("selected", "default")
+    indexed = values.get("index_mode", False)
+    return selected if isinstance(selected, str) else "default", indexed is True
+
+
+def save_shortcut_preferences(selected: str, index_mode: bool) -> None:
+    settings = _read_settings_file()
+    settings[GROUP_SHORTCUTS] = {"selected": selected, "index_mode": index_mode}
+    _write_settings_file(settings)
+
+DEFAULT_AI_PROVIDER = "chatgpt"
+
+
+@dataclass(slots=True)
+class AiModel:
+    name: str
+    model: str
+    enabled: bool = True
+
+
+@dataclass(slots=True)
+class AiSettings:
+    provider_id: str
+    models: dict[str, list[AiModel]]
+    selected_models: dict[str, str] = field(default_factory=dict)
+    api_keys: dict[str, str] = field(default_factory=dict)
+    concurrency: int = 4
+    high_model: ModelSelection | None = None
+    low_model: ModelSelection | None = None
+    low_model_range: LowModelRange = LowModelRange.STANDARD
+
+
+@dataclass(frozen=True)
+class AiSetupValues:
+    """Provider configuration exchanged through the public setup contract."""
+
+    api_key: str
+    models: tuple[AiModel, ...]
+
+
+def load_ai_settings(registry: ProviderRegistry) -> AiSettings:
+    settings = _read_settings_file()
+    if GROUP_AI not in settings:
+        initial = AiSettings(DEFAULT_AI_PROVIDER, {
+            provider_id: registry.get_default_models(provider_id)
+            for provider_id in registry.providers
+        })
+        save_ai_settings(initial)
+        return initial
+    group = settings[GROUP_AI]
+    if not isinstance(group, dict):
+        return AiSettings(DEFAULT_AI_PROVIDER, {})
+
+    providers_data = group.get(KEY_AI_PROVIDERS, {})
+    models: dict[str, list[AiModel]] = {}
+    selected_models: dict[str, str] = {}
+    api_keys: dict[str, str] = {}
+
+    if isinstance(providers_data, dict):
+        for p_id, p_info in providers_data.items():
+            if not isinstance(p_id, str) or not isinstance(p_info, dict):
+                continue
+            api_keys[p_id] = str(p_info.get(KEY_AI_API_KEY) or "").strip()
+            sel = str(p_info.get(KEY_AI_SELECTED_MODEL) or "").strip()
+            if sel:
+                selected_models[p_id] = sel
+            raw_models = p_info.get(KEY_AI_MODELS, [])
+            models[p_id] = []
+            seen: set[str] = set()
+            if isinstance(raw_models, list):
+                for entry in raw_models:
+                    if isinstance(entry, dict):
+                        m_id = str(entry.get("model", "")).strip()
+                        name = str(entry.get("name", "")).strip() or m_id
+                        enabled = entry.get("enabled", True) is True
+                        if m_id and m_id not in seen:
+                            models[p_id].append(AiModel(name, m_id, enabled))
+                            seen.add(m_id)
+
+    provider = group.get(KEY_AI_PROVIDER)
+    concurrency = group.get(KEY_AI_CONCURRENCY, 4)
+    def assignment(key: str) -> ModelSelection | None:
+        value = group.get(key)
+        if not isinstance(value, dict):
+            return None
+        provider_id, model_id = value.get("provider_id"), value.get("model_id")
+        if not isinstance(provider_id, str) or not isinstance(model_id, str) or not provider_id or not model_id:
+            return None
+        return ModelSelection(provider_id, model_id)
+    range_value = group.get("low_model_range", "standard")
+    low_range = next((item for item in LowModelRange if item.value == range_value), LowModelRange.STANDARD)
+    return AiSettings(
+        provider_id=provider if isinstance(provider, str) and provider else DEFAULT_AI_PROVIDER,
+        models=models,
+        selected_models=selected_models,
+        api_keys=api_keys,
+        concurrency=concurrency if type(concurrency) is int and 1 <= concurrency <= 32 else 4,
+        high_model=assignment("high_model"), low_model=assignment("low_model"), low_model_range=low_range,
+    )
+
+
+def save_ai_settings(settings: AiSettings) -> None:
+    data = _read_settings_file()
+    _update_ai_settings(data, settings)
+    _write_settings_file(data)
+
+
+def _update_ai_settings(data: dict[str, object], settings: AiSettings) -> None:
+    group = data.get(GROUP_AI, {})
+    if not isinstance(group, dict):
+        group = {}
+    group[KEY_AI_PROVIDER] = settings.provider_id
+    group[KEY_AI_CONCURRENCY] = max(1, min(32, settings.concurrency))
+    group["high_model"] = asdict(settings.high_model) if settings.high_model is not None else None
+    group["low_model"] = asdict(settings.low_model) if settings.low_model is not None else None
+    group["low_model_range"] = settings.low_model_range.value
+
+    all_provider_ids = set(settings.models.keys()) | set(settings.api_keys.keys()) | set(settings.selected_models.keys())
+    providers_data: dict[str, dict[str, object]] = {}
+    for p_id in sorted(all_provider_ids):
+        p_models = settings.models.get(p_id, [])
+        p_models_list = [
+            {"name": item.name.strip() or item.model.strip(), "model": item.model.strip(), "enabled": item.enabled}
+            for item in p_models if item.model.strip()
+        ]
+        selected = settings.selected_models.get(p_id, "")
+        providers_data[p_id] = {
+            KEY_AI_API_KEY: settings.api_keys.get(p_id, ""),
+            KEY_AI_SELECTED_MODEL: selected,
+            KEY_AI_MODELS: p_models_list,
+        }
+    group[KEY_AI_PROVIDERS] = providers_data
+    group.pop(KEY_AI_MODEL, None)
+    group.pop("models", None)
+    group.pop("selected_models", None)
+    group.pop("api_keys", None)
+
+    data[GROUP_AI] = group
+
+
+def initial_setup_seen() -> bool:
+    return _read_settings_file().get(KEY_INITIAL_SETUP_SEEN) is True
+
+
+def mark_initial_setup_seen() -> None:
+    data = _read_settings_file()
+    data[KEY_INITIAL_SETUP_SEEN] = True
+    _write_settings_file(data)
+
+
+def save_initial_setup(registry: ProviderRegistry, provider_id: str, values: AiSetupValues) -> None:
+    if registry.get(provider_id) is None:
+        raise ValueError("選択したAIは利用できません。")
+    models = [AiModel(item.name.strip() or item.model.strip(), item.model.strip(), item.enabled)
+              for item in values.models]
+    if (not values.api_key.strip() or not any(item.enabled for item in models)
+            or any(not item.model for item in models)
+            or len({item.model for item in models}) != len(models)):
+        raise ValueError("認証情報と有効なモデルを設定してください。")
+    settings = load_ai_settings(registry)
+    settings.provider_id = provider_id
+    settings.api_keys[provider_id] = values.api_key.strip()
+    settings.models[provider_id] = models
+    if settings.selected_models.get(provider_id) not in {item.model for item in models}:
+        settings.selected_models.pop(provider_id, None)
+    data = _read_settings_file()
+    _update_ai_settings(data, settings)
+    data[KEY_INITIAL_SETUP_SEEN] = True
+    _write_settings_file(data)
+
+
+def load_voice_input_provider() -> str:
+    voice_settings = _read_settings_file().get(GROUP_VOICE_INPUT, {})
+    if not isinstance(voice_settings, dict):
+        return ""
+    provider_id = voice_settings.get("provider", DEFAULT_VOICE_INPUT_PROVIDER)
+    return provider_id if isinstance(provider_id, str) else ""
+
+
+def save_voice_input_provider(provider_id: str) -> None:
+    settings = _read_settings_file()
+    settings[GROUP_VOICE_INPUT] = {"provider": provider_id}
+    _write_settings_file(settings)
+
+
+def load_ui_language_revision(default: str = DEFAULT_UI_LANGUAGE) -> tuple[str, int]:
+    settings = _read_settings_file()
+    ui_settings = settings.get(GROUP_UI, {})
+    if not isinstance(ui_settings, dict):
+        return default, 0
+    generation = ui_settings.get("language_generation", 0)
+    if type(generation) is not int or generation < 0:
+        raise ValueError("表示言語の更新世代が不正です。")
+    language = ui_settings.get(KEY_UI_LANGUAGE)
+    if not language:
+        return default, generation
+    value = str(language)
+    return (DEFAULT_UI_LANGUAGE if value.lower() == DEFAULT_UI_LANGUAGE else normalize_language(value)), generation
+
+
+def load_ui_language(default: str = DEFAULT_UI_LANGUAGE) -> str:
+    return load_ui_language_revision(default)[0]
+
+
+def save_ui_language(language: str) -> None:
+    language = DEFAULT_UI_LANGUAGE if language.lower() == DEFAULT_UI_LANGUAGE else normalize_language(language)
+    settings = _read_settings_file()
+    ui_settings = settings.get(GROUP_UI, {})
+    if not isinstance(ui_settings, dict):
+        ui_settings = {}
+    generation = ui_settings.get("language_generation", 0)
+    if type(generation) is not int or generation < 0:
+        raise ValueError("表示言語の更新世代が不正です。")
+    if ui_settings.get(KEY_UI_LANGUAGE, DEFAULT_UI_LANGUAGE) != language:
+        ui_settings["language_generation"] = generation + 1
+    ui_settings[KEY_UI_LANGUAGE] = language
+    settings[GROUP_UI] = ui_settings
+    _write_settings_file(settings)
+
+
+def load_theme_settings(default_theme: str = DEFAULT_THEME, default_icon_theme: str = DEFAULT_ICON_THEME) -> tuple[str, str]:
+    settings = _read_settings_file()
+    ui_settings = settings.get(GROUP_UI, {})
+    if not isinstance(ui_settings, dict):
+        return default_theme, default_icon_theme
+    theme = ui_settings.get(KEY_THEME)
+    icon_theme = ui_settings.get(KEY_ICON_THEME)
+    return (str(theme) if theme else default_theme,
+            str(icon_theme) if icon_theme else default_icon_theme)
+
+
+def save_theme_settings(theme: str, icon_theme: str) -> None:
+    settings = _read_settings_file()
+    ui_settings = settings.get(GROUP_UI, {})
+    if not isinstance(ui_settings, dict):
+        ui_settings = {}
+    ui_settings[KEY_THEME] = theme
+    ui_settings[KEY_ICON_THEME] = icon_theme
+    settings[GROUP_UI] = ui_settings
+    _write_settings_file(settings)
+
+
+@dataclass(slots=True)
+class WindowLayout:
+    geometry: str = ""
+    state: str = ""
+    splitter_main: str = ""
+    splitter_focus: str = ""
+    ai_panel_visible: bool = True
+    dock_tab_position: DockTabPosition = "bottom"
+    dock_tab_vertical_text: bool = True
+
+
+def load_window_layout() -> WindowLayout:
+    settings = _read_settings_file()
+    ui_settings = settings.get(GROUP_UI, {})
+    if not isinstance(ui_settings, dict):
+        return WindowLayout()
+    position = ui_settings.get(KEY_DOCK_TAB_POSITION)
+    tab_position: DockTabPosition = "bottom"
+    if position == "top":
+        tab_position = "top"
+    elif position == "left":
+        tab_position = "left"
+    elif position == "right":
+        tab_position = "right"
+    return WindowLayout(
+        geometry=str(ui_settings.get(KEY_WINDOW_GEOMETRY) or ""),
+        state=str(ui_settings.get(KEY_WINDOW_STATE) or ""),
+        splitter_main=str(ui_settings.get(KEY_SPLITTER_MAIN) or ""),
+        splitter_focus=str(ui_settings.get(KEY_SPLITTER_FOCUS) or ""),
+        ai_panel_visible=bool(ui_settings.get(KEY_AI_PANEL_VISIBLE, True)),
+        dock_tab_position=tab_position,
+        dock_tab_vertical_text=bool(ui_settings.get(KEY_DOCK_TAB_VERTICAL_TEXT, True)),
+    )
+
+
+def save_window_layout(layout: WindowLayout) -> None:
+    settings = _read_settings_file()
+    ui_settings = settings.get(GROUP_UI, {})
+    if not isinstance(ui_settings, dict):
+        ui_settings = {}
+    ui_settings[KEY_WINDOW_GEOMETRY] = layout.geometry
+    ui_settings[KEY_WINDOW_STATE] = layout.state
+    ui_settings[KEY_SPLITTER_MAIN] = layout.splitter_main
+    ui_settings[KEY_SPLITTER_FOCUS] = layout.splitter_focus
+    ui_settings[KEY_AI_PANEL_VISIBLE] = layout.ai_panel_visible
+    ui_settings[KEY_DOCK_TAB_POSITION] = layout.dock_tab_position
+    ui_settings[KEY_DOCK_TAB_VERTICAL_TEXT] = layout.dock_tab_vertical_text
+    settings[GROUP_UI] = ui_settings
+    _write_settings_file(settings)
+
+
+KEY_RENDER_LITERAL_NEWLINES = "render_literal_newlines"
+KEY_HIGHLIGHT_TRANSLATION_TAGS = "highlight_translation_tags"
+KEY_APPLY_COLOR_TAGS = "apply_color_tags"
+
+
+def load_ui_display_flags() -> tuple[bool, bool, bool]:
+    """画面表示フラグ (改行展開, タグハイライト, 色タグ適用) をロード。デフォルトはすべてTrue。"""
+    settings = _read_settings_file()
+    ui_settings = settings.get(GROUP_UI, {})
+    if not isinstance(ui_settings, dict):
+        ui_settings = {}
+    return (
+        bool(ui_settings.get(KEY_RENDER_LITERAL_NEWLINES, True)),
+        bool(ui_settings.get(KEY_HIGHLIGHT_TRANSLATION_TAGS, True)),
+        bool(ui_settings.get(KEY_APPLY_COLOR_TAGS, True)),
+    )
+
+
+def save_ui_display_flags(render_newlines: bool, highlight_tags: bool, apply_color_tags: bool) -> None:
+    """画面表示フラグを settings.json の ui グループに保存。"""
+    settings = _read_settings_file()
+    ui_settings = settings.get(GROUP_UI, {})
+    if not isinstance(ui_settings, dict):
+        ui_settings = {}
+    ui_settings[KEY_RENDER_LITERAL_NEWLINES] = render_newlines
+    ui_settings[KEY_HIGHLIGHT_TRANSLATION_TAGS] = highlight_tags
+    ui_settings[KEY_APPLY_COLOR_TAGS] = apply_color_tags
+    settings[GROUP_UI] = ui_settings
+    _write_settings_file(settings)
+
+
+def load_game_filter_rules(adapter_id: str, game_id: str) -> dict[str, object] | None:
+    settings = _read_settings_file()
+    rules_group = settings.get(GROUP_FILTER_RULES, {})
+    if not isinstance(rules_group, dict):
+        return None
+    adapter_rules = rules_group.get(adapter_id, {})
+    if not isinstance(adapter_rules, dict):
+        return None
+    game_rules = adapter_rules.get(game_id)
+    return game_rules if isinstance(game_rules, dict) else None
+
+
+def save_game_filter_rules(adapter_id: str, game_id: str, rules_data: dict[str, object]) -> None:
+    settings = _read_settings_file()
+    rules_group = settings.get(GROUP_FILTER_RULES, {})
+    if not isinstance(rules_group, dict):
+        rules_group = {}
+    adapter_rules = rules_group.get(adapter_id, {})
+    if not isinstance(adapter_rules, dict):
+        adapter_rules = {}
+    adapter_rules[game_id] = rules_data
+    rules_group[adapter_id] = adapter_rules
+    settings[GROUP_FILTER_RULES] = rules_group
+    _write_settings_file(settings)
+
+
+GROUP_PLUGINS = "plugins"
+
+
+def load_plugin_settings(plugin_id: str) -> dict[str, object]:
+    settings = _read_settings_file()
+    plugins_group = settings.get(GROUP_PLUGINS, {})
+    if not isinstance(plugins_group, dict):
+        return {}
+    plugin_settings = plugins_group.get(plugin_id, {})
+    return dict(plugin_settings) if isinstance(plugin_settings, dict) else {}
+
+
+def save_plugin_settings(plugin_id: str, data: dict[str, object]) -> None:
+    settings = _read_settings_file()
+    plugins_group = settings.get(GROUP_PLUGINS, {})
+    if not isinstance(plugins_group, dict):
+        plugins_group = {}
+    plugins_group[plugin_id] = data
+    settings[GROUP_PLUGINS] = plugins_group
+    _write_settings_file(settings)
+
+
+def load_mcp_settings() -> McpSettings:
+    from autolingua2.ir.validation import array, boolean
+    data = record(_read_settings_file().get(GROUP_MCP, {}))
+    port = data.get("port", 0)
+    if type(port) is not int or not 0 <= port <= 65535:
+        raise ValueError("MCPポート番号が不正です。")
+    permissions: list[Permission] = [permission for permission in PERMISSIONS
+                   if permission in array(data.get("permissions", list(PERMISSIONS)))]
+    connections: list[ExternalMcpConnection] = []
+    for value in array(data.get("connections", [])):
+        item = record(value)
+        transport = text(item.get("transport"))
+        if transport not in {"stdio", "http"}:
+            raise ValueError("MCP接続方式が不正です。")
+        connections.append(ExternalMcpConnection(
+            text(item.get("id"), nonempty=True), text(item.get("name"), nonempty=True),
+            "stdio" if transport == "stdio" else "http", text(item.get("address"), nonempty=True),
+            [text(arg) for arg in array(item.get("arguments", []))], text(item.get("token", "")),
+        ))
+    if len({connection.id for connection in connections}) != len(connections):
+        raise ValueError("MCP接続IDが重複しています。")
+    return McpSettings(boolean(data.get("enabled", False)), port,
+                       text(data.get("token", "")), permissions, connections)
+
+
+def save_mcp_settings(value: McpSettings) -> None:
+    settings = _read_settings_file()
+    settings[GROUP_MCP] = asdict(value)
+    _write_settings_file(settings)
+
+
+def load_custom_languages() -> dict[str, str]:
+    value = _read_settings_file().get("translation_languages", {})
+    if not isinstance(value, dict):
+        return {}
+    return {code: name for code, name in value.items()
+            if isinstance(code, str) and isinstance(name, str)}
+
+
+def save_custom_languages(languages: dict[str, str]) -> None:
+    settings = _read_settings_file()
+    settings["translation_languages"] = dict(languages)
+    _write_settings_file(settings)
+
+
+def _string_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value] if value else []
+    if isinstance(value, (list, tuple)):
+        return [str(item) for item in value if str(item)]
+    return []
+
+
+def _read_settings_file() -> dict[str, object]:
+    path = settings_path()
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+class SettingsSaveError(OSError):
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        super().__init__(f"設定ファイルを保存できませんでした。\n保存先：{path}")
+
+
+def _write_settings_file(settings: dict[str, object]) -> None:
+    path = settings_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(settings, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
+        output = QSaveFile(qt_file_path(path))
+        output.setDirectWriteFallback(False)
+        if not output.open(QIODevice.OpenModeFlag.WriteOnly):
+            raise OSError(output.errorString())
+        if output.write(payload) != len(payload):
+            error = output.errorString()
+            output.cancelWriting()
+            raise OSError(error)
+        if not output.commit():
+            raise OSError(output.errorString())
+    except (OSError, ImportError, AttributeError) as exc:
+        logging.getLogger(__name__).exception("Settings save failed: %s", path)
+        raise SettingsSaveError(path) from exc
+
+
+def load_watch_settings() -> WatchSettings:
+    data = record(json.loads(source_watch.target_settings(settings_path())))
+    enabled = required(data, "enabled")
+    if type(enabled) is not bool:
+        raise ValueError("監視設定が不正です。")
+    targets: list[WatchTarget] = []
+    seen: set[str] = set()
+    for item in array(required(data, "targets")):
+        target = record(item)
+        path = text(target.get("project_path", ""))
+        root = text(required(target, "source_root"), nonempty=True)
+        if root in seen:
+            raise ValueError("通知・監視対象に重複したプロジェクトがあります。")
+        seen.add(root)
+        targets.append(WatchTarget(
+            path,
+            text(required(target, "name")),
+            root,
+            [text(suffix, nonempty=True) for suffix in array(required(target, "suffixes"))],
+            text(target.get("icon_path", "")), text(target.get("sound_path", "")),
+            text(target.get("adapter_id", "")), text(target.get("source_language", "")),
+            text(target.get("source_slot", "")),
+        ))
+    return WatchSettings(enabled, targets)
+
+
+def save_watch_settings(settings: WatchSettings) -> None:
+    try:
+        source_watch.save_target_settings(settings_path(), json.dumps(asdict(settings), ensure_ascii=False))
+    except (OSError, ImportError, AttributeError) as exc:
+        logging.getLogger(__name__).exception("Daemon target settings save failed")
+        raise OSError("デーモンの監視設定を保存できませんでした。ネイティブモジュールのビルドを確認してください。") from exc
+
+
+def settings_path() -> Path:
+    override = os.environ.get(SETTINGS_ENV_VAR)
+    if override:
+        return Path(override)
+
+    return DATA_DIR / SETTINGS_FILE_NAME

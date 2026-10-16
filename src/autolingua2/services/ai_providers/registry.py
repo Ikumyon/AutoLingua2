@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from .base import AiProviderPlugin
 
 if TYPE_CHECKING:
-    from autolingua2.services.settings_store import AiModel
+    from autolingua2.services.settings.settings_store import AiModel
 
 
 class ProviderRegistry:
@@ -22,7 +22,7 @@ class ProviderRegistry:
 
     def get_default_models(self, provider_id: str) -> list[AiModel]:
         """指定プロバイダの推奨モデルリストを AiModel オブジェクトとして返します。"""
-        from autolingua2.services.settings_store import AiModel
+        from autolingua2.services.settings.settings_store import AiModel
 
         provider = self.get(provider_id)
         if provider is None:

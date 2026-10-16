@@ -5,8 +5,8 @@ from PySide6.QtWidgets import (
     QCheckBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QToolButton, QWidget,
 )
 
-from autolingua2.services.settings_store import AiModel
-from autolingua2.ui.icons import IconManager
+from autolingua2.services.settings.settings_store import AiModel
+from autolingua2.ui.resources.icons import IconManager
 
 
 class _InlineLineEdit(QLineEdit):

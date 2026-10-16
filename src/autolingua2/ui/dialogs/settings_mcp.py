@@ -1,7 +1,7 @@
 """MCP settings integrated into the application's existing settings dialog."""
 from __future__ import annotations
 
-from autolingua2.ui.i18n import translation_source
+from autolingua2.ui.resources.i18n import translation_source
 
 from copy import deepcopy
 import secrets
@@ -13,11 +13,11 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
-from autolingua2.services.mcp_client import McpClient
-from autolingua2.services.mcp_server import McpServer
-from autolingua2.services.operation_contract import ExternalMcpConnection, McpSettings, PERMISSIONS, Permission
-from autolingua2.services.settings_store import load_mcp_settings, save_mcp_settings
-from autolingua2.ui.i18n import tr
+from autolingua2.services.integration.mcp_client import McpClient
+from autolingua2.services.integration.mcp_server import McpServer
+from autolingua2.services.operations.operation_contract import ExternalMcpConnection, McpSettings, PERMISSIONS, Permission
+from autolingua2.services.settings.settings_store import load_mcp_settings, save_mcp_settings
+from autolingua2.ui.resources.i18n import tr
 
 
 class McpSettingsPage(QWidget):

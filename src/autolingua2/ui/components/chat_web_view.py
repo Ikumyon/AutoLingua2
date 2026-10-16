@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from autolingua2.ui.i18n import translation_source
+from autolingua2.ui.resources.i18n import translation_source
 
 import json
 import logging
@@ -18,8 +18,8 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QWidget
 
 from autolingua2.infrastructure.filesystem import ASSETS_DIR
-from autolingua2.ui.i18n import tr
-from autolingua2.ui.operation_panel import NAMES, STATUSES
+from autolingua2.ui.resources.i18n import tr
+from autolingua2.ui.main.operation_panel import NAMES, STATUSES
 
 
 logger = logging.getLogger(__name__)

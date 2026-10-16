@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from autolingua2.ui.i18n import translation_source
+from autolingua2.ui.resources.i18n import translation_source
 
 from copy import deepcopy
 from collections.abc import Callable, Mapping
@@ -18,15 +18,15 @@ from PySide6.QtWidgets import (
 
 from autolingua2.adapters.base import FileAdapter
 from autolingua2.ir.source_watch import WatchTarget
-from autolingua2.services.settings_store import SettingsSaveError, load_watch_settings
-from autolingua2.services.source_updates import (
+from autolingua2.services.settings.settings_store import SettingsSaveError, load_watch_settings
+from autolingua2.services.translation.source_updates import (
     SourceUpdate, apply_watch_settings, register_target, watch_status,
     notifications_available, preview_notification_sound, validate_notification_file,
 )
 from autolingua2.infrastructure.filesystem import ASSETS_DIR
-from autolingua2.services.operation_worker import OperationWorker
-from autolingua2.ui.icons import IconManager
-from autolingua2.ui.i18n import tr
+from autolingua2.services.operations.operation_worker import OperationWorker
+from autolingua2.ui.resources.icons import IconManager
+from autolingua2.ui.resources.i18n import tr
 from .base import SimpleDialogController, require_child
 
 

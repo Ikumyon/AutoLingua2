@@ -14,11 +14,11 @@ from PySide6.QtWidgets import (
 )
 
 from autolingua2.ir.automation_script import READ_FUNCTIONS, ReadValue, Script, ScriptError, Step
-from autolingua2.services.automation import AutomationRunner
+from autolingua2.services.operations.automation import AutomationRunner
 from autolingua2.ui.components.script_editor import ScriptEditor
 from autolingua2.ui.components.search_bar import SearchBar
 from autolingua2.ui.dialogs.base import SimpleDialogController, require_child
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 
 
 EXAMPLE = '''string[] languages = ["ja", "th", "ko", "de"]

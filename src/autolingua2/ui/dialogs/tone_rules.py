@@ -1,7 +1,7 @@
 """GUI editor for ordered branches and boolean expression trees."""
 from __future__ import annotations
 
-from autolingua2.ui.i18n import translation_source
+from autolingua2.ui.resources.i18n import translation_source
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -16,7 +16,7 @@ from autolingua2.ir.tone import (
     COMPARISONS, TARGETS, ToneBlock, ToneBranch, ToneCondition, ToneExpression,
     ToneGroup, ToneItem, ToneOperator, validate_expression,
 )
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 from .base import require_child
 
 

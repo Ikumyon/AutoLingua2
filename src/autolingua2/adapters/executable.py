@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from threading import local
 
-from autolingua2.services.export_contract import ExportFile
+from autolingua2.services.exporting.export_contract import ExportFile
 from autolingua2.ir.filter_rules import FilterRule
 from autolingua2.ir.imported import GameProfile, GameSlot, ImportedTranslation
 from autolingua2.ir.serialization import imported_from_dict

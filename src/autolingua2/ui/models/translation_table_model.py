@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from autolingua2.ir.workspace import UnitView as TranslationUnit
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 
 
 SourceNameGetter = Callable[[TranslationUnit], str]

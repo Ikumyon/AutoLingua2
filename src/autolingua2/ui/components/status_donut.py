@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from autolingua2.ui.i18n import translation_source
+from autolingua2.ui.resources.i18n import translation_source
 
 import math
 
@@ -9,7 +9,7 @@ from PySide6.QtGui import QColor, QMouseEvent, QPaintEvent, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
 from autolingua2.ir import UnitState
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 
 
 STATUS_LABELS: dict[UnitState, str] = {

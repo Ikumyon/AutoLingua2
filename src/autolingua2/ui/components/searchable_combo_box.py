@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QStyle, QStyledItemDelegate, QStyleOption, QStyleOptionViewItem, QStylePainter, QVBoxLayout, QWidget,
 )
 
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 
 
 @dataclass(frozen=True, slots=True)

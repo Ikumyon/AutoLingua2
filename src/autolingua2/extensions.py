@@ -10,11 +10,11 @@ from typing import Literal
 
 from .ir.validation import record, required, text
 from .plugins.manager import PluginManager
-from .services.operation_contract import PluginInformation
-from .ui.i18n import LocalizationManager, current_ui_language, language_events
-from .ui.icons import IconManager
-from .ui.theme import ThemeManager
-from .ui.resource_api import LocalizationAPI, ThemeAPI
+from .services.operations.operation_contract import PluginInformation
+from .ui.resources.i18n import LocalizationManager, current_ui_language, language_events
+from .ui.resources.icons import IconManager
+from .ui.resources.theme import ThemeManager
+from .ui.resources.resource_api import LocalizationAPI, ThemeAPI
 
 ResourceKind = Literal["ui_translation", "theme", "icon_theme"]
 logger = logging.getLogger(__name__)

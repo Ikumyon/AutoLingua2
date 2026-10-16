@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from autolingua2.ui.i18n import translation_source
+from autolingua2.ui.resources.i18n import translation_source
 
 import logging
 from collections.abc import Callable
@@ -13,9 +13,9 @@ from PySide6.QtWidgets import (
 
 from autolingua2.extensions import ExtensionEntrance
 from autolingua2.plugins.api import SettingsPageProvider
-from autolingua2.services.settings_store import AiModel
+from autolingua2.services.settings.settings_store import AiModel
 from autolingua2.ir.translation import LowModelRange, ModelSelection
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 from .base import SimpleDialogController, load_ui, require_child
 from .glossary import GlossaryPageController
 from .settings_ai import AiSettingsPageController
@@ -25,7 +25,7 @@ from .settings_tone import TonePageController
 from .source_watch import WatchPageController
 from .settings_mcp import McpSettingsPage
 from .settings_shortcuts import ShortcutSettingsPage
-from autolingua2.services.mcp_server import McpServer
+from autolingua2.services.integration.mcp_server import McpServer
 
 
 class SettingsDialogController(SimpleDialogController):

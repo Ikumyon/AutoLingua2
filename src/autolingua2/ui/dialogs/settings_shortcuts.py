@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from autolingua2.ir.shortcuts import ShortcutPreset
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 from autolingua2.ui.shortcuts import PORTABLE, ShortcutConflict, ShortcutManager, normalize_key
 from .base import load_ui, require_child
 

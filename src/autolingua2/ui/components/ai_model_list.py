@@ -3,8 +3,8 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
-from autolingua2.services.settings_store import AiModel
-from autolingua2.ui.icons import IconManager
+from autolingua2.services.settings.settings_store import AiModel
+from autolingua2.ui.resources.icons import IconManager
 from .ai_model_row import ModelRowWidget
 
 
@@ -42,7 +42,7 @@ class ModelListController(QObject):
         return row
 
     def add_empty(self) -> None:
-        from autolingua2.ui.i18n import tr
+        from autolingua2.ui.resources.i18n import tr
         row = self.add(AiModel(tr("SettingsDialog", "新規モデル"), ""))
         row.field_model.start_edit()
 

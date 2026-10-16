@@ -4,12 +4,12 @@ from PySide6.QtCore import QCoreApplication, QObject, Qt
 from PySide6.QtWidgets import QComboBox, QDialog, QListWidget, QListWidgetItem, QVBoxLayout, QWidget
 
 from autolingua2.extensions import ExtensionEntrance
-from autolingua2.services.settings_store import (
+from autolingua2.services.settings.settings_store import (
     DEFAULT_UI_LANGUAGE, load_theme_settings, load_ui_language, load_voice_input_provider,
     save_theme_settings, save_ui_language, save_voice_input_provider,
 )
-from autolingua2.services.voice_input import voice_input_available
-from autolingua2.ui.i18n import normalize_language, system_language, tr
+from autolingua2.services.ai.voice_input import voice_input_available
+from autolingua2.ui.resources.i18n import normalize_language, system_language, tr
 from .base import require_child
 from .self_translation import SelfTranslationController
 

@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 from autolingua2.ui.shortcuts import ShortcutManager
 
 

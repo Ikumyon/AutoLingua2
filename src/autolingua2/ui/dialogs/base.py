@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QDialog, QMessageBox, QPushButton, QWidget
 
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 from autolingua2.ui.ui_loader import load_ui as load_ui
 from autolingua2.ui.ui_loader import require_child as require_child
 

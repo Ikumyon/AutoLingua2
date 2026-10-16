@@ -12,7 +12,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QAbstractItemView, QTableWidget, QTextEdit, QWidget
 
-from autolingua2.services.chat_references import ChatAttachment, read_chat_file
+from autolingua2.services.ai.chat_references import ChatAttachment, read_chat_file
 
 REFERENCE_MIME = "application/x-autolingua-chat-reference"
 REFERENCE_OBJECT = int(QTextFormat.ObjectTypes.UserObject) + 1

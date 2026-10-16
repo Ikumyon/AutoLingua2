@@ -13,9 +13,9 @@ from PySide6.QtWidgets import QApplication, QAbstractButton, QMainWindow, QMenu,
 from shiboken6 import isValid
 
 from autolingua2.ir.shortcuts import ShortcutCommand, ShortcutPreset, scopes_overlap
-from autolingua2.services.settings_store import load_shortcut_preferences, save_shortcut_preferences
-from autolingua2.services.shortcut_presets import ShortcutPresetStore
-from autolingua2.ui.i18n import tr
+from autolingua2.services.settings.settings_store import load_shortcut_preferences, save_shortcut_preferences
+from autolingua2.services.settings.shortcut_presets import ShortcutPresetStore
+from autolingua2.ui.resources.i18n import tr
 
 
 PORTABLE = QKeySequence.SequenceFormat.PortableText

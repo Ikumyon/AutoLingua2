@@ -16,10 +16,10 @@ from PySide6.QtWidgets import (
 from autolingua2.extensions import ExtensionEntrance
 from autolingua2.ir.glossary import Glossary, GlossaryTerm, PARTS_OF_SPEECH, glossary_chain
 from autolingua2.ir.text_search import SearchSyntaxError, TextSearch
-from autolingua2.services.glossary_store import GlossaryStore
+from autolingua2.services.settings.glossary_store import GlossaryStore
 from autolingua2.ui.components.drop_zone import DropZone
 from autolingua2.ui.components.searchable_combo_box import enable_combo_search
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 from .base import SimpleDialogController, require_child
 
 

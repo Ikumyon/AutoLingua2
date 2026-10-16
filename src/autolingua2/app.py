@@ -35,8 +35,8 @@ def main() -> int:
         from PySide6.QtWidgets import QApplication, QMessageBox
         from PySide6.QtCore import QTimer
         from .extensions import ExtensionEntrance
-        from .services.settings_store import load_ui_language, load_theme_settings
-        from .ui.main_window import MainWindowController
+        from .services.settings.settings_store import load_ui_language, load_theme_settings
+        from .ui.main.main_window import MainWindowController
 
         startup.check()
         current_platform.configure_desktop_integration("autolingua.desktop.app")

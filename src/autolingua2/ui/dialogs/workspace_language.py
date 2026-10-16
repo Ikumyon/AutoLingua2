@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from autolingua2.ui.i18n import translation_source
+from autolingua2.ui.resources.i18n import translation_source
 
 from typing import Callable
 
 from PySide6.QtWidgets import QHeaderView, QLineEdit, QMessageBox, QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QWidget
 
-from autolingua2.services.workspaces import WorkspaceService
-from autolingua2.services.translation_memory import TranslationMemoryError
+from autolingua2.services.projects.workspaces import WorkspaceService
+from autolingua2.services.translation.translation_memory import TranslationMemoryError
 from autolingua2.ui.dialogs.base import SimpleDialogController, require_child
-from autolingua2.ui.i18n import tr
-from autolingua2.ui.language_names import workspace_language_name
+from autolingua2.ui.resources.i18n import tr
+from autolingua2.ui.main.language_names import workspace_language_name
 
 
 class WorkspaceLanguageDialog(SimpleDialogController):

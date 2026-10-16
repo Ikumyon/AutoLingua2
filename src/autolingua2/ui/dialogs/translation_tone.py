@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from autolingua2.ui.i18n import translation_source
+from autolingua2.ui.resources.i18n import translation_source
 
 from collections.abc import Sequence
 
@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from autolingua2.ir.tone import ToneItem
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.i18n import tr
 
 
 class TranslationToneDialog(QDialog):

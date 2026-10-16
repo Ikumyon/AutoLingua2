@@ -15,10 +15,10 @@ from autolingua2.ir.tone import (
     ConditionalTone, Tone, ToneBlock, ToneBranch, ToneItem, add_tone_branch,
     delete_tone, remove_nested_branches, tone_references, validate_tones,
 )
-from autolingua2.services.tone_store import ToneStore
+from autolingua2.services.settings.tone_store import ToneStore
 from autolingua2.ui.components.searchable_combo_box import ComboAction, SearchableComboBox
-from autolingua2.ui.icons import IconManager
-from autolingua2.ui.i18n import tr
+from autolingua2.ui.resources.icons import IconManager
+from autolingua2.ui.resources.i18n import tr
 from .base import require_child
 from .tone_rules import BranchLocation, ToneRulesController, branch_text, populate_branches
 
