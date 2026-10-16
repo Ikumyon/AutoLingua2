@@ -1,6 +1,8 @@
 """Nonblocking, read-only external MCP connections using QtNetwork/QProcess."""
 from __future__ import annotations
 
+from autolingua2.infrastructure.automation_activity import begin_activity
+
 from collections.abc import Callable
 from dataclasses import dataclass, field
 import json
@@ -70,6 +72,17 @@ class McpClient(QObject):
             raise ValueError("登録済みの外部MCP接続を指定してください。")
         arguments = dict(params)
         job_id = text(arguments.pop("_job_id", ""))
+        activity = begin_activity("外部MCPの応答")
+        original_success, original_failure = success, failure
+        def accepted(value: dict[str, Any]) -> None:
+            try:
+                activity.callback(original_success)(value)
+            finally:
+                activity.finish()
+        def rejected(error: str) -> None:
+            activity.finish("failed", error)
+            activity.callback(original_failure)(error)
+        success, failure = accepted, rejected
         if connection.status == "ready":
             self._request_ready(connection, method, arguments, success, failure, job_id)
         else:

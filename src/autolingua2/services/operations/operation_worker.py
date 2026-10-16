@@ -6,6 +6,7 @@ from typing import Any
 
 from PySide6.QtCore import QObject, QThread, Signal
 from autolingua2.infrastructure.operations import operation_scope, OperationCancelled
+from autolingua2.infrastructure.automation_activity import track_worker
 
 
 class OperationWorker(QThread):
@@ -17,6 +18,7 @@ class OperationWorker(QThread):
         self.cancel_event = Event()
         self.result: Any = None
         self.error: Exception | None = None
+        self.automation_activity = track_worker(self, "読み込み・保存・出力")
 
     def requestInterruption(self) -> None:
         self.cancel_event.set()

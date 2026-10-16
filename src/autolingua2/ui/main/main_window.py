@@ -132,6 +132,7 @@ from autolingua2.ui.dialogs.multi_model_dialog import MultiModelTranslationDialo
 from autolingua2.ui.resources.i18n import current_ui_language, language_events, tr
 from autolingua2.ui.main.language_names import workspace_language_name
 from autolingua2.ui.creation.import_worker import ImportWorker
+from autolingua2.infrastructure.automation_activity import background_callback, deferred_callback
 from autolingua2.services.operations.operation_worker import OperationWorker
 from autolingua2.plugins.api import GameTextPresentation
 from autolingua2.ui.main.main_window_focus import FocusEditorController
@@ -376,7 +377,7 @@ class MainWindowController(QObject):
         self._refresh_project_notification()
         self.source_watch_timer = QTimer(self)
         self.source_watch_timer.setInterval(30000)
-        self.source_watch_timer.timeout.connect(self._poll_source_updates)
+        self.source_watch_timer.timeout.connect(background_callback(self._poll_source_updates))
         self.source_watch_timer.start()
         if load_watch_settings().enabled:
             QTimer.singleShot(0, lambda: self._run_operation(ensure_watcher, lambda _result: None))
@@ -1274,8 +1275,8 @@ class MainWindowController(QObject):
         worker.progress.connect(dialog.setLabelText)
         worker.progress.connect(self._operation_progress)
         self._operation_dialog = dialog
-        self._operation_completed = completed
-        worker.finished.connect(self._operation_finished)
+        self._operation_completed = worker.automation_activity.callback(completed)
+        worker.finished.connect(worker.automation_activity.callback(self._operation_finished))
         worker.finished.connect(worker.deleteLater)
         dialog.show()
         worker.start()
@@ -1299,7 +1300,7 @@ class MainWindowController(QObject):
             return
         self.io_worker = None
         if self._pending_rules_refresh:
-            QTimer.singleShot(0, self._refresh_source_rules)
+            QTimer.singleShot(0, deferred_callback(self._refresh_source_rules))
         self._operation_dialog.close()
         self._operation_dialog.deleteLater()
         close_after_io = self._close_after_io
@@ -1319,6 +1320,7 @@ class MainWindowController(QObject):
         except Exception as exc:
             import logging
             logging.getLogger(__name__).exception("Operation completion failed")
+            worker.automation_activity.finish("failed", str(exc))
             self._restart_target = None
             QMessageBox.warning(self.window, "プラグイン処理エラー", str(exc))
 
@@ -2179,11 +2181,11 @@ class MainWindowController(QObject):
         )
         self.import_worker = worker
         self._set_import_busy(True)
-        worker.loaded.connect(self._on_project_imported)
-        worker.failed.connect(self._on_import_failed)
+        worker.loaded.connect(worker.automation_activity.callback(self._on_project_imported))
+        worker.failed.connect(worker.automation_activity.callback(self._on_import_failed))
         worker.progress.connect(self._operation_progress)
-        worker.conflict_requested.connect(self._on_import_key_conflict)
-        worker.finished.connect(self._on_import_finished)
+        worker.conflict_requested.connect(worker.automation_activity.callback(self._on_import_key_conflict))
+        worker.finished.connect(worker.automation_activity.callback(self._on_import_finished))
         worker.finished.connect(worker.deleteLater)
         worker.start()
 
@@ -2209,7 +2211,10 @@ class MainWindowController(QObject):
         self.window.statusBar().showMessage(tr("MainWindow", "対象を解析しています…") if busy else "")
 
     def _on_project_imported(self, imported: ImportedTranslation) -> None:
+        worker = self.import_worker
         if self._close_after_import:
+            if worker is not None:
+                worker.automation_activity.finish("cancelled")
             return
         for key, value in self._import_metadata.items():
             setattr(imported.project, key, value)
@@ -2223,6 +2228,8 @@ class MainWindowController(QObject):
                     game = next(g for g in adapter.supported_games if g.id == suggestions["game_id"])
                     imported.project.game_id = game.id
         if not self._confirm_project_change():
+            if worker is not None:
+                worker.automation_activity.finish("cancelled")
             return
         self.load_import(imported)
         if adapter is not None and imported.project.game_id != self._import_metadata["game_id"]:
@@ -2237,7 +2244,7 @@ class MainWindowController(QObject):
     def _on_import_finished(self) -> None:
         self.import_worker = None
         if self._pending_rules_refresh:
-            QTimer.singleShot(0, self._refresh_source_rules)
+            QTimer.singleShot(0, deferred_callback(self._refresh_source_rules))
         self._set_import_busy(False)
         if self._close_after_import:
             self._close_after_import = False

@@ -12,6 +12,7 @@ class AutomationRunner(QObject):
     action_requested = Signal(object)
     line_changed = Signal(int)
     finished = Signal(str, bool)
+    completion_requested = Signal()
 
     def __init__(self, parent: QObject) -> None:
         super().__init__(parent)
@@ -50,7 +51,9 @@ class AutomationRunner(QObject):
                     self.action_requested.emit(step)
                     return
         except StopIteration:
-            self.stop("完了しました。")
+            self.timer.stop()
+            self.iterator = None
+            self.completion_requested.emit()
             return
         except (ScriptError, ArithmeticError, RecursionError, ValueError) as exc:
             self.fail(str(exc))
@@ -63,8 +66,8 @@ class AutomationRunner(QObject):
             self.pending = None
             self.timer.start(0)
 
-    def fail(self, reason: str) -> None:
-        step = self.current
+    def fail(self, reason: str, *, step: Step | None = None) -> None:
+        step = step if step is not None else self.current
         if step is not None:
             prefix = f"{step.token.line}行 {step.token.column}列: "
             if not reason.startswith(prefix):

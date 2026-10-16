@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.infrastructure.automation_activity import begin_activity
+
 from typing import TYPE_CHECKING
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -137,6 +139,10 @@ class MultiModelTranslationDialog(QDialog):
         self.tone = tone
 
         self._cards: dict[str, ModelResultCard] = {}  # req_id -> card
+        self._automation_activity = begin_activity("全モデル翻訳", owner=self)
+        self._pending_models: set[str] = set()
+        self.finished.connect(lambda _result: self._automation_activity.finish(
+            "cancelled" if self._pending_models else "succeeded"))
         self._adopted_text: str | None = None
 
         self._setup_ui()
@@ -190,8 +196,11 @@ class MultiModelTranslationDialog(QDialog):
     def _start_translations(self) -> None:
         text = self.source_text.strip()
         if not text:
+            self._automation_activity.finish()
             return
 
+        self._pending_models = set(self._cards) if text else set()
+        self._automation_activity.watch(lambda: bool(self._pending_models))
         for req_id, card in self._cards.items():
             card.set_loading()
             target_p = self.providers.get(card.provider_id)
@@ -200,6 +209,8 @@ class MultiModelTranslationDialog(QDialog):
 
             if target_p is None or not target_key:
                 card.set_error(tr("MultiModelDialog", "APIキー未設定またはプロバイダ無効"))
+                self._pending_models.discard(req_id)
+                self._automation_activity.error = tr("MultiModelDialog", "APIキー未設定またはプロバイダ無効")
                 continue
 
             self.ai_client.translate_text(
@@ -219,11 +230,14 @@ class MultiModelTranslationDialog(QDialog):
         card = self._cards.get(req_id)
         if card is not None:
             card.set_result(translated_text)
+            self._pending_models.discard(req_id)
 
     def _on_translation_failed(self, req_id: str, error_message: str) -> None:
         card = self._cards.get(req_id)
         if card is not None:
             card.set_error(error_message)
+            self._pending_models.discard(req_id)
+            self._automation_activity.error = error_message
 
     def _on_text_adopted(self, text: str) -> None:
         self._adopted_text = text
@@ -232,6 +246,8 @@ class MultiModelTranslationDialog(QDialog):
         self.accept()
 
     def closeEvent(self, event) -> None:
+        if self._pending_models:
+            self._automation_activity.finish("cancelled")
         self._disconnect_signals()
         super().closeEvent(event)
 

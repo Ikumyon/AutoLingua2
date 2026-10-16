@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.infrastructure.automation_activity import activity_callback, observe_async
+
 import json
 import logging
 from collections import deque
@@ -70,6 +72,7 @@ class AiNetworkClient(QObject):
         self._active_replies.clear()
         self._validation_remaining = 0
 
+    @observe_async("AIモデルの接続確認", lambda self: self._validation_remaining > 0)
     def validate_models(
         self,
         provider: AiProviderPlugin,
@@ -157,12 +160,16 @@ class AiNetworkClient(QObject):
             logger.exception("検証レスポンス処理で予期せぬエラー (%s): %s", model, exc)
             self._on_single_validation_finished(model, False, f"応答処理エラー: {exc}")
 
+    @activity_callback
     def _on_single_validation_finished(self, model: str, is_valid: bool, message: str) -> None:
         logger.info("Model validation result model=%s valid=%s detail=%s", model, is_valid, message)
         if is_valid:
             self._validation_success += 1
         else:
             self._validation_error += 1
+            activity = getattr(self, "_automation_activity", None)
+            if activity is not None:
+                activity.error = message
 
         self.model_validated.emit(model, is_valid, message)
 

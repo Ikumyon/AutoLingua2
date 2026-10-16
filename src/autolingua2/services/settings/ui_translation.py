@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.infrastructure.automation_activity import activity_callback, observe_async
+
 from collections import Counter, deque
 from collections.abc import Mapping
 from functools import lru_cache
@@ -196,6 +198,7 @@ class UiTranslationService(QObject):
         self._catalog_names: tuple[str, ...] = ()
         self._compiling = ""
 
+    @observe_async("アプリの表示言語の翻訳", lambda self: self.busy, errors=("failed",), cancelled=("cancelled",))
     def start(self, tag: str, name: str, provider_id: str, model: str,
               languages: Mapping[str, LanguageInfo]) -> None:
         if self.busy or self.process.state() != QProcess.ProcessState.NotRunning:
@@ -265,6 +268,7 @@ class UiTranslationService(QObject):
         self.client.translate_text(self._request, provider, self._api_key, self._model, payload,
                                    "ja", self._tag, target_language_name=self._name, purpose="ui")
 
+    @activity_callback
     def _translated(self, request_id: str, response: str) -> None:
         if not self.busy or request_id != self._request:
             return
@@ -314,6 +318,7 @@ class UiTranslationService(QObject):
         ts_path = Path(temporary.path()) / self._compiling
         self.process.start(self._lrelease, [str(ts_path), "-qm", str(ts_path.with_suffix(".qm"))])
 
+    @activity_callback
     def _compiled(self, code: int, status: QProcess.ExitStatus) -> None:
         if not self.busy:
             self._temporary = None

@@ -1,0 +1,24 @@
+{
+  "name": "autolingua2-guide",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/tool.mjs vite --host 127.0.0.1",
+    "validate": "node scripts/validate-locales.mjs",
+    "test": "node --test scripts/validate-locales.test.mjs",
+    "typecheck": "node scripts/tool.mjs typescript --noEmit -p tsconfig.json",
+    "build": "npm run validate && npm run typecheck && node scripts/tool.mjs vite build",
+    "preview": "node scripts/tool.mjs vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@fortawesome/free-solid-svg-icons": "7.0.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "typescript": "6.0.2",
+    "vite": "8.2.2"
+  }
+}

@@ -4,6 +4,8 @@ from pathlib import Path
 import re
 from collections.abc import Callable
 
+from .eu4_encoding import decode_eu4_escape, has_eu4_escape
+
 from autolingua2.plugins.contracts import (
     Issue, TranslationProject, TranslationSource, TranslationUnit,
     GameProfile, GameSlot, ImportedTranslation, SourceRef, FilterRule, TagKind,
@@ -131,7 +133,7 @@ class ParadoxYamlAdapter:
 
     def _detect_file_language(self, path: Path) -> str | None:
         try:
-            text = self._read_text(path)
+            text = self._read_localization(path)
             for line in text.splitlines()[:50]:
                 stripped = line.strip()
                 if not stripped or stripped.startswith("#"):
@@ -144,18 +146,28 @@ class ParadoxYamlAdapter:
         return None
 
     def load(self, path: Path) -> ImportedTranslation:
-        text = self._read_text(path)
+        text = self._read_localization(path)
         return self._load_text(path, text)
+
+    def _read_localization(self, path: Path) -> str:
+        content = path.read_bytes()
+        payload = content.removeprefix(b"\xef\xbb\xbf")
+        if not content.startswith((b"\xff\xfe", b"\xfe\xff")) and has_eu4_escape(payload):
+            return decode_eu4_escape(payload)
+        return self._read_text(path)
 
     def inspect_key_file(self, path: Path) -> KeyFile:
         content = path.read_bytes()
-        encoding = self._detect_encoding(content)
         bom = next((mark for mark in (b"\xef\xbb\xbf", b"\xff\xfe", b"\xfe\xff")
                     if content.startswith(mark)), b"")
+        payload = content[len(bom):]
+        escaped = bom not in {b"\xff\xfe", b"\xfe\xff"} and has_eu4_escape(payload)
+        # Latin-1 keeps every original byte intact when removing key lines.
+        encoding = "latin-1" if escaped else self._detect_encoding(content)
         text = content[len(bom):].decode(encoding)
         if bom + text.encode(encoding) != content:
             raise ValueError(f"文字コードを保持して修正できません: {path}")
-        imported = self._load_text(path, text)
+        imported = self._load_text(path, decode_eu4_escape(payload) if escaped else text)
         language = imported.project.source_language
         if not language:
             raise ValueError(f"言語を検出できません: {path}")
@@ -167,6 +179,11 @@ class ParadoxYamlAdapter:
     def remove_key_lines(self, snapshot: KeyFile, lines: set[int]) -> bytes:
         if not lines <= {entry.line_number for entry in snapshot.entries}:
             raise ValueError("削除するキー行が見つかりません。")
+        if snapshot.encoding == "latin-1":
+            return snapshot.bom + b"".join(
+                line for number, line in enumerate(
+                    snapshot.content[len(snapshot.bom):].splitlines(keepends=True), 1)
+                if number not in lines)
         text = snapshot.content[len(snapshot.bom):].decode(snapshot.encoding)
         remaining = "".join(line for number, line in enumerate(text.splitlines(keepends=True), 1)
                             if number not in lines)

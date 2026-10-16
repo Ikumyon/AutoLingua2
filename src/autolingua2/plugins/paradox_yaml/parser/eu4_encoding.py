@@ -64,3 +64,37 @@ def encode_eu4_escape(text: str) -> bytes:
             low = (low + 14) & 0xFF
         result.extend((marker, low, high))
     return bytes(result)
+
+
+def has_eu4_escape(data: bytes) -> bool:
+    """Escape markers cannot occur in ordinary UTF-8 localization text."""
+    return any(marker in data for marker in (b"\x10", b"\x11", b"\x12", b"\x13"))
+
+
+def decode_eu4_escape(data: bytes) -> str:
+    """Decode EU4 escape bytes, rejecting truncated or invalid characters."""
+    result: list[str] = []
+    index = 0
+    while index < len(data):
+        marker = data[index]
+        if 0x10 <= marker <= 0x13:
+            if index + 2 >= len(data):
+                raise ValueError(f"EU4 CJKエスケープが途中で途切れています: byte {index}")
+            low, high = data[index + 1:index + 3]
+            if (marker - 0x10) & 1:
+                low = (low - 14) & 0xFF
+            if (marker - 0x10) & 2:
+                high = (high + 9) & 0xFF
+            code = (high << 8) | low
+            if 0xE100 < code < 0xEA00:
+                code -= 0xE000
+            if code == 0 or 0xD800 <= code <= 0xDFFF:
+                raise ValueError(f"EU4 CJKエスケープの文字が不正です: byte {index}")
+            result.append(chr(code))
+            index += 3
+        else:
+            # Preserve undefined CP1252 bytes as their original control codes.
+            result.append(bytes([marker]).decode("cp1252")
+                          if marker not in {0x81, 0x8D, 0x8F, 0x90, 0x9D} else chr(marker))
+            index += 1
+    return "".join(result)

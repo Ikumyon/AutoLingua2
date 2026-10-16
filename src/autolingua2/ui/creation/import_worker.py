@@ -9,6 +9,7 @@ from autolingua2.ir.state import UnitState
 from autolingua2.ir.key_conflict import KeyConflict
 from autolingua2.services.projects.project_io import import_project
 from autolingua2.infrastructure.operations import OperationCancelled, operation_scope
+from autolingua2.infrastructure.automation_activity import track_worker
 
 
 class ImportWorker(QThread):
@@ -42,6 +43,8 @@ class ImportWorker(QThread):
         self.inherited_language = inherited_language
         self.inherited_state = inherited_state
         self.cancel_event = Event()
+        self.error: Exception | None = None
+        self.automation_activity = track_worker(self, "翻訳元の読み込み")
         self._confirmation = Condition()
         self._pending_conflict: KeyConflict | None = None
         self._conflict_answer: tuple[int, ...] | None = None
@@ -89,8 +92,10 @@ class ImportWorker(QThread):
             if not self.isInterruptionRequested():
                 self.loaded.emit(imported)
         except OperationCancelled:
+            self.cancel_event.set()
             self.progress.emit("読み込みを中止しました。確定済みのファイル修正は保持されます。")
         except Exception as exc:
+            self.error = exc
             logging.getLogger(__name__).exception("plugin=%s operation=import failed", self.adapter.id)
             if not self.isInterruptionRequested():
                 self.failed.emit(str(exc))

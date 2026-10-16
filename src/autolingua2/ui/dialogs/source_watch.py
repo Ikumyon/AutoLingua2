@@ -350,7 +350,8 @@ class WatchPageController(QObject):
             else:
                 on_saved()
 
-        worker.finished.connect(completed)
+        worker.automation_activity.label = "設定の保存"
+        worker.finished.connect(worker.automation_activity.callback(completed))
         worker.finished.connect(worker.deleteLater)
         worker.start()
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.infrastructure.automation_activity import activity_callback, observe_async
+
 import json
 import os
 import subprocess
@@ -139,14 +141,18 @@ class UpdateDialogController(QObject):
         self.button_retry.clicked.connect(self.start_check)
         self.button_download.clicked.connect(self._on_download_clicked)
 
+    @observe_async("アプリの更新確認", lambda self: self._checking, owner=lambda self: self.dialog)
     def start_check(self) -> None:
+        self._checking = True
         self.stack_update.setCurrentWidget(self.page_checking)
         self._worker = UpdateCheckWorker(self)
         self._worker.finished_check.connect(self._on_check_finished)
         self._worker.failed_check.connect(self._on_check_failed)
         self._worker.start()
 
+    @activity_callback
     def _on_check_finished(self, data: dict) -> None:
+        self._checking = False
         self._update_data = data
         has_update = data.get("has_update", False)
         current_version = data.get("current_version", "—")
@@ -165,7 +171,12 @@ class UpdateDialogController(QObject):
             self.label_installed_version.setText(current_version)
             self.stack_update.setCurrentWidget(self.page_latest)
 
+    @activity_callback
     def _on_check_failed(self, error_message: str) -> None:
+        self._checking = False
+        activity = getattr(self, "_automation_activity", None)
+        if activity is not None:
+            activity.finish("failed", error_message)
         self.text_error_detail.setPlainText(error_message)
         self.stack_update.setCurrentWidget(self.page_error)
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.infrastructure.automation_activity import activity_callback, observe_async
+
 from collections import Counter, deque
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
@@ -196,6 +198,8 @@ class TranslationService(QObject):
             self.activity_changed.emit(workspace, unit, True)
         return job
 
+    @observe_async("翻訳・AI校閲", lambda self: self.busy,
+                   errors=("translation_failed", "memory_failed"), cancelled=("batch_stopped",))
     def start_batch(self, workspace: Workspace, targets: list[UnitView], classification: ClassificationResult | None) -> None:
         if self.running:
             self.stop()
@@ -263,6 +267,8 @@ class TranslationService(QObject):
         self._pump()
         self._finish_batch_if_done()
 
+    @observe_async("翻訳・AI校閲", lambda self: self.busy,
+                   errors=("translation_failed", "memory_failed"), cancelled=("batch_stopped",))
     def translate_single(self, workspace: Workspace, unit: UnitView, options: TranslationOptions) -> None:
         self._enqueue_single(workspace, unit, options)
         self._pump()
@@ -284,6 +290,8 @@ class TranslationService(QObject):
         self._individual_ready.append(job.id)
         self.slots.notify_ready()
 
+    @observe_async("翻訳・AI校閲", lambda self: self.busy,
+                   errors=("translation_failed", "memory_failed"), cancelled=("batch_stopped",))
     def translate_similar(self, workspace: Workspace, source: UnitView, targets: Sequence[UnitView], options: TranslationOptions) -> None:
         reference = options.text_context.tags.analyze(source.target_text)[0]
         for unit in targets:
@@ -326,6 +334,7 @@ class TranslationService(QObject):
         else:
             self._individual_ready.append(job.id)
 
+    @activity_callback
     def _pump(self) -> None:
         if self._pumping:
             return
@@ -465,6 +474,7 @@ class TranslationService(QObject):
             self._inflight.pop(key, None)
         return self._pending.pop(request_id, []), key
 
+    @activity_callback
     def _completed(self, request_id: str, translated: str) -> None:
         job_ids, key = self._take_request(request_id)
         for job_id, mapping in job_ids:
@@ -486,6 +496,7 @@ class TranslationService(QObject):
                 self._cache[key] = translated
             self._accept(job, restored)
 
+    @activity_callback
     def _failed(self, request_id: str, error: str) -> None:
         job_ids, _ = self._take_request(request_id)
         if job_ids:
@@ -495,6 +506,7 @@ class TranslationService(QObject):
             if job is not None:
                 self._fail_job(job, error)
 
+    @activity_callback
     def _rejected(self, request_id: str, error: str) -> None:
         job_ids, _ = self._take_request(request_id)
         for job_id, _ in job_ids:
@@ -581,6 +593,7 @@ class TranslationService(QObject):
             result[key] = value
         return result
 
+    @activity_callback
     def _review_received(self, request_id: str, value: object) -> None:
         job_id = self._reviews.pop(request_id, None)
         if job_id is None:
@@ -615,6 +628,7 @@ class TranslationService(QObject):
             self.usage_counts["validation_failures"] += 1
             self._fail_job(job, str(exc), state=UnitState.REVIEW_ERROR)
 
+    @activity_callback
     def _review_failed(self, request_id: str, value: object) -> None:
         job_id = self._reviews.pop(request_id, None)
         if job_id is None:

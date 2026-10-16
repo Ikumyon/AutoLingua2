@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QTableView, QTextEdit, QWidget,
 )
 
+from autolingua2.infrastructure.automation_activity import AutomationAction, AutomationSession
 from autolingua2.ir.automation_script import READ_FUNCTIONS, ReadValue, Script, ScriptError, Step
 from autolingua2.services.operations.automation import AutomationRunner
 from autolingua2.ui.components.script_editor import ScriptEditor
@@ -100,6 +101,14 @@ class AutomationDialogController(QObject):
         self.runner.action_requested.connect(self._dispatch)
         self.runner.line_changed.connect(self._line)
         self.runner.finished.connect(self._finished)
+        self.runner.completion_requested.connect(self._complete)
+        self.session: AutomationSession | None = None
+        self.action: AutomationAction | None = None
+        self.requested_step: Step | None = None
+        self.completing = False
+        self.ready_elapsed = QElapsedTimer()
+        self.ready_elapsed.start()
+        self.stable_window: QWidget | None = None
         self.wait_timer = QTimer(self)
         self.wait_timer.setSingleShot(True)
         self.wait_timer.timeout.connect(self._settle)
@@ -368,6 +377,14 @@ class AutomationDialogController(QObject):
         self.editor.ensureCursorVisible()
 
     def _finished(self, message: str, error: bool) -> None:
+        if self.session is not None:
+            self.session.close()
+            self.session.deleteLater()
+            self.session = None
+        self.action = None
+        self.requested_step = None
+        self.completing = False
+        self.stable_window = None
         self.wait_timer.stop()
         self.wait_step = None
         self.prepared_step = None
@@ -475,6 +492,68 @@ class AutomationDialogController(QObject):
         raise ValueError(f"{operation}に対応する種類の部品ではありません: {target}")
 
     def _dispatch(self, step: Step) -> None:
+        if not self.runner.running or self.runner.pending is not step:
+            return
+        if self.session is None:
+            self.session = AutomationSession(self)
+        if self.requested_step is not step:
+            self.ready_elapsed.restart()
+            self.action = None
+            self.requested_step = step
+            self.stable_window = None
+        active = self._active()
+        if self._tasks_pending(active):
+            self.wait_step = step
+            return
+        if not self.runner.running:
+            return
+        if active is None or not self._owns(active) or active is self.dialog:
+            self._await_ready(step, "操作対象のアプリ画面")
+            return
+        widgets = [widget for widget in active.findChildren(QWidget, step.target or "")
+                   if widget.window() is active and widget.isVisible()]
+        if not widgets or (step.token.text not in READ_FUNCTIONS and not any(w.isEnabled() for w in widgets)):
+            self._await_ready(step, step.target or "操作対象")
+            return
+        if self.action is None:
+            self.action = self.session.action(step, active)
+        with self.action.scope():
+            self._perform(step)
+
+    def _await_ready(self, step: Step | None, label: str) -> None:
+        if self.ready_elapsed.elapsed() >= 5000:
+            self.runner.fail(f"{label}を操作できるまでの待機がタイムアウトしました。")
+            return
+        self.state.setText(tr("AutomationDialog", "待機中: {label}").format(label=label))
+        self.wait_step = step
+        self.wait_timer.start(25)
+
+    def _tasks_pending(self, active: QWidget | None, *, final: bool = False) -> bool:
+        session = self.session
+        if session is None:
+            return False
+        failure = session.failure()
+        if failure is not None:
+            self.runner.fail(f"{failure.label}: {failure.error or '処理に失敗しました。'}",
+                             step=failure.action.step if failure.action is not None else None)
+            return False
+        blocking = session.blocking(active, final=final)
+        if not blocking:
+            return False
+        if final and not session.blocking(active):
+            self._await_ready(None, "確認画面への回答")
+            return True
+        self.state.setText(tr("AutomationDialog", "待機中: {label}").format(label=blocking[0].label))
+        self.ready_elapsed.restart()
+        self.wait_timer.start(25)
+        return True
+
+    def _complete(self) -> None:
+        self.completing = True
+        self.ready_elapsed.restart()
+        self.wait_timer.start(0)
+
+    def _perform(self, step: Step) -> None:
         if not self.runner.running or self.runner.pending is not step:
             return
         try:
@@ -612,14 +691,30 @@ class AutomationDialogController(QObject):
             else:
                 self.wait_timer.start(25)
             return
+        if self.completing:
+            active = self._active()
+            if self._tasks_pending(active, final=True) or not self.runner.running:
+                return
+            self.runner.stop("完了しました。")
+            return
         step = self.wait_step
         if not self.runner.running or step is None or self.runner.pending is not step:
             return
-        self.wait_step = None
-        if self.prepared_step is step:
+        active = self._active()
+        if self._tasks_pending(active) or not self.runner.running:
+            return
+        if self.action is None or self.prepared_step is step:
             self._dispatch(step)
-        else:
-            self.runner.acknowledge(step)
+            return
+        if active is None or not self._owns(active) or active is self.dialog:
+            self._await_ready(step, "操作後のアプリ画面")
+            return
+        if self.stable_window is not active:
+            self.stable_window = active
+            self.wait_timer.start(0)
+            return
+        self.wait_step = None
+        self.runner.acknowledge(step)
 
     def _script_key_press(self, event: QKeyEvent) -> bool:
         if self.editor.isReadOnly() or event.modifiers() & (
@@ -698,6 +793,11 @@ class AutomationDialogController(QObject):
                 event.ignore()
                 return True
         if self.runner.running or self.start_script is not None:
+            if (self.runner.running and isinstance(watched, QMessageBox) and event.type() == QEvent.Type.Show
+                    and self._owns(watched) and watched.icon() in {QMessageBox.Icon.Warning, QMessageBox.Icon.Critical}
+                    and not watched.standardButtons() & (QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                                                        | QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Ignore)):
+                self.runner.fail(watched.text())
             if watched is self.window and event.type() == QEvent.Type.Close:
                 self._stop("メインウィンドウを閉じたため停止しました。")
             elif event.spontaneous() and event.type() in {

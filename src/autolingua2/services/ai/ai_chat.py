@@ -1,6 +1,8 @@
 """Provider-independent chat orchestration using the public operation service."""
 from __future__ import annotations
 
+from autolingua2.infrastructure.automation_activity import activity_callback, observe_async
+
 from autolingua2.services.ai.chat_references import ChatAttachment
 
 from dataclasses import dataclass
@@ -117,6 +119,7 @@ class AiChatSession(QObject):
         self._job_contexts.clear()
         self._seen_jobs.clear()
 
+    @observe_async("AIチャット", lambda self: self.busy or bool(self._operation_results))
     def send(self, text: str, translator: BaseHttpTranslator,
              attachments: tuple[ChatAttachment, ...] = ()) -> None:
         if self.busy:
@@ -180,6 +183,7 @@ class AiChatSession(QObject):
                                  system_prompt,
                                  self.operations.tools(), self.continuation)
 
+    @activity_callback
     def _capacity_received(self, request_id: str, value: object) -> None:
         if not self.busy or request_id != self.request_id:
             return
@@ -270,6 +274,7 @@ class AiChatSession(QObject):
         self._request_summary()
         return True
 
+    @activity_callback
     def _received(self, request_id: str, value: object) -> None:
         if not self.busy or request_id != self.request_id:
             return
@@ -360,6 +365,7 @@ class AiChatSession(QObject):
                           else "操作結果を取得しました。")
         return result
 
+    @activity_callback
     def _failed(self, request_id: str, error: object) -> None:
         if not self.busy or request_id != self.request_id:
             return
@@ -378,6 +384,9 @@ class AiChatSession(QObject):
         self._restore_compression_history()
         self._clear_operation_continuation()
         self._retain_partial_turn(keep_user=keep_history)
+        activity = getattr(self, "_automation_activity", None)
+        if activity is not None:
+            activity.finish("failed", error.message)
         self.message.emit("error", error.message)
         self._finish()
 
@@ -433,6 +442,7 @@ class AiChatSession(QObject):
         if not self.busy:
             QTimer.singleShot(0, self._resume_operations)
 
+    @activity_callback
     def _resume_operations(self) -> None:
         if self.busy or not self._operation_results:
             return
@@ -486,6 +496,9 @@ class AiChatSession(QObject):
         self._clear_operation_continuation()
         if not self.busy:
             return
+        activity = getattr(self, "_automation_activity", None)
+        if activity is not None:
+            activity.finish("cancelled")
         keep_history = self._original_history is not None
         self._restore_compression_history()
         self._retain_partial_turn(keep_user=keep_history)

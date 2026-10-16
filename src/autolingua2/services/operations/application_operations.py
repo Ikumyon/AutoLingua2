@@ -5,6 +5,8 @@ receive snapshots; confirmation and undo never replace unrelated records.
 """
 from __future__ import annotations
 
+from autolingua2.infrastructure.automation_activity import AutomationActivity, begin_activity
+
 from collections import Counter
 from collections.abc import Callable, Mapping
 from copy import deepcopy
@@ -124,6 +126,7 @@ class ApplicationOperations(QObject):
         self.scope_selection: list[str] = []
         self.proposals: dict[str, OperationProposal] = {}
         self.jobs: dict[str, OperationJob] = {}
+        self._automation_jobs: dict[str, AutomationActivity] = {}
         self._workers: dict[str, OperationWorker] = {}
         self._updates: dict[str, tuple[SourceUpdate, str]] = {}
         self._exports: dict[str, tuple[list[ImportedTranslation], TranslationExporter, Path, dict[str, Any], str, list[tuple[str, str]]]] = {}
@@ -987,11 +990,19 @@ class ApplicationOperations(QObject):
 
     def _new_job(self, kind: str, total: int = 0) -> OperationJob:
         job = OperationJob(uuid4().hex, kind, self.project_id, "running", total=total)
+        self._automation_jobs[job.id] = begin_activity(kind)
         self.jobs[job.id] = job
         self._emit_job(job)
         return job
 
     def _emit_job(self, job: OperationJob) -> None:
+        activity = self._automation_jobs.get(job.id)
+        if activity is not None and job.status in {"completed", "failed", "cancelled"}:
+            failures = [row for row in job.results if row.get("status") == "failed"]
+            outcome = "failed" if failures else "succeeded" if job.status == "completed" else job.status
+            activity.finish(outcome, (failures[0].get("error") or "一部の処理に失敗しました。") if failures
+                            else job.error if job.status != "completed" else "")
+            self._automation_jobs.pop(job.id, None)
         self.job_changed.emit(asdict(job))
 
     def _get_job(self, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -1028,7 +1039,7 @@ class ApplicationOperations(QObject):
                 worker.deleteLater()
                 if not self._workers:
                     QTimer.singleShot(0, self.workers_idle.emit)
-        worker.finished.connect(finished)
+        worker.finished.connect(worker.automation_activity.callback(finished))
         worker.progress.connect(lambda message: self._job_progress(job, message))
         worker.start()
         return asdict(job)

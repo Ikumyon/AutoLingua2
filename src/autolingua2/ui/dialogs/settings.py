@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from autolingua2.infrastructure.automation_activity import activity_callback, observe_async
+
 from autolingua2.ui.resources.i18n import translation_source
 
 import logging
@@ -223,20 +225,30 @@ class SettingsDialogController(SimpleDialogController):
         self.apply_button.setEnabled(not running and not self._saving)
         self._categories.setEnabled(not running and not self._saving)
 
-    def _save_aborted(self) -> None:
+    def _save_aborted(self, succeeded: bool = False) -> None:
+        activity = getattr(self, "_automation_activity", None)
+        if activity is not None and not succeeded:
+            activity.finish("failed", "設定を保存できませんでした。")
         self._set_saving(False)
 
     def _cancel_save(self) -> None:
+        activity = getattr(self, "_automation_activity", None)
+        if activity is not None and self._saving:
+            activity.finish("cancelled")
         self._save_aborted()
         self.ai_page.cancel()
 
     def _save_error(self, error: Exception) -> None:
+        activity = getattr(self, "_automation_activity", None)
+        if activity is not None:
+            activity.finish("failed", str(error))
         logging.getLogger(__name__).exception("Settings save failed")
         self._save_aborted()
         self.ai_page.cancel()
         self.select_category(self._saving_category)
         QMessageBox.warning(self.dialog, tr("SettingsDialog", "保存エラー"), str(error))
 
+    @observe_async("設定の保存", lambda self: self._saving, owner=lambda self: self.dialog)
     def _validate_for_save(self, close_after_save: bool = True) -> None:
         if self._saving or self.general_page.self_translation.busy:
             return
@@ -264,6 +276,7 @@ class SettingsDialogController(SimpleDialogController):
         except Exception as error:
             self._save_error(error)
 
+    @activity_callback
     def _finish_validation(self) -> None:
         if not self._saving:
             return
@@ -277,6 +290,7 @@ class SettingsDialogController(SimpleDialogController):
         self.select_category("source_watch")
         self._save_aborted()
 
+    @activity_callback
     def _save_pages(self) -> None:
         if not self._saving:
             return
@@ -306,7 +320,7 @@ class SettingsDialogController(SimpleDialogController):
         except Exception as error:
             self._save_error(error)
             return
-        self._save_aborted()
+        self._save_aborted(True)
         if self._close_after_save:
             self.dialog.accept()
         elif self._save_category is not None:

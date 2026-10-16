@@ -1,6 +1,8 @@
 """Voice input lifecycle, independent of chat widgets and plugin management."""
 from __future__ import annotations
 
+from autolingua2.infrastructure.automation_activity import activity_callback, observe_async
+
 from collections.abc import Mapping
 import logging
 from typing import Literal
@@ -109,6 +111,7 @@ class VoiceInputService(QObject):
             self.cancel()
             self.error.emit(str(exc))
 
+    @observe_async("音声の文字起こし", lambda self: self.state == "processing", errors=("error",))
     def stop(self) -> None:
         if self._state != "recording":
             return
@@ -143,6 +146,7 @@ class VoiceInputService(QObject):
         self._provider = None
 
     @Slot(int, str, str)
+    @activity_callback
     def _receive(self, generation: int, kind: str, value: str) -> None:
         if self._closed or generation != self._generation or not self.active:
             return
