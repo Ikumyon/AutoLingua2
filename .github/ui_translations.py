@@ -14,6 +14,7 @@ import re
 import shutil
 import subprocess
 import sys
+import sysconfig
 import tempfile
 import xml.etree.ElementTree as ET
 
@@ -21,10 +22,19 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def catalogs() -> dict[str, bytes]:
-    executable = shutil.which("pyside6-lupdate", path=str(Path(sys.executable).parent))
+def find_qt_tool(name: str) -> str:
+    for directory in (sysconfig.get_path("scripts"), str(Path(sys.executable).parent)):
+        executable = shutil.which(name, path=directory)
+        if executable is not None:
+            return executable
+    executable = shutil.which(name)
     if executable is None:
-        raise RuntimeError("pyside6-lupdate が見つかりません。同じ仮想環境で実行してください。")
+        raise RuntimeError(f"{name} が見つかりません。同じ仮想環境で実行してください。")
+    return executable
+
+
+def catalogs() -> dict[str, bytes]:
+    executable = find_qt_tool("pyside6-lupdate")
     with tempfile.TemporaryDirectory() as temporary:
         extracted = Path(temporary) / "extracted.ts"
         subprocess.run([
@@ -156,9 +166,7 @@ def check_translations(output: dict[str, bytes]) -> bool:
 
 
 def compile_translations() -> None:
-    executable = shutil.which("pyside6-lrelease", path=str(Path(sys.executable).parent))
-    if executable is None:
-        raise RuntimeError("pyside6-lrelease が見つかりません。同じ仮想環境で実行してください。")
+    executable = find_qt_tool("pyside6-lrelease")
     for folder in sorted((ROOT / "translations").iterdir()):
         if not folder.is_dir() or not (folder / "metadata.json").is_file():
             continue
