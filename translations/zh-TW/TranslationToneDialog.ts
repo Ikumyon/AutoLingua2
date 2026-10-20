@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="zh-TW" sourcelanguage="ja">
+  <context>
+    <name>TranslationToneDialog</name>
+    <message>
+      <source>原文</source>
+      <translation>原文</translation>
+    </message>
+    <message>
+      <source>口調を指定してください。</source>
+      <translation>請指定語氣。</translation>
+    </message>
+    <message>
+      <source>口調を選択…</source>
+      <translation>選擇語氣…</translation>
+    </message>
+    <message>
+      <source>確定する</source>
+      <translation>確認</translation>
+    </message>
+    <message>
+      <source>編集に戻る</source>
+      <translation>返回編輯</translation>
+    </message>
+    <message>
+      <source>訳文</source>
+      <translation>譯文</translation>
+    </message>
+    <message>
+      <source>訳文の確定</source>
+      <translation>確認譯文</translation>
+    </message>
+  </context>
+</TS>

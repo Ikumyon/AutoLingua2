@@ -103,10 +103,8 @@ jobs:
             python scripts/python/compile_ui.py $_.FullName $uic
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-          Get-ChildItem translations -Recurse -Filter *.ts | ForEach-Object {
-            pyside6-lrelease $_.FullName -qm ([IO.Path]::ChangeExtension($_.FullName, '.qm'))
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+          python .github/ui_translations.py --compile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:PYTHONPATH = (Resolve-Path build/native).Path
           python -m PyInstaller --noconfirm AUTOlingua2.spec
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

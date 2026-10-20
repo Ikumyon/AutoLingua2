@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="hi-IN" sourcelanguage="ja">
+  <context>
+    <name>SearchBarForm</name>
+    <message>
+      <source>.*</source>
+      <translation>.*</translation>
+    </message>
+    <message>
+      <source>Aa</source>
+      <translation>Aa</translation>
+    </message>
+    <message>
+      <source>ab</source>
+      <translation>ab</translation>
+    </message>
+    <message>
+      <source>単語全体に一致する</source>
+      <translation>पूरे शब्द का मिलान</translation>
+    </message>
+    <message>
+      <source>大文字と小文字を区別する</source>
+      <translation>अक्षर-स्थिति का मिलान</translation>
+    </message>
+    <message>
+      <source>検索</source>
+      <translation>खोजें</translation>
+    </message>
+    <message>
+      <source>正規表現を使用する</source>
+      <translation>रेगुलर एक्सप्रेशन उपयोग करें</translation>
+    </message>
+    <message>
+      <source>置換欄を開く／閉じる</source>
+      <translation>प्रतिस्थापन फ़ील्ड दिखाएँ / छिपाएँ</translation>
+    </message>
+  </context>
+</TS>

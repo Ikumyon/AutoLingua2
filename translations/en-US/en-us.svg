@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2470" height="1300" viewBox="0 0 2470 1300">
+  <title>Flag of the United States</title>
+  <rect width="2470" height="1300" fill="#fff"/>
+  <path stroke="#b22234" stroke-width="100" d="M0 50H2470 M0 250H2470 M0 450H2470 M0 650H2470 M0 850H2470 M0 1050H2470 M0 1250H2470"/>
+  <rect width="988" height="700" fill="#3c3b6e"/>
+  <defs>
+    <polygon id="star" fill="#fff" points="0,-40 8.98,-12.36 38.04,-12.36 14.53,4.72 23.51,32.36 0,15.28 -23.51,32.36 -14.53,4.72 -38.04,-12.36 -8.98,-12.36"/>
+    <g id="six">
+      <use href="#star" x="82.333"/>
+      <use href="#star" x="247"/>
+      <use href="#star" x="411.667"/>
+      <use href="#star" x="576.333"/>
+      <use href="#star" x="741"/>
+      <use href="#star" x="905.667"/>
+    </g>
+    <g id="five">
+      <use href="#star" x="164.667"/>
+      <use href="#star" x="329.333"/>
+      <use href="#star" x="494"/>
+      <use href="#star" x="658.667"/>
+      <use href="#star" x="823.333"/>
+    </g>
+  </defs>
+  <use href="#six" y="70"/>
+  <use href="#five" y="140"/>
+  <use href="#six" y="210"/>
+  <use href="#five" y="280"/>
+  <use href="#six" y="350"/>
+  <use href="#five" y="420"/>
+  <use href="#six" y="490"/>
+  <use href="#five" y="560"/>
+  <use href="#six" y="630"/>
+</svg>

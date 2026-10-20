@@ -1,0 +1,228 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="zh-TW" sourcelanguage="ja">
+  <context>
+    <name>Glossary</name>
+    <message>
+      <source>AUTOlingua2用語集</source>
+      <translation>AUTOlingua2 詞彙表</translation>
+    </message>
+    <message>
+      <source>JSONファイルは1つずつ取り込んでください。</source>
+      <translation>請逐一匯入 JSON 檔案。</translation>
+    </message>
+    <message>
+      <source>{glossaries}用語集 / {terms}語 / {inheritance}</source>
+      <translation>{glossaries} 個詞彙表 / {terms} 個詞彙 / {inheritance}</translation>
+    </message>
+    <message>
+      <source>{language}の他形態：{variants}</source>
+      <translation>{language} 的變體：{variants}</translation>
+    </message>
+    <message>
+      <source>この用語集で上書き：</source>
+      <translation>在此詞彙表中覆寫：</translation>
+    </message>
+    <message>
+      <source>この用語集と登録された用語を削除しますか？</source>
+      <translation>刪除此詞彙表及其註冊的詞彙？</translation>
+    </message>
+    <message>
+      <source>なし</source>
+      <translation>無</translation>
+    </message>
+    <message>
+      <source>ゲームの共通用語集は削除できません</source>
+      <translation>無法刪除遊戲的共用詞彙表</translation>
+    </message>
+    <message>
+      <source>ファイルを選択</source>
+      <translation>選擇檔案</translation>
+    </message>
+    <message>
+      <source>ファイル内：{count}件 / 他形態へ統合：{merged}件</source>
+      <translation>檔案中：{count} 項 / 合併為變體：{merged} 項</translation>
+    </message>
+    <message>
+      <source>ファイル：{file}
+取り込み先：{destination}</source>
+      <translation>檔案：{file}
+目的地：{destination}</translation>
+    </message>
+    <message>
+      <source>メモ</source>
+      <translation>備註</translation>
+    </message>
+    <message>
+      <source>作成用語集：{created}件
+追加用語：{added}件
+更新用語：{updated}件</source>
+      <translation>已建立詞彙表：{created}
+已新增詞彙：{added}
+已更新詞彙：{updated}</translation>
+    </message>
+    <message>
+      <source>保存先：</source>
+      <translation>儲存位置：</translation>
+    </message>
+    <message>
+      <source>出力されない情報：訳の他形態 {variants}件 / 大文字小文字の設定 {settings}件 / 継承構造</source>
+      <translation>不匯出的資訊：{variants} 個譯文變體 / {settings} 項大小寫設定 / 繼承結構</translation>
+    </message>
+    <message>
+      <source>削除</source>
+      <translation>刪除</translation>
+    </message>
+    <message>
+      <source>原文の他形態</source>
+      <translation>原文變體</translation>
+    </message>
+    <message>
+      <source>原文：</source>
+      <translation>原文：</translation>
+    </message>
+    <message>
+      <source>原文：{source} / 訳：{target}</source>
+      <translation>原文：{source} / 譯文：{target}</translation>
+    </message>
+    <message>
+      <source>取り込み完了</source>
+      <translation>匯入完成</translation>
+    </message>
+    <message>
+      <source>取り込む</source>
+      <translation>匯入</translation>
+    </message>
+    <message>
+      <source>取り込む用語集を確認してください。</source>
+      <translation>請確認要匯入的詞彙表。</translation>
+    </message>
+    <message>
+      <source>同じ用語の両言語の情報を更新します。用語集名は変更しません。</source>
+      <translation>更新相符詞彙的兩種語言資訊。不變更詞彙表名稱。</translation>
+    </message>
+    <message>
+      <source>名前変更</source>
+      <translation>重新命名</translation>
+    </message>
+    <message>
+      <source>品詞</source>
+      <translation>詞性</translation>
+    </message>
+    <message>
+      <source>品詞を選択してください。</source>
+      <translation>請選擇詞性。</translation>
+    </message>
+    <message>
+      <source>子用語集があるため削除できません</source>
+      <translation>無法刪除含子詞彙表的詞彙表</translation>
+    </message>
+    <message>
+      <source>対象：</source>
+      <translation>目標：</translation>
+    </message>
+    <message>
+      <source>新しい用語集</source>
+      <translation>新增詞彙表</translation>
+    </message>
+    <message>
+      <source>既存の代表表現・他形態・大文字小文字設定を保持し、表現とメモを統合します。親の用語は子で上書きします。</source>
+      <translation>保留現有偏好詞彙、變體和大小寫設定，合併表達和備註。子詞彙覆寫父詞彙。</translation>
+    </message>
+    <message>
+      <source>既存の用語は変更せず、ファイル内の名前で配下に新規作成します。</source>
+      <translation>在所選詞彙表下依檔案中的名稱新增，不變更現有詞彙。</translation>
+    </message>
+    <message>
+      <source>書き出す…</source>
+      <translation>匯出…</translation>
+    </message>
+    <message>
+      <source>最上位の親で2言語を設定してください</source>
+      <translation>請在最上層父項設定兩種語言</translation>
+    </message>
+    <message>
+      <source>最上位の親で2言語を設定してください。</source>
+      <translation>請在最上層父項設定兩種語言。</translation>
+    </message>
+    <message>
+      <source>検索エラー：{error}</source>
+      <translation>搜尋錯誤：{error}</translation>
+    </message>
+    <message>
+      <source>用語を保存できません</source>
+      <translation>無法儲存詞彙</translation>
+    </message>
+    <message>
+      <source>用語集JSONをドロップ（取り込み時に形式を選択）</source>
+      <translation>拖入詞彙表 JSON（匯入時選擇格式）</translation>
+    </message>
+    <message>
+      <source>用語集JSONを取り込む</source>
+      <translation>匯入詞彙表 JSON</translation>
+    </message>
+    <message>
+      <source>用語集の操作に失敗しました</source>
+      <translation>詞彙表操作失敗</translation>
+    </message>
+    <message>
+      <source>用語集を削除</source>
+      <translation>刪除詞彙表</translation>
+    </message>
+    <message>
+      <source>用語集を書き出す</source>
+      <translation>匯出詞彙表</translation>
+    </message>
+    <message>
+      <source>用語集を選択してください</source>
+      <translation>選擇詞彙表</translation>
+    </message>
+    <message>
+      <source>継承あり</source>
+      <translation>有繼承</translation>
+    </message>
+    <message>
+      <source>継承なし</source>
+      <translation>無繼承</translation>
+    </message>
+    <message>
+      <source>継承付き用語集は、親子関係を保持して配下に新規作成します。統合はできません。</source>
+      <translation>含繼承的詞彙表會保留父子關係，在所選詞彙表下新增。不支援合併。</translation>
+    </message>
+    <message>
+      <source>継承元：</source>
+      <translation>繼承自：</translation>
+    </message>
+    <message>
+      <source>継承関係全体</source>
+      <translation>整個繼承結構</translation>
+    </message>
+    <message>
+      <source>親：</source>
+      <translation>父項：</translation>
+    </message>
+    <message>
+      <source>親：なし</source>
+      <translation>父項：無</translation>
+    </message>
+    <message>
+      <source>訳の他形態</source>
+      <translation>譯文變體</translation>
+    </message>
+    <message>
+      <source>訳：</source>
+      <translation>譯文：</translation>
+    </message>
+    <message>
+      <source>選択した用語集のみ：登録分</source>
+      <translation>僅所選詞彙表：已註冊詞彙</translation>
+    </message>
+    <message>
+      <source>選択した用語集のみ：継承を統合</source>
+      <translation>僅所選詞彙表：含繼承詞彙</translation>
+    </message>
+    <message>
+      <source>選択した用語集＋祖先</source>
+      <translation>所選詞彙表及其祖先</translation>
+    </message>
+  </context>
+</TS>

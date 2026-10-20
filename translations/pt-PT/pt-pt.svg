@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
+  <title>Flag of Portugal</title>
+  <rect width="360" height="600" fill="#006600"/>
+  <rect x="360" width="540" height="600" fill="#ff0000"/>
+  <g fill="none" stroke="#ffcf00" stroke-width="10">
+    <circle cx="360" cy="300" r="140"/>
+    <ellipse cx="360" cy="300" rx="50" ry="140"/>
+    <ellipse cx="360" cy="300" rx="140" ry="45"/>
+    <path d="M231 247L489 353M231 353L489 247"/>
+  </g>
+  <path d="M285 200H435V310Q435 365 360 400Q285 365 285 310Z" fill="#fff" stroke="#c00" stroke-width="20"/>
+  <g>
+    <path d="M348 232h24v22q0 12-12 17q-12-5-12-17z" fill="#003399"/>
+    <circle cx="360" cy="239" r="2.2" fill="#fff"/>
+    <circle cx="354" cy="246" r="2.2" fill="#fff"/>
+    <circle cx="366" cy="246" r="2.2" fill="#fff"/>
+    <circle cx="354" cy="255" r="2.2" fill="#fff"/>
+    <circle cx="366" cy="255" r="2.2" fill="#fff"/>
+    <path d="M313 272h24v22q0 12-12 17q-12-5-12-17z" fill="#003399"/>
+    <circle cx="325" cy="279" r="2.2" fill="#fff"/>
+    <circle cx="319" cy="286" r="2.2" fill="#fff"/>
+    <circle cx="331" cy="286" r="2.2" fill="#fff"/>
+    <circle cx="319" cy="295" r="2.2" fill="#fff"/>
+    <circle cx="331" cy="295" r="2.2" fill="#fff"/>
+    <path d="M383 272h24v22q0 12-12 17q-12-5-12-17z" fill="#003399"/>
+    <circle cx="395" cy="279" r="2.2" fill="#fff"/>
+    <circle cx="389" cy="286" r="2.2" fill="#fff"/>
+    <circle cx="401" cy="286" r="2.2" fill="#fff"/>
+    <circle cx="389" cy="295" r="2.2" fill="#fff"/>
+    <circle cx="401" cy="295" r="2.2" fill="#fff"/>
+    <path d="M348 272h24v22q0 12-12 17q-12-5-12-17z" fill="#003399"/>
+    <circle cx="360" cy="279" r="2.2" fill="#fff"/>
+    <circle cx="354" cy="286" r="2.2" fill="#fff"/>
+    <circle cx="366" cy="286" r="2.2" fill="#fff"/>
+    <circle cx="354" cy="295" r="2.2" fill="#fff"/>
+    <circle cx="366" cy="295" r="2.2" fill="#fff"/>
+    <path d="M348 312h24v22q0 12-12 17q-12-5-12-17z" fill="#003399"/>
+    <circle cx="360" cy="319" r="2.2" fill="#fff"/>
+    <circle cx="354" cy="326" r="2.2" fill="#fff"/>
+    <circle cx="366" cy="326" r="2.2" fill="#fff"/>
+    <circle cx="354" cy="335" r="2.2" fill="#fff"/>
+    <circle cx="366" cy="335" r="2.2" fill="#fff"/>
+    <path d="M293 228v-5h4v5h6v-5h4v18h-14z" fill="#ffcf00"/>
+    <path d="M353 203v-5h4v5h6v-5h4v18h-14z" fill="#ffcf00"/>
+    <path d="M413 228v-5h4v5h6v-5h4v18h-14z" fill="#ffcf00"/>
+    <path d="M293 288v-5h4v5h6v-5h4v18h-14z" fill="#ffcf00"/>
+    <path d="M413 288v-5h4v5h6v-5h4v18h-14z" fill="#ffcf00"/>
+    <path d="M318 348v-5h4v5h6v-5h4v18h-14z" fill="#ffcf00"/>
+    <path d="M388 348v-5h4v5h6v-5h4v18h-14z" fill="#ffcf00"/>
+  </g>
+</svg>

@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="en-US" sourcelanguage="ja">
+  <context>
+    <name>TranslationTable</name>
+    <message>
+      <source>キー</source>
+      <translation>Key</translation>
+    </message>
+    <message>
+      <source>ファイル</source>
+      <translation>File</translation>
+    </message>
+    <message>
+      <source>原文</source>
+      <translation>Source</translation>
+    </message>
+    <message>
+      <source>操作</source>
+      <translation>Action</translation>
+    </message>
+    <message>
+      <source>状態</source>
+      <translation>State</translation>
+    </message>
+    <message>
+      <source>訳文</source>
+      <translation>Translation</translation>
+    </message>
+  </context>
+</TS>

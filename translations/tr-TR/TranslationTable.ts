@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="tr-TR" sourcelanguage="ja">
+  <context>
+    <name>TranslationTable</name>
+    <message>
+      <source>キー</source>
+      <translation>Anahtar</translation>
+    </message>
+    <message>
+      <source>ファイル</source>
+      <translation>Dosya</translation>
+    </message>
+    <message>
+      <source>原文</source>
+      <translation>Kaynak</translation>
+    </message>
+    <message>
+      <source>操作</source>
+      <translation>Eylem</translation>
+    </message>
+    <message>
+      <source>状態</source>
+      <translation>Zustand</translation>
+    </message>
+    <message>
+      <source>訳文</source>
+      <translation>Çeviri</translation>
+    </message>
+  </context>
+</TS>

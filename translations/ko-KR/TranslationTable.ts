@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="ko-KR" sourcelanguage="ja">
+  <context>
+    <name>TranslationTable</name>
+    <message>
+      <source>キー</source>
+      <translation>키</translation>
+    </message>
+    <message>
+      <source>ファイル</source>
+      <translation>파일</translation>
+    </message>
+    <message>
+      <source>原文</source>
+      <translation>원문</translation>
+    </message>
+    <message>
+      <source>操作</source>
+      <translation>작업</translation>
+    </message>
+    <message>
+      <source>状態</source>
+      <translation>상태</translation>
+    </message>
+    <message>
+      <source>訳文</source>
+      <translation>번역문</translation>
+    </message>
+  </context>
+</TS>

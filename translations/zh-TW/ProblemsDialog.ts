@@ -1,0 +1,62 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="zh-TW" sourcelanguage="ja">
+  <context>
+    <name>ProblemsDialog</name>
+    <message>
+      <source>すべて</source>
+      <translation>全部</translation>
+    </message>
+    <message>
+      <source>オンラインガイドをブラウザで開きます。</source>
+      <translation>在瀏覽器中開啟線上指南。</translation>
+    </message>
+    <message>
+      <source>ファイル</source>
+      <translation>檔案</translation>
+    </message>
+    <message>
+      <source>保存</source>
+      <translation>儲存</translation>
+    </message>
+    <message>
+      <source>内容</source>
+      <translation>詳細資訊</translation>
+    </message>
+    <message>
+      <source>問題を検索</source>
+      <translation>搜尋問題</translation>
+    </message>
+    <message>
+      <source>問題一覧</source>
+      <translation>問題清單</translation>
+    </message>
+    <message>
+      <source>対処方法 ↗</source>
+      <translation>疑難排解指南 ↗</translation>
+    </message>
+    <message>
+      <source>対象</source>
+      <translation>目標</translation>
+    </message>
+    <message>
+      <source>構文</source>
+      <translation>語法</translation>
+    </message>
+    <message>
+      <source>種類</source>
+      <translation>類型</translation>
+    </message>
+    <message>
+      <source>翻訳</source>
+      <translation>譯文</translation>
+    </message>
+    <message>
+      <source>該当箇所へ移動</source>
+      <translation>移至位置</translation>
+    </message>
+    <message>
+      <source>閉じる</source>
+      <translation>關閉</translation>
+    </message>
+  </context>
+</TS>

@@ -1,0 +1,102 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="zh-TW" sourcelanguage="ja">
+  <context>
+    <name>Shortcuts</name>
+    <message>
+      <source>AUTOlingua2 標準</source>
+      <translation>AUTOlingua2 預設值</translation>
+    </message>
+    <message>
+      <source>{key}：{name}</source>
+      <translation>{key}：{name}</translation>
+    </message>
+    <message>
+      <source>このセットを削除しますか？ 確定・適用時にファイルを削除します。</source>
+      <translation>刪除此設定組？確認或套用後會刪除其檔案。</translation>
+    </message>
+    <message>
+      <source>アドレス入力開始</source>
+      <translation>開始輸入位址</translation>
+    </message>
+    <message>
+      <source>キーの割り当て</source>
+      <translation>按鍵指派</translation>
+    </message>
+    <message>
+      <source>キーの競合を解消してください。</source>
+      <translation>請解決快速鍵衝突。</translation>
+    </message>
+    <message>
+      <source>キーの競合を解消してください：{name}</source>
+      <translation>請解決快速鍵衝突：{name}</translation>
+    </message>
+    <message>
+      <source>ショートカットを入力</source>
+      <translation>輸入快速鍵</translation>
+    </message>
+    <message>
+      <source>ショートカット設定</source>
+      <translation>快速鍵設定</translation>
+    </message>
+    <message>
+      <source>セット削除</source>
+      <translation>刪除設定組</translation>
+    </message>
+    <message>
+      <source>デバッグモードで起動した場合だけ変更できます。</source>
+      <translation>僅在偵錯模式啟動時可變更。</translation>
+    </message>
+    <message>
+      <source>フォーカス編集</source>
+      <translation>專注編輯器</translation>
+    </message>
+    <message>
+      <source>フォーカス編集 &gt; 保存</source>
+      <translation>專注編輯器 &gt; 儲存</translation>
+    </message>
+    <message>
+      <source>メイン画面</source>
+      <translation>主視窗</translation>
+    </message>
+    <message>
+      <source>入力を妨げるキーにはCtrl・Alt・Metaのいずれかが必要です。</source>
+      <translation>妨礙文字輸入的按鍵需搭配 Ctrl、Alt 或 Meta。</translation>
+    </message>
+    <message>
+      <source>同じキーが重複しています：{id}</source>
+      <translation>重複按鍵：{id}</translation>
+    </message>
+    <message>
+      <source>場所：{location}</source>
+      <translation>位置：{location}</translation>
+    </message>
+    <message>
+      <source>文字編集の基本操作（変更不可）</source>
+      <translation>基本文字編輯操作（不可變更）</translation>
+    </message>
+    <message>
+      <source>無効なキーです：{key}</source>
+      <translation>無效按鍵：{key}</translation>
+    </message>
+    <message>
+      <source>確定・取消・移動の基本キーは変更できません。</source>
+      <translation>無法變更確認、取消和導覽的基本按鍵。</translation>
+    </message>
+    <message>
+      <source>訳文出力</source>
+      <translation>匯出譯文</translation>
+    </message>
+    <message>
+      <source>選択中のコマンド：{name}</source>
+      <translation>選取命令：{name}</translation>
+    </message>
+    <message>
+      <source>選択中のセットが見つかりません。</source>
+      <translation>找不到選取的設定組。</translation>
+    </message>
+    <message>
+      <source>選択中のセットに競合があります。</source>
+      <translation>選取的設定組有衝突。</translation>
+    </message>
+  </context>
+</TS>

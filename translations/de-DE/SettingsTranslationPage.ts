@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="de-DE" sourcelanguage="ja">
+  <context>
+    <name>SettingsTranslationPage</name>
+    <message>
+      <source>4文字以下の変更、または12文字以下かつ類似度90%以上を低へ</source>
+      <translation>Sparmodell bei Änderungen bis 4 Zeichen oder bis 12 Zeichen und mindestens 90% Ähnlichkeit verwenden</translation>
+    </message>
+    <message>
+      <source>低モデル</source>
+      <translation>Sparmodell</translation>
+    </message>
+    <message>
+      <source>低モデルを使う範囲</source>
+      <translation>Einsatzbereich des Sparmodells</translation>
+    </message>
+    <message>
+      <source>同時リクエスト数</source>
+      <translation>Gleichzeitige Anfragen</translation>
+    </message>
+    <message>
+      <source>狭い　　　　　　　　標準　　　　　　　　広い</source>
+      <translation>Eng                Standard                Weit</translation>
+    </message>
+    <message>
+      <source>高モデル</source>
+      <translation>Hochleistungsmodell</translation>
+    </message>
+  </context>
+</TS>

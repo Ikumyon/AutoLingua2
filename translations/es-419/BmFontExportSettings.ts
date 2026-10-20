@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="es-419" sourcelanguage="ja">
+  <context>
+    <name>BmFontExportSettings</name>
+    <message>
+      <source>原文</source>
+      <translation>Texto original</translation>
+    </message>
+    <message>
+      <source>対象テキスト：</source>
+      <translation>Texto que incluir:</translation>
+    </message>
+    <message>
+      <source>訳文（翻訳）</source>
+      <translation>Traducción (texto de destino)</translation>
+    </message>
+  </context>
+</TS>

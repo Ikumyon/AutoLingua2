@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="sr-RS" sourcelanguage="ja">
+  <context>
+    <name>TranslationTable</name>
+    <message>
+      <source>キー</source>
+      <translation>Кључ</translation>
+    </message>
+    <message>
+      <source>ファイル</source>
+      <translation>Датотека</translation>
+    </message>
+    <message>
+      <source>原文</source>
+      <translation>Извор</translation>
+    </message>
+    <message>
+      <source>操作</source>
+      <translation>Радња</translation>
+    </message>
+    <message>
+      <source>状態</source>
+      <translation>Стање</translation>
+    </message>
+    <message>
+      <source>訳文</source>
+      <translation>Превод</translation>
+    </message>
+  </context>
+</TS>

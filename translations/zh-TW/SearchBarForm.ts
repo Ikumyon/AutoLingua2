@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="zh-TW" sourcelanguage="ja">
+  <context>
+    <name>SearchBarForm</name>
+    <message>
+      <source>.*</source>
+      <translation>.*</translation>
+    </message>
+    <message>
+      <source>Aa</source>
+      <translation>Aa</translation>
+    </message>
+    <message>
+      <source>ab</source>
+      <translation>ab</translation>
+    </message>
+    <message>
+      <source>単語全体に一致する</source>
+      <translation>全字符合</translation>
+    </message>
+    <message>
+      <source>大文字と小文字を区別する</source>
+      <translation>區分大小寫</translation>
+    </message>
+    <message>
+      <source>検索</source>
+      <translation>搜尋</translation>
+    </message>
+    <message>
+      <source>正規表現を使用する</source>
+      <translation>使用正規表示式</translation>
+    </message>
+    <message>
+      <source>置換欄を開く／閉じる</source>
+      <translation>顯示／隱藏取代欄</translation>
+    </message>
+  </context>
+</TS>

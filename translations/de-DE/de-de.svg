@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
+  <title>Flag of Germany</title>
+  <rect width="900" height="200" fill="#000"/>
+  <rect y="200" width="900" height="200" fill="#d00"/>
+  <rect y="400" width="900" height="200" fill="#ffce00"/>
+</svg>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
+  <title>Flag of Hungary</title>
+  <rect width="1200" height="200" fill="#ce2939"/>
+  <rect y="200" width="1200" height="200" fill="#fff"/>
+  <rect y="400" width="1200" height="200" fill="#477050"/>
+</svg>

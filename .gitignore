@@ -46,3 +46,7 @@ AGENTS.md
 web/node_modules/
 assets/chat/
 /developer-thumbnail-reader/
+
+# 本体UIの翻訳済み辞書は配布ビルド時に生成する（日本語の言語名辞書は保持）
+/translations/**/*.qm
+!/translations/ja_JP/language_names.qm

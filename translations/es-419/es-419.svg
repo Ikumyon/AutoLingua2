@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
+  <title>Latin America regional language icon</title>
+  <rect width="900" height="600" rx="55" fill="#f3f7fb"/>
+  <circle cx="450" cy="300" r="245" fill="#2279ba"/>
+  <g fill="none" stroke="#8bc4e7" stroke-width="5">
+    <ellipse cx="450" cy="300" rx="130" ry="245"/>
+    <path d="M205 300H695M238 178H662M238 422H662"/>
+  </g>
+  <path d="M260 140L355 100L412 145L388 188L355 206L373 240L415 265L445 280L465 308L448 328L415 300L390 295L373 267L340 249L312 218Z M448 319L500 302L565 334L590 378L565 412L540 420L521 465L495 504L467 510L453 473L460 431L445 390L430 352Z" fill="#73bb56"/>
+</svg>

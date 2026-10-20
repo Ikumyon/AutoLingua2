@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="pl-PL" sourcelanguage="ja">
+  <context>
+    <name>ThumbnailExportDialog</name>
+    <message>
+      <source>サムネイルを出力</source>
+      <translation>Eksportuj thumbnail</translation>
+    </message>
+  </context>
+</TS>

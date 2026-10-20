@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="zh-TW" sourcelanguage="ja">
+  <context>
+    <name>ShortcutPresetDialog</name>
+    <message>
+      <source>User</source>
+      <translation>使用者</translation>
+    </message>
+    <message>
+      <source>タグ（カンマ区切り）</source>
+      <translation>標籤（以逗號分隔）</translation>
+    </message>
+    <message>
+      <source>作者</source>
+      <translation>作者</translation>
+    </message>
+    <message>
+      <source>名前</source>
+      <translation>名稱</translation>
+    </message>
+    <message>
+      <source>新規ショートカットセット</source>
+      <translation>新增快速鍵設定組</translation>
+    </message>
+    <message>
+      <source>説明</source>
+      <translation>說明</translation>
+    </message>
+  </context>
+</TS>

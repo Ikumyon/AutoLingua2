@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
+  <title>Arabic language icon</title>
+  <rect width="900" height="600" rx="60" fill="#087e72"/>
+  <circle cx="450" cy="300" r="245" fill="none" stroke="#93d3ca" stroke-width="10"/>
+  <text x="450" y="390" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="300" fill="#fff">ع</text>
+</svg>

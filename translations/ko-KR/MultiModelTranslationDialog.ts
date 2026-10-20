@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="ko-KR" sourcelanguage="ja">
+  <context>
+    <name>MultiModelTranslationDialog</name>
+    <message>
+      <source>全モデル翻訳結果</source>
+      <translation>모든 모델 결과</translation>
+    </message>
+    <message>
+      <source>原文</source>
+      <translation>원문</translation>
+    </message>
+    <message>
+      <source>登録モデルごとの翻訳結果:</source>
+      <translation>등록 모델별 번역 결과:</translation>
+    </message>
+    <message>
+      <source>閉じる</source>
+      <translation>닫기</translation>
+    </message>
+  </context>
+</TS>

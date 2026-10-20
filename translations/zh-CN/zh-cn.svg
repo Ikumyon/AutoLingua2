@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
+  <title>Flag of China</title>
+  <rect width="900" height="600" fill="#de2910"/>
+  <defs><polygon id="star" fill="#ffde00" points="0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309"/></defs>
+  <use href="#star" transform="translate(150 150) scale(90)"/>
+  <use href="#star" transform="translate(300 60) rotate(-120.964) scale(30)"/>
+  <use href="#star" transform="translate(360 120) rotate(-98.13) scale(30)"/>
+  <use href="#star" transform="translate(360 210) rotate(-74.055) scale(30)"/>
+  <use href="#star" transform="translate(300 270) rotate(-51.34) scale(30)"/>
+</svg>

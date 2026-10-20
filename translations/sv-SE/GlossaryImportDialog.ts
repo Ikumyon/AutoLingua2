@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="sv-SE" sourcelanguage="ja">
+  <context>
+    <name>GlossaryImportDialog</name>
+    <message>
+      <source>⇄ 入れ替え</source>
+      <translation>⇄ Byt</translation>
+    </message>
+    <message>
+      <source>オンラインガイドをブラウザで開きます。</source>
+      <translation>Öppna onlineguiden i webbläsaren.</translation>
+    </message>
+    <message>
+      <source>取り込みのガイド ↗</source>
+      <translation>Importguide ↗</translation>
+    </message>
+    <message>
+      <source>形式：</source>
+      <translation>Format:</translation>
+    </message>
+    <message>
+      <source>用語集を取り込む</source>
+      <translation>Importera ordlista</translation>
+    </message>
+    <message>
+      <source>選択した用語集の配下に新規作成</source>
+      <translation>Skapa under vald ordlista</translation>
+    </message>
+    <message>
+      <source>選択した用語集へ統合</source>
+      <translation>Slå ihop med vald ordlista</translation>
+    </message>
+  </context>
+</TS>

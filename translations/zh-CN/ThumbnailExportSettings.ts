@@ -1,0 +1,70 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="zh-CN" sourcelanguage="ja">
+  <context>
+    <name>ThumbnailExportSettings</name>
+    <message>
+      <source>#ffffff</source>
+      <translation>#ffffff</translation>
+    </message>
+    <message>
+      <source>4:2:0</source>
+      <translation>4:2:0</translation>
+    </message>
+    <message>
+      <source>4:2:2</source>
+      <translation>4:2:2</translation>
+    </message>
+    <message>
+      <source>4:4:4</source>
+      <translation>4:4:4</translation>
+    </message>
+    <message>
+      <source>JPEG</source>
+      <translation>JPEG</translation>
+    </message>
+    <message>
+      <source>PNG</source>
+      <translation>PNG</translation>
+    </message>
+    <message>
+      <source>プログレッシブ保存</source>
+      <translation>渐进式编码</translation>
+    </message>
+    <message>
+      <source>メタデータを保持</source>
+      <translation>保留元数据</translation>
+    </message>
+    <message>
+      <source>品質</source>
+      <translation>质量</translation>
+    </message>
+    <message>
+      <source>圧縮を最適化</source>
+      <translation>优化压缩</translation>
+    </message>
+    <message>
+      <source>圧縮レベル</source>
+      <translation>压缩级别</translation>
+    </message>
+    <message>
+      <source>圧縮レベル
+画質は変わりません。PNGの最適化が有効な場合は最適化側で圧縮が決まります。</source>
+      <translation>压缩级别
+不影响画质。启用 PNG 优化后，由优化器决定压缩方式。</translation>
+    </message>
+    <message>
+      <source>色差サブサンプリング</source>
+      <translation>色度子采样</translation>
+    </message>
+    <message>
+      <source>色差サブサンプリング
+4:4:4は色の細部を保持。4:2:0は容量を抑えます。</source>
+      <translation>色度子采样
+4:4:4 保留色彩细节。4:2:0 减小文件体积。</translation>
+    </message>
+    <message>
+      <source>透明部分の背景色</source>
+      <translation>透明区域背景色</translation>
+    </message>
+  </context>
+</TS>

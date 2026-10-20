@@ -1,0 +1,90 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="nb-NO" sourcelanguage="ja">
+  <context>
+    <name>SourceWatchTargetDialog</name>
+    <message>
+      <source>キャンセル</source>
+      <translation>Avbryt</translation>
+    </message>
+    <message>
+      <source>保存</source>
+      <translation>Lagre</translation>
+    </message>
+    <message>
+      <source>参照…</source>
+      <translation>Durchsuchen…</translation>
+    </message>
+    <message>
+      <source>名前</source>
+      <translation>Name</translation>
+    </message>
+    <message>
+      <source>更新通知</source>
+      <translation>Update-Benachrichtigungen</translation>
+    </message>
+    <message>
+      <source>標準</source>
+      <translation>Standard</translation>
+    </message>
+    <message>
+      <source>標準に戻す</source>
+      <translation>Standard wiederherstellen</translation>
+    </message>
+    <message>
+      <source>画像を変更</source>
+      <translation>Bild ändern</translation>
+    </message>
+    <message>
+      <source>監視対象を編集</source>
+      <translation>Überwachungsziel rediger</translation>
+    </message>
+    <message>
+      <source>監視対象を追加</source>
+      <translation>Überwachungsziel legg til</translation>
+    </message>
+    <message>
+      <source>監視設定エラー</source>
+      <translation>Überwachungseinstellungsfehler</translation>
+    </message>
+    <message>
+      <source>翻訳元フォルダ</source>
+      <translation>Quellordner</translation>
+    </message>
+    <message>
+      <source>試聴</source>
+      <translation>Ton vorhören</translation>
+    </message>
+    <message>
+      <source>追加</source>
+      <translation>Legg til</translation>
+    </message>
+    <message>
+      <source>通知画像</source>
+      <translation>Benachrichtigungsbild</translation>
+    </message>
+    <message>
+      <source>通知設定エラー</source>
+      <translation>Benachrichtigungsfehler</translation>
+    </message>
+    <message>
+      <source>通知音</source>
+      <translation>Benachrichtigungston</translation>
+    </message>
+    <message>
+      <source>通知音エラー</source>
+      <translation>Benachrichtigungston-Feil</translation>
+    </message>
+    <message>
+      <source>通知音：{name}</source>
+      <translation>Benachrichtigungston: {name}</translation>
+    </message>
+    <message>
+      <source>通知音：標準</source>
+      <translation>Benachrichtigungston: Standard</translation>
+    </message>
+    <message>
+      <source>音を変更</source>
+      <translation>Ton ändern</translation>
+    </message>
+  </context>
+</TS>

@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<TS version="2.1" language="th-TH" sourcelanguage="ja">
+  <context>
+    <name>TranslationTable</name>
+    <message>
+      <source>キー</source>
+      <translation>คีย์</translation>
+    </message>
+    <message>
+      <source>ファイル</source>
+      <translation>ไฟล์</translation>
+    </message>
+    <message>
+      <source>原文</source>
+      <translation>ต้นฉบับ</translation>
+    </message>
+    <message>
+      <source>操作</source>
+      <translation>การดำเนินการ</translation>
+    </message>
+    <message>
+      <source>状態</source>
+      <translation>Zustand</translation>
+    </message>
+    <message>
+      <source>訳文</source>
+      <translation>การแปล</translation>
+    </message>
+  </context>
+</TS>
