@@ -6,11 +6,16 @@ import { Icon } from './Icon';
 import { useTheme } from './useTheme';
 import { BrandLogo } from './BrandLogo';
 import { routePath, siteUrl } from './urls';
+import { ProductPage } from './ProductPage';
 
 function readRoute() {
   const path = routePath();
-  if (path === '/' || /^\/guide(?:\/[^/]+)?\/?$/.test(path)) {
-    const suffix = path === '/' ? '/guide' : path;
+  const product = /^\/([^/]+)\/?$/.exec(path);
+  if (path === '/' || (product && languages.some(item => item.code === product[1]))) {
+    return { language: product?.[1] ?? browserLanguage(), slug: '', valid: true, product: true };
+  }
+  if (/^\/guide(?:\/[^/]+)?\/?$/.test(path)) {
+    const suffix = path;
     history.replaceState(null, '', siteUrl(`/${browserLanguage()}${suffix}${location.search}${location.hash}`));
   }
   const match = /^\/([^/]+)\/guide(?:\/([^/]+))?\/?$/.exec(routePath());
@@ -19,9 +24,9 @@ function readRoute() {
   const target = match && legacyAnchorTargets[`${match[2]}#${anchor}`];
   if (target) {
     history.replaceState(null, '', siteUrl(`/${match[1]}/guide/${target}`));
-    return { language: match[1], slug: target.split('#')[0], valid: true };
+    return { language: match[1], slug: target.split('#')[0], valid: true, product: false };
   }
-  return { language: match?.[1] ?? 'ja', slug: match?.[2] ?? '', valid: Boolean(match) };
+  return { language: match?.[1] ?? 'ja', slug: match?.[2] ?? '', valid: Boolean(match), product: false };
 }
 
 const readingOrder = pages.flatMap(page => [page, ...referencePages.filter(child => child.parentSlug === page.slug)]);
@@ -44,8 +49,8 @@ export default function App() {
   const parentPage = pages.find(item => item.slug === page?.parentSlug);
   const readingIndex = readingOrder.findIndex(item => item.slug === page?.slug);
   const children = referencePages.filter(item => item.parentSlug === page?.slug);
-  const home = route.valid && languageSupported && !route.slug;
-  const notFound = !route.valid || !languageSupported || (!home && !page);
+  const home = !route.product && route.valid && languageSupported && !route.slug;
+  const notFound = !route.valid || !languageSupported || (!route.product && !home && !page);
 
   useEffect(() => {
     setRoute(readRoute());
@@ -67,8 +72,10 @@ export default function App() {
   useEffect(() => {
     document.documentElement.lang = language;
     const text = dictionary ?? fallback;
-    document.title = `${text[notFound ? 'guide.notFound' : home ? 'guide.home' : page?.title ?? 'guide.notFound']} | ${text['guide.title']}`;
-  }, [language, dictionary, home, notFound, page]);
+    document.title = route.product ? `AUTOlingua Desktop | ${text['product.headline']}` : `${text[notFound ? 'guide.notFound' : home ? 'guide.home' : page?.title ?? 'guide.notFound']} | ${text['guide.title']}`;
+    const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+    if (description) description.content = text[route.product ? 'product.description' : 'guide.description'];
+  }, [language, dictionary, home, notFound, page, route.product]);
 
   useEffect(() => {
     if (!dictionary) return;
@@ -86,7 +93,12 @@ export default function App() {
     }, { rootMargin: '-90px 0px -55% 0px' });
     document.querySelectorAll('.guide-section').forEach(section => observer.observe(section));
     return () => observer.disconnect();
-  }, [route.slug, dictionary]);
+  }, [route.slug, route.product, dictionary]);
+
+  if (route.product) return <ProductPage t={t} language={language} theme={theme} toggleTheme={toggleTheme} changeLanguage={value => {
+    history.pushState(null, '', siteUrl(`/${value}/${location.search}${location.hash}`));
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }} />;
 
   return <>
     <a className="skip-link" href="#content">{t('guide.skipToContent')}</a>
@@ -102,6 +114,7 @@ export default function App() {
     <div className="layout">
       <aside id="guide-sidebar" className={`sidebar ${menuOpen ? 'is-open' : ''}`}>
         <nav aria-label={t('guide.toc')}>
+          <GuideLink href={`/${language}/`} className="home-link">{t('product.home')} <Icon name="arrowLeft" /></GuideLink>
           <GuideLink href={`/${language}/guide`} current={home} className="home-link">{t('guide.home')}</GuideLink>
           <div className="sidebar-label">{t('guide.toc')}</div>
           <ol>{pages.map((item, index) => <li key={item.slug}><GuideLink href={`/${language}/guide/${item.slug}`} current={page?.slug === item.slug && !notFound}><span className="chapter-number">{String(index + 1).padStart(2, '0')}</span><span>{t(item.title)}{!item.sections.length && <small>{t('guide.preparing')}</small>}</span></GuideLink>{referencePages.filter(reference => reference.parentSlug === item.slug).map(reference => <GuideLink key={reference.slug} href={`/${language}/guide/${reference.slug}`} className="reference-link" current={page?.slug === reference.slug && !notFound}>{t(reference.navTitle ?? reference.title)}</GuideLink>)}</li>)}</ol>

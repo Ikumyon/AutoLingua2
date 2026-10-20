@@ -25,6 +25,10 @@ export default {
       const index = bundle['index.html'];
       if (!index || index.type !== 'asset') throw new Error('Missing guide entry');
       this.emitFile({ type: 'asset', fileName: '404.html', source: index.source });
+      // Real landing-page entry files avoid serving localized product URLs as 404s.
+      for (const file of readdirSync(resolve(root, 'public/locales')).filter(file => file.endsWith('.json'))) {
+        this.emitFile({ type: 'asset', fileName: `${file.slice(0, -5)}/index.html`, source: index.source });
+      }
     } },
     resolveId(id) {
       if (id === 'virtual:guide-default-locale') return '\0guide-default-locale';

@@ -1,6 +1,8 @@
-# Autolingua Desktop ユーザーガイド
+# Autolingua Desktop 紹介ページ・ユーザーガイド
 
 React + TypeScript + CSS で作成したオンライン専用の静的サイトです。
+トップはアプリの紹介ページで、「IkumyonToolsで入手」に相当する配布先バッジから `https://ikumyon.github.io/IkumyonTools/tool.html?tool=autolingua2` へ移動します。配布ファイルそのものはこのサイトに置きません。
+`/` と `/<言語>/` が紹介ページ、`/<言語>/guide` 以下がユーザーガイドです。紹介ページは `src/ProductPage.tsx` と `src/product.css`、文章は各言語JSONの `product.` キーで管理します。
 初期設定の本文は提供された原稿を収録しています。基本操作から自動化まで、`.ui` と Python の実装を確認して記述しています。
 全10章と15の子ページで構成し、親ページには概要と基本操作、子ページには詳細な手順・設定の意味・使用例・結果確認を掲載しています。
 モデル名など外部サービス側の情報は、利用時点の接続先でも確認してください。
@@ -22,6 +24,7 @@ npm run build
 
 `npm run build` は翻訳検証、TypeScriptチェック、Viteビルドを順に実行します。
 出力は `dist/` です。`npm run preview` でビルド成果物を確認できます。
+紹介ページはトップと各言語ディレクトリの `index.html` を出力し、言語別URLへの直接アクセスでも通常のページとして配信します。
 
 ## ファイル構成
 
