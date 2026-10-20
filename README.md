@@ -52,6 +52,8 @@ Pythonの対応範囲と依存関係は [pyproject.toml](pyproject.toml) に記�
 
 GitHub Actionsの **Build desktop** でWindows・Linuxのビルドを検証します。
 `main` へのpush、プルリクエスト、手動実行に対応し、ガイドやMarkdownだけの変更は対象外です。
+`v0.9.0` のような `v` で始まるタグをpushしたときも、そのタグの配布用ビルドを実行します。
+時間による定期実行は行いません。タグは配布するバージョンを確定したときに付けます。
 
 両OSでチャット画面の型チェックとビルド、Rustの4コンポーネントのビルド、
 Pythonネイティブ拡張の読み込み、Qtリソースの変換、PyInstallerによるパッケージ作成を行います。

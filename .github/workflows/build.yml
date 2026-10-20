@@ -3,6 +3,7 @@ name: Build desktop
 on:
   push:
     branches: [main]
+    tags: ['v*']
     paths-ignore:
       - 'guide/**'
       - '**/*.md'
