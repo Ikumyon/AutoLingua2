@@ -10,6 +10,21 @@ export const fallback = reference;
 
 export const languages = localeLanguages;
 
+export function browserLanguage(preferences: readonly string[] = navigator.languages): string {
+  for (const preference of preferences) {
+    const tag = preference.replaceAll('_', '-').toLowerCase();
+    const exact = languages.find(language => language.code.toLowerCase() === tag);
+    if (exact) return exact.code;
+    const base = tag.split('-')[0];
+    if (base === 'zh') {
+      return tag.split('-').some(part => ['tw', 'hk', 'mo', 'hant'].includes(part)) ? 'zh-TW' : 'zh-CN';
+    }
+    const match = languages.find(language => language.code.toLowerCase().split('-')[0] === base);
+    if (match) return match.code;
+  }
+  return 'en';
+}
+
 export async function loadDictionary(language: string, signal: AbortSignal): Promise<Dictionary> {
   const response = await fetch(siteUrl(`/locales/${encodeURIComponent(language)}.json`), { signal });
   if (!response.ok) throw new Error(`Locale HTTP ${response.status}`);

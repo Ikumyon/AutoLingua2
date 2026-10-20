@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AutomationTriggerConfirm</class>
+ <widget class="QDialog" name="AutomationTriggerConfirm">
+  <property name="windowTitle"><string>自動化スクリプトの実行確認</string></property>
+  <property name="minimumSize"><size><width>440</width><height>0</height></size></property>
+  <layout class="QVBoxLayout" name="layoutMain">
+   <item><widget class="QLabel" name="labelConfirm"><property name="text"><string/></property><property name="textFormat"><enum>Qt::PlainText</enum></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QLabel" name="labelDetails"><property name="text"><string/></property><property name="textFormat"><enum>Qt::PlainText</enum></property><property name="wordWrap"><bool>true</bool></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
+   <item><layout class="QHBoxLayout" name="layoutButtons">
+    <item><spacer name="spacerButtons"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item>
+    <item><widget class="QPushButton" name="buttonCancel"><property name="text"><string>キャンセル</string></property><property name="autoDefault"><bool>false</bool></property><property name="default"><bool>true</bool></property></widget></item>
+    <item><widget class="QPushButton" name="buttonExecute"><property name="text"><string>実行</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+   </layout></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

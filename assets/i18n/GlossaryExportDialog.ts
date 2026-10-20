@@ -30,5 +30,13 @@
       <source>用語集を書き出す</source>
       <translation>用語集を書き出す</translation>
     </message>
+    <message>
+      <source>オンラインガイドをブラウザで開きます。</source>
+      <translation>オンラインガイドをブラウザで開きます。</translation>
+    </message>
+    <message>
+      <source>書き出しのガイド ↗</source>
+      <translation>書き出しのガイド ↗</translation>
+    </message>
   </context>
 </TS>

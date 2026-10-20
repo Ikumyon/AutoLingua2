@@ -5,7 +5,7 @@ from collections.abc import Callable
 import math
 import re
 
-from PySide6.QtCore import QElapsedTimer, QEvent, QItemSelectionModel, QObject, QSaveFile, QIODeviceBase, QTimer, Qt
+from PySide6.QtCore import QElapsedTimer, QEvent, QItemSelectionModel, QObject, QSaveFile, QIODeviceBase, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor, QFontDatabase, QIcon, QKeyEvent
 from PySide6.QtWidgets import (
     QAbstractButton, QAbstractItemView, QApplication, QDialog, QFileDialog, QLabel, QMainWindow, QMessageBox,
@@ -48,6 +48,8 @@ click("buttonTranslateAll")
 
 class AutomationDialogController(QObject):
     """Resolve script operations against widgets in the active application window."""
+
+    execution_finished = Signal(str, bool)
 
     def __init__(self, window: QMainWindow, get_icon: Callable[[str], QIcon]) -> None:
         super().__init__(window)
@@ -96,6 +98,7 @@ class AutomationDialogController(QObject):
         self.log.setMaximumBlockCount(1000)
         self.file_label = require_child(self.dialog, QLabel, "labelFile")
         self.state = require_child(self.dialog, QLabel, "labelState")
+        self.execution_label = require_child(self.dialog, QLabel, "labelExecution")
         self.path: Path | None = None
         self.runner = AutomationRunner(self)
         self.runner.action_requested.connect(self._dispatch)
@@ -327,13 +330,22 @@ class AutomationDialogController(QObject):
         return True
 
     def _start(self) -> None:
-        self.log.clear()
         try:
             script = Script(self.editor.toPlainText())
         except ScriptError as exc:
             self._line(exc.token.line)
             self._finished(str(exc), True)
             return
+        self.start_script_object(script)
+
+    @property
+    def busy(self) -> bool:
+        return self.runner.running or self.start_script is not None
+
+    def start_script_object(self, script: Script) -> None:
+        if self.busy:
+            raise RuntimeError("自動化はすでに実行中です。")
+        self.log.clear()
         app = QApplication.instance()
         if not isinstance(app, QApplication):
             raise RuntimeError("QApplicationがありません。")
@@ -346,6 +358,10 @@ class AutomationDialogController(QObject):
         self._set_running(True)
         self.start_script = script
         self.dialog.showMinimized()
+        if getattr(self, "external_execution", False):
+            self.window.showNormal()
+            self.window.raise_()
+            self.window.activateWindow()
         self.elapsed.start()
         self.wait_timer.start(0)
 
@@ -365,6 +381,8 @@ class AutomationDialogController(QObject):
 
     def _line(self, line: int) -> None:
         self.state.setText(tr("AutomationDialog", "実行位置: {line}行").format(line=line))
+        if getattr(self, "external_execution", False):
+            return
         cursor = QTextCursor(self.editor.document().findBlockByNumber(line - 1))
         cursor.select(QTextCursor.SelectionType.LineUnderCursor)
         selection = QTextEdit.ExtraSelection()
@@ -395,6 +413,9 @@ class AutomationDialogController(QObject):
         self._set_running(False)
         self.state.setText(tr("AutomationDialog", "エラー") if error else message)
         self.log.appendPlainText(message)
+        self.external_execution = False
+        self.execution_label.clear()
+        self.execution_finished.emit(message, error)
 
     def _active(self) -> QWidget | None:
         modal = QApplication.activeModalWidget()
@@ -790,6 +811,10 @@ class AutomationDialogController(QObject):
         if watched is self.dialog and event.type() == QEvent.Type.Close:
             self._stop("実行ウィンドウを閉じたため停止しました。")
             if not self._confirm_discard():
+                event.ignore()
+                return True
+            triggers = getattr(self, "triggers", None)
+            if triggers is not None and not triggers.confirm_discard():
                 event.ignore()
                 return True
         if self.runner.running or self.start_script is not None:

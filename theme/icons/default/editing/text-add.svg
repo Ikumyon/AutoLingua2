@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>text-add</title>
+  <defs>
+    <linearGradient id="taChar" x1="3" y1="3" x2="16" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3bd5ff"/>
+      <stop offset="0.55" stop-color="#0094f0"/>
+      <stop offset="1" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="taPlus" x1="13" y1="13" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fde047"/>
+      <stop offset="0.55" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <path fill="url(#taChar)" d="M3 5.2C3 4.26 3.76 3.5 4.7 3.5h10.6c.94 0 1.7.76 1.7 1.7v1.6a1.2 1.2 0 1 1-2.4 0V6.3h-3v11.3h1.3a1.2 1.2 0 1 1 0 2.4H7.1a1.2 1.2 0 1 1 0-2.4h1.3V6.3h-3v.5a1.2 1.2 0 1 1-2.4 0V5.2Z"/>
+    <circle cx="17.5" cy="17.5" r="5" fill="url(#taPlus)"/>
+    <path stroke="#ffffff" stroke-width="2" stroke-linecap="round" d="M17.5 15v5M15 17.5h5"/>
+  </g>
+</svg>

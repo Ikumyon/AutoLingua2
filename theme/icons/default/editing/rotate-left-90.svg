@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>rotate-left-90</title>
+  <defs>
+    <linearGradient id="rlArc" x1="3" y1="3" x2="20" y2="14" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3bd5ff"/>
+      <stop offset="0.55" stop-color="#0094f0"/>
+      <stop offset="1" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="rlBox" x1="8" y1="11" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fde047"/>
+      <stop offset="0.55" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <rect x="9" y="11" width="10" height="10" rx="2.2" fill="url(#rlBox)"/>
+    <path stroke="url(#rlArc)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M4 9.5a8 8 0 0 1 13.5-4.2"/>
+    <path stroke="url(#rlArc)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M3.5 4.5v5.2h5.2"/>
+  </g>
+</svg>

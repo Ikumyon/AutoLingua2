@@ -63,10 +63,12 @@ class SettingsDialogController(SimpleDialogController):
 
         self._mount_pages()
         self.shortcut_page = ShortcutSettingsPage(self._stack)
+        self.shortcut_page.widget.setObjectName("pageShortcuts")
         self._stack.addWidget(self.shortcut_page.widget)
         self._add_category("shortcuts", tr("SettingsDialog", "ショートカットキー"),
                            self.shortcut_page.widget, self._category_items["application"])
         self.mcp_page = McpSettingsPage(mcp_server, self._stack)
+        self.mcp_page.setObjectName("pageMcp")
         self._stack.addWidget(self.mcp_page)
         self._add_category("mcp", tr("SettingsDialog", "MCP"), self.mcp_page, self._category_items["application"])
         self.dialog.finished.connect(lambda result: self.mcp_page.tester.close())
@@ -207,6 +209,7 @@ class SettingsDialogController(SimpleDialogController):
             raise TypeError("設定カテゴリにページが登録されていません")
         self._stack.setCurrentWidget(page)
         self._category_title.setText(current.text(0))
+        require_child(self.dialog, QPushButton, "buttonGuideResources").setVisible(page.objectName() == "pageMcp")
 
     def _set_saving(self, saving: bool) -> None:
         self._saving = saving

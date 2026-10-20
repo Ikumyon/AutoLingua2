@@ -36,6 +36,7 @@
    </item>
    <item>
     <layout class="QHBoxLayout" name="layoutBottom">
+     <item><widget class="QPushButton" name="buttonGuideProblems"><property name="text"><string>対処方法 ↗</string></property><property name="toolTip"><string>オンラインガイドをブラウザで開きます。</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
      <item>
       <widget class="QPushButton" name="buttonGoTo">
        <property name="text"><string>該当箇所へ移動</string></property>

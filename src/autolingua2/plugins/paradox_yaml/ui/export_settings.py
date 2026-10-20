@@ -1,33 +1,30 @@
 """Output options owned entirely by the Paradox plugin."""
 from __future__ import annotations
 
-from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QComboBox, QFormLayout, QWidget
 
 from autolingua2.plugins.contracts import ImportedTranslation
+from autolingua2.ui.ui_loader import load_ui, require_child
 
 
 class ParadoxExportWidget(QWidget):
     def __init__(self, workspaces: list[ImportedTranslation], parent: QWidget) -> None:
         super().__init__(parent)
-        form = QFormLayout(self)
+        panel = load_ui("dialogs/ParadoxExportSettings.ui", self)
         self.layout_ids = ["language", "mixed"]
-        self.folder_layout = QComboBox(self)
-        self.folder_layout.addItem(QCoreApplication.translate("ParadoxExport", "言語ごとのフォルダに分ける"))
-        self.folder_layout.addItem(QCoreApplication.translate("ParadoxExport", "同じフォルダに配置する"))
-        form.addRow(QCoreApplication.translate("ParadoxExport", "フォルダ構成："), self.folder_layout)
+        self.folder_layout = require_child(panel, QComboBox, "comboFolderLayout")
         self.encoding_ids = ["utf8", "escaped"]
         self.eu4_encoding: QComboBox | None = None
         eu4_projects = [item.project for item in workspaces if item.project.game_id == "eu4"]
+        encoding = require_child(panel, QComboBox, "comboEncoding")
+        require_child(panel, QFormLayout, "layoutParadox").setRowVisible(encoding, bool(eu4_projects))
         if eu4_projects:
-            encoding = QComboBox(self)
-            encoding.addItem(QCoreApplication.translate("ParadoxExport", "UTF-8 BOM付き"))
-            encoding.addItem(QCoreApplication.translate("ParadoxExport", "EU4 CJKエスケープ"))
             if any(project.target_language.lower().replace("_", "-").split("-")[0]
                    in {"zh", "ja", "ko"} for project in eu4_projects):
                 encoding.setCurrentIndex(1)
-            form.addRow(QCoreApplication.translate("ParadoxExport", "エンコード方式："), encoding)
             self.eu4_encoding = encoding
+        self.setLayout(panel.layout())
+        panel.deleteLater()
 
 
 class ParadoxExportSettings:

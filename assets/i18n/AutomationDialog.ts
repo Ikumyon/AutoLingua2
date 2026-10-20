@@ -3,6 +3,46 @@
   <context>
     <name>AutomationDialog</name>
     <message>
+      <source>トリガー</source>
+      <translation>トリガー</translation>
+    </message>
+    <message>
+      <source>トリガー未登録</source>
+      <translation>トリガー未登録</translation>
+    </message>
+    <message>
+      <source>パスを挿入…</source>
+      <translation>パスを挿入…</translation>
+    </message>
+    <message>
+      <source>保存して反映</source>
+      <translation>保存して反映</translation>
+    </message>
+    <message>
+      <source>削除</source>
+      <translation>削除</translation>
+    </message>
+    <message>
+      <source>名前</source>
+      <translation>名前</translation>
+    </message>
+    <message>
+      <source>構文チェック</source>
+      <translation>構文チェック</translation>
+    </message>
+    <message>
+      <source>構文ヘルプ</source>
+      <translation>構文ヘルプ</translation>
+    </message>
+    <message>
+      <source>追加</source>
+      <translation>追加</translation>
+    </message>
+    <message>
+      <source>処理</source>
+      <translation>処理</translation>
+    </message>
+    <message>
       <source>すべて置換</source>
       <translation>すべて置換</translation>
     </message>
@@ -73,6 +113,18 @@
     <message>
       <source>開始</source>
       <translation>開始</translation>
+    </message>
+    <message>
+      <source>このタブのガイド ↗</source>
+      <translation>このタブのガイド ↗</translation>
+    </message>
+    <message>
+      <source>オンラインガイドをブラウザで開きます。</source>
+      <translation>オンラインガイドをブラウザで開きます。</translation>
+    </message>
+    <message>
+      <source>言語リファレンス ↗</source>
+      <translation>言語リファレンス ↗</translation>
     </message>
   </context>
 </TS>

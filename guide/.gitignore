@@ -3,3 +3,6 @@ dist/
 !.gitignore
 !scripts/
 !scripts/**
+guide/scripts/**/__pycache__/
+__pycache__/
+

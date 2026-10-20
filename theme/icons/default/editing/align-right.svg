@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>align-right</title>
+  <defs>
+    <linearGradient id="alRightGuide" x1="18.5" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fde047"/>
+      <stop offset="0.55" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </linearGradient>
+    <linearGradient id="alRightBar1" x1="3.5" y1="5.5" x2="16.8" y2="10.9" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3bd5ff"/>
+      <stop offset="0.55" stop-color="#0094f0"/>
+      <stop offset="1" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="alRightBar2" x1="8" y1="13.1" x2="16.8" y2="18.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f97dbd"/>
+      <stop offset="0.55" stop-color="#f43f5e"/>
+      <stop offset="1" stop-color="#e11d48"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <rect x="18.6" y="3" width="2.4" height="18" rx="1.2" fill="url(#alRightGuide)"/>
+    <rect x="3.5" y="5.5" width="13.3" height="5.4" rx="1.8" fill="url(#alRightBar1)"/>
+    <rect x="8" y="13.1" width="8.8" height="5.4" rx="1.8" fill="url(#alRightBar2)"/>
+  </g>
+</svg>

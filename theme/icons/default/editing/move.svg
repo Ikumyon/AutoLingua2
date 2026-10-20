@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>move</title>
+  <defs>
+    <linearGradient id="mvArrow" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3bd5ff"/>
+      <stop offset="0.55" stop-color="#0094f0"/>
+      <stop offset="1" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="mvPivot" x1="9" y1="9" x2="15" y2="15" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fde047"/>
+      <stop offset="0.55" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <path stroke="url(#mvArrow)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M12 2.5v19M2.5 12h19"/>
+    <path stroke="url(#mvArrow)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m9 5.5 3-3 3 3M9 18.5l3 3 3-3M5.5 9l-3 3 3 3M18.5 9l3 3-3 3"/>
+    <circle cx="12" cy="12" r="2.8" fill="url(#mvPivot)"/>
+  </g>
+</svg>

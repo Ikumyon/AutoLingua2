@@ -45,3 +45,4 @@ fixtures/
 AGENTS.md
 web/node_modules/
 assets/chat/
+/developer-thumbnail-reader/

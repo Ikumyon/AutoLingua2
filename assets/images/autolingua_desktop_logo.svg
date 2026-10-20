@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 260" width="100%" height="100%">
+  <defs>
+    <!--
+      【グラデーション設計：完全同色スタート＆エンド方式】
+      ・ネイビー側の色はすべて純粋な「#172D47」に統一
+      ・シアン側の色はすべて純粋な「#00BDEB」に統一
+      ・水平グラデーション（y1="0%" y2="0%"）で「#172D47（0%〜10%） → #00BDEB（85%〜100%）」とすることで、
+        パーツの継ぎ目で色が100%一致し、境界線が完全に消えて滑らかに繋がります。
+    -->
+
+    <!-- 1. 上辺〜「O」右半弧のグラデーション（左端 #172D47 → 右側 #00BDEB） -->
+    <linearGradient id="topSmoothGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#172D47" />
+      <stop offset="8%" stop-color="#172D47" />
+      <stop offset="72%" stop-color="#00BDEB" />
+      <stop offset="100%" stop-color="#00BDEB" />
+    </linearGradient>
+
+    <!-- 2. 下辺のグラデーション（左端 #172D47 → 右側 #00BDEB） -->
+    <linearGradient id="bottomSmoothGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#172D47" />
+      <stop offset="5%" stop-color="#172D47" />
+      <stop offset="28%" stop-color="#00BDEB" />
+      <stop offset="100%" stop-color="#00BDEB" />
+    </linearGradient>
+
+    <!-- 3. 右端ローラーの折り返しグラデーション（上段 #00BDEB → 下段 #172D47） -->
+    <linearGradient id="rightFoldSmoothGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00BDEB" />
+      <stop offset="22%" stop-color="#00BDEB" />
+      <stop offset="85%" stop-color="#172D47" />
+      <stop offset="100%" stop-color="#172D47" />
+    </linearGradient>
+  </defs>
+
+  <!-- ==================== 1. 左側：AUTO カプセルコンベア（純粋な #172D47 に統一） ==================== -->
+  <!-- 左側全体を単一の #172D47 に統一することで、グラデーション開始色（#172D47）と1ミリの狂いもなく同化します -->
+  <path d="M 310,152
+           L 96,152
+           A 50,50 0 0,1 46,102
+           A 50,50 0 0,1 96,52
+           L 190,52
+           L 190,68
+           L 96,68
+           A 34,34 0 0,0 62,102
+           A 34,34 0 0,0 96,136
+           L 310,136 Z"
+        fill="#172D47" />
+
+  <!-- 左プーリー（従動ローラー）の回転ベアリング表現 -->
+  <circle cx="96" cy="102" r="21" fill="none" stroke="#00BDEB" stroke-width="2.5" stroke-dasharray="8 5.5" opacity="0.45" />
+  <circle cx="96" cy="102" r="5.5" fill="#00BDEB" />
+
+
+  <!-- ==================== 2. メイン文字：AUT + O（左半弧＋右ローラー） ==================== -->
+  <g font-family="'Segoe UI', 'Montserrat', 'Inter', 'Helvetica Neue', Arial, sans-serif">
+    <!-- AUT -->
+    <text x="102" y="131"
+          font-size="82"
+          font-weight="900"
+          letter-spacing="2"
+          fill="#172D47">AUT</text>
+  </g>
+
+  <!-- 「O」の左半弧（#172D47：中心 X=342, Y=102） -->
+  <path d="M 342,136
+           A 34,34 0 0,1 308,102
+           A 34,34 0 0,1 342,68
+           L 342,52
+           A 50,50 0 0,0 292,102
+           A 50,50 0 0,0 342,152 Z"
+        fill="#172D47" />
+
+  <!-- 「O」の内部駆動ローラー（AI翻訳エンジンの回転ハブ） -->
+  <circle cx="342" cy="102" r="19" fill="none" stroke="#00BDEB" stroke-width="3" stroke-dasharray="11 5.5" />
+  <circle cx="342" cy="102" r="8.5" fill="#172D47" />
+  <circle cx="342" cy="102" r="3.5" fill="#00BDEB" />
+
+
+  <!-- ==================== 3. 「O」の右半弧〜下辺〜右端折り返し（同色グラデーション接続） ==================== -->
+
+  <!-- (A) 上辺（X=180）で左の #172D47 と同色で重なり、長い距離をかけて滑らかに #00BDEB へ変化しながら「O」の右半弧を回る -->
+  <path d="M 180,52
+           L 342,52
+           A 50,50 0 0,1 392,102
+           A 50,50 0 0,1 342,152
+           L 342,136
+           A 34,34 0 0,0 376,102
+           A 34,34 0 0,0 342,68
+           L 180,68 Z"
+        fill="url(#topSmoothGrad)" />
+
+  <!-- (B) 下辺メイン搬送ストリーム（X=300 で左の #172D47 と同色で重なり、滑らかに #00BDEB へ変化して X=810 まで走る） -->
+  <path d="M 300,136
+           L 810,136
+           L 810,152
+           L 300,152 Z"
+        fill="url(#bottomSmoothGrad)" />
+
+  <!-- (C) 右端ローラーの折り返し（上段 #00BDEB と同色で直結し、ローラーを回りながら下段 #172D47 へ滑らかに変化） -->
+  <path d="M 800,136
+           L 810,136
+           A 22,22 0 0,1 832,158
+           A 22,22 0 0,1 810,180
+           L 744,180
+           L 754,164
+           L 810,164
+           A 6,6 0 0,0 816,158
+           A 6,6 0 0,0 810,152
+           L 800,152 Z"
+        fill="url(#rightFoldSmoothGrad)" />
+
+  <!-- 右端ローラーの回転軸ドット -->
+  <circle cx="809" cy="158" r="3.5" fill="#172D47" />
+
+  <!-- (D) 右端：コンベアから勢いよく送り出される翻訳ストリーム矢印 -->
+  <path d="M 842,129
+           L 882,144
+           L 842,159
+           L 852,144 Z"
+        fill="#00BDEB" />
+  <path d="M 888,135
+           L 910,144
+           L 888,153
+           L 894,144 Z"
+        fill="#00BDEB" opacity="0.55" />
+
+  <!-- (E) コンベアベルト上の進行スリット -->
+  <!-- 左側（ネイビーベルト上のシアンスリット） -->
+  <g fill="#00BDEB" opacity="0.75">
+    <polygon points="142,140 155,140 150,148 137,148" />
+    <polygon points="178,140 191,140 186,148 173,148" />
+    <polygon points="214,140 227,140 222,148 209,148" />
+  </g>
+  <!-- 右側（シアンベルト上のホワイトスリット） -->
+  <g fill="#FFFFFF" opacity="0.85">
+    <polygon points="442,140 455,140 450,148 437,148" />
+    <polygon points="478,140 491,140 486,148 473,148" />
+    <polygon points="514,140 527,140 522,148 509,148" />
+    <polygon points="676,140 689,140 684,148 671,148" />
+    <polygon points="712,140 725,140 720,148 707,148" />
+    <polygon points="748,140 761,140 756,148 743,148" />
+  </g>
+
+
+  <!-- ==================== 4. メイン後半文字：lingua ==================== -->
+  <g font-family="'Segoe UI', 'Montserrat', 'Inter', 'Helvetica Neue', Arial, sans-serif"
+     font-size="88"
+     font-weight="700"
+     letter-spacing="0.5">
+    <text x="412" y="126"
+          fill="#172D47"
+          stroke="#FFFFFF"
+          stroke-width="4.5"
+          stroke-linejoin="round"
+          paint-order="stroke fill">lingua</text>
+  </g>
+
+
+  <!-- ==================== 5. サブ文字：Desktop ==================== -->
+  <text x="604" y="202"
+        font-family="'Segoe UI', 'Montserrat', 'Inter', 'Helvetica Neue', Arial, sans-serif"
+        font-size="31"
+        font-weight="600"
+        letter-spacing="3.2"
+        fill="#172D47">Desktop</text>
+
+  <!-- Desktop左側のアクセントライン -->
+  <rect x="414" y="191" width="136" height="2.5" rx="1.25" fill="#00BDEB" opacity="0.5" />
+  <rect x="560" y="191" width="24" height="2.5" rx="1.25" fill="#00BDEB" opacity="0.85" />
+</svg>

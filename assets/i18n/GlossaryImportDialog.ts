@@ -22,5 +22,13 @@
       <source>選択した用語集へ統合</source>
       <translation>選択した用語集へ統合</translation>
     </message>
+    <message>
+      <source>オンラインガイドをブラウザで開きます。</source>
+      <translation>オンラインガイドをブラウザで開きます。</translation>
+    </message>
+    <message>
+      <source>取り込みのガイド ↗</source>
+      <translation>取り込みのガイド ↗</translation>
+    </message>
   </context>
 </TS>

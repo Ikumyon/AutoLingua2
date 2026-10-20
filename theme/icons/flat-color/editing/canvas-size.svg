@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>canvas-size</title>
+  <g fill="none">
+    <path stroke="#fbbf24" stroke-width="2.4" stroke-linecap="round" d="M6.5 2v2.5M17.5 2v2.5M6.5 19.5V22M17.5 19.5V22M2 6.5h2.5M2 17.5h2.5M19.5 6.5H22M19.5 17.5H22"/>
+    <rect x="5.5" y="5.5" width="13" height="13" rx="2" fill="#0094f0"/>
+    <path stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9 15 15 9M11.5 9H15v3.5M12.5 15H9v-3.5"/>
+  </g>
+</svg>

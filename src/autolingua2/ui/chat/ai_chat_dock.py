@@ -91,6 +91,8 @@ class AiChatDockController(QObject):
         self.execution_combo.currentIndexChanged.connect(self._execution_changed)
         options = require_child(window, QPushButton, "buttonChatOptions")
         menu = QMenu(options)
+        menu.addAction(require_child(window, QAction, "actionChatGuide"))
+        menu.addSeparator()
         form = QWidget(menu)
         form_layout = QFormLayout(form)
         self._scope_label = QLabel(tr("AiChat", "操作の対象範囲"), form)

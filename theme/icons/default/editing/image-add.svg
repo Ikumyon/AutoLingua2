@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>image-add</title>
+  <defs>
+    <linearGradient id="iaBg" x1="2.5" y1="3" x2="18.5" y2="19" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3bd5ff"/>
+      <stop offset="0.55" stop-color="#0094f0"/>
+      <stop offset="1" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="iaPlus" x1="13" y1="13" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fde047"/>
+      <stop offset="0.55" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <rect x="2.5" y="3" width="16" height="16" rx="3" fill="url(#iaBg)"/>
+    <circle cx="7.5" cy="8" r="1.8" fill="#fde047"/>
+    <path fill="#ffffff" fill-opacity="0.85" d="m4.8 16.2 4-4.5a.9.9 0 0 1 1.35 0l2.45 2.75 1.7-1.85a.85.85 0 0 1 1.25 0l1.95 2.15v1.45H4.8Z"/>
+    <circle cx="17.5" cy="17.5" r="5" fill="url(#iaPlus)"/>
+    <path stroke="#ffffff" stroke-width="2" stroke-linecap="round" d="M17.5 15v5M15 17.5h5"/>
+  </g>
+</svg>

@@ -12,7 +12,7 @@ import sys
 from typing import Callable
 
 from PySide6.QtCore import QByteArray, QEasingCurve, QEvent, QModelIndex, QObject, QPoint, QPropertyAnimation, QSize, Qt, QSignalBlocker, QTimer, QLocale, QItemSelection, QItemSelectionModel
-from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QContextMenuEvent, QIcon, QMouseEvent, QPixmap, QSyntaxHighlighter
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QContextMenuEvent, QIcon, QImage, QMouseEvent, QPixmap, QSyntaxHighlighter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -76,6 +76,9 @@ from autolingua2.ir.tone import DEFAULT_TONE_ID, ConditionalTone, Tone, ToneItem
 from autolingua2.ir.glossary import Glossary, glossary_chain
 from autolingua2.ui.dialogs.glossary import STORAGE_ERRORS
 from autolingua2.ui.dialogs.workspace_language import WorkspaceLanguageDialog
+from autolingua2.ui.dialogs.thumbnail import ThumbnailDialog
+from autolingua2.ui.export.thumbnail_export_dialog import ThumbnailExportDialog
+from autolingua2.services.exporting.thumbnail_export import export_thumbnail
 from autolingua2.ui.dialogs.automation import AutomationDialogController
 from autolingua2.services.ai.ai_network import AiNetworkClient
 from autolingua2.services.ai.ai_chat import ChatFile, ChatReference
@@ -436,6 +439,7 @@ class MainWindowController(QObject):
             else:
                 self._save_window_layout()
             self.plugins.remove_display_listener(self._on_plugin_display_changed)
+            self.automation_triggers.shutdown()
             self.automation_dialog.shutdown()
             self.chat_dock.close()
             self.mcp_server.close()
@@ -765,6 +769,8 @@ class MainWindowController(QObject):
         self.button_edit_icon = QToolButton(self.icon_hover_actions)
         self.button_edit_icon.setObjectName("buttonEditIcon")
         self.button_edit_icon.clicked.connect(self._browse_project_icon)
+        self.button_process_icon = require_child(self.window, QPushButton, "buttonProcessIcon")
+        self.button_process_icon.clicked.connect(self._process_project_icon)
         self.button_clear_icon = QToolButton(self.icon_hover_actions)
         self.button_clear_icon.setObjectName("buttonClearIcon")
         self.button_clear_icon.clicked.connect(self.clear_project_icon)
@@ -858,6 +864,12 @@ class MainWindowController(QObject):
         export_action.setObjectName("actionExportTranslation")
         export_action.triggered.connect(self.save_translation)
         file_menu.insertAction(self.action_exit, export_action)
+        self.action_export_thumbnail = QAction(tr("MainWindow", "サムネイルを出力…"), self.window)
+        self.action_export_thumbnail.setObjectName("actionExportThumbnail")
+        self.action_export_thumbnail.triggered.connect(self.save_thumbnail)
+        file_menu.insertAction(self.action_exit, self.action_export_thumbnail)
+        file_menu.aboutToShow.connect(lambda: self.action_export_thumbnail.setEnabled(
+            bool(self.project.thumbnail or self._selected_thumbnail)))
         self.action_new_project.triggered.connect(self.show_new_project_page)
         self.action_exit.triggered.connect(self.window.close)
 
@@ -887,6 +899,8 @@ class MainWindowController(QObject):
         self.action_problems.triggered.connect(self.open_problems_dialog)
         self.action_about.triggered.connect(self._open_about_dialog)
         self.automation_dialog = AutomationDialogController(self.window, self.icon_manager.get_icon)
+        from autolingua2.ui.dialogs.automation_triggers import AutomationTriggers
+        self.automation_triggers = AutomationTriggers(self)
         automation_action = QAction(tr("MainWindow", "自動化スクリプト…"), self.window)
         automation_action.setObjectName("actionAutomation")
         automation_action.triggered.connect(self.automation_dialog.show)
@@ -1101,6 +1115,7 @@ class MainWindowController(QObject):
             self._saved_project = project_snapshot(self.workspace_service)
             self.window.setWindowTitle(f"Autolingua Desktop - {self.project.name}")
             self._remember_current_project(path)
+            self.automation_triggers.emit_event("project_opened")
             QTimer.singleShot(0, self._poll_source_updates)
             if on_loaded is not None:
                 on_loaded()
@@ -1231,6 +1246,32 @@ class MainWindowController(QObject):
             self._run_operation(lambda: apply_update(latest, result, path), applied)
 
         self._run_operation(lambda: prepare_update(service, target, adapter), prepared)
+
+    def save_thumbnail(self) -> None:
+        if self.io_worker is not None:
+            return
+        thumbnail = self.project.thumbnail or self._selected_thumbnail
+        image = QImage()
+        if not thumbnail or not image.loadFromData(QByteArray.fromBase64(thumbnail.encode("ascii")), "PNG"):
+            QMessageBox.information(self.window, tr("MainWindow", "サムネイルを出力"),
+                                    tr("MainWindow", "出力するサムネイルがありません。"))
+            return
+        contribution = self.plugins.ui_contributions.get(self.project.adapter_id)
+        extension = contribution.thumbnail_export if contribution is not None else None
+        dialog = ThumbnailExportDialog(self.output_path or PROJECT_ROOT, self.window, extension)
+        try:
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            destination = dialog.destination
+            if destination is None:
+                raise RuntimeError("画像出力先が指定されていません。")
+            settings = dialog.settings
+            plugin_settings = dict(dialog.plugin_settings)
+        finally:
+            dialog.dialog.deleteLater()
+        self._run_operation(
+            lambda: export_thumbnail(image, destination, settings, extension, plugin_settings),
+            lambda _result: None)
 
     def save_translation(self) -> None:
         if self.io_worker is not None:
@@ -1373,6 +1414,7 @@ class MainWindowController(QObject):
         from autolingua2.services.settings.settings_store import initial_setup_seen
         if not initial_setup_seen():
             self.open_initial_setup()
+        self.automation_triggers.startup()
 
     def _open_shortcut_settings(self, command_id: str) -> None:
         if self._settings_dialog is not None:
@@ -1842,7 +1884,7 @@ class MainWindowController(QObject):
             return False
         try:
             thumbnail = read_project_thumbnail(path)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             QMessageBox.warning(self.window, tr("MainWindow", "エラー"), str(exc))
             return False
         self.selected_icon_path = path.resolve()
@@ -1868,6 +1910,7 @@ class MainWindowController(QObject):
 
     def _sync_project_icon_actions(self) -> None:
         has_icon = self.selected_icon_path is not None
+        self.button_process_icon.setEnabled(has_icon)
         frame = self.frame_icon_drop.frame_drop_zone
         if frame.property("hasIcon") != has_icon:
             frame.setProperty("hasIcon", has_icon)
@@ -1885,6 +1928,21 @@ class MainWindowController(QObject):
         )
         actions.setVisible(has_icon and self.frame_icon_drop.underMouse())
         actions.raise_()
+
+    def _process_project_icon(self) -> None:
+        if self._project_icon_pixmap is None:
+            return
+        dialog = ThumbnailDialog(self._project_icon_pixmap, self.window, icon_manager=self.icon_manager)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            try:
+                pixmap, thumbnail = dialog.result_data()
+            except ValueError as exc:
+                QMessageBox.warning(self.window, tr("MainWindow", "エラー"), str(exc))
+                return
+            self._project_icon_pixmap = pixmap
+            self._selected_thumbnail = thumbnail
+            self._project_icon_is_manual = True
+            self._resize_project_icon_preview()
 
     def _browse_project_icon(self) -> None:
         file_filter = tr("MainWindow", "画像ファイル (*.png *.jpg *.jpeg *.webp *.ico *.bmp);;すべてのファイル (*.*)")

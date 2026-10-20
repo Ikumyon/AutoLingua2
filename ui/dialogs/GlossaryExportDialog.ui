@@ -6,6 +6,7 @@
   <property name="sizeGripEnabled"><bool>true</bool></property>
   <property name="geometry"><rect><x>0</x><y>0</y><width>820</width><height>560</height></rect></property>
   <layout class="QVBoxLayout" name="layoutExport">
+   <item><widget class="QPushButton" name="buttonGuideGlossaryExport"><property name="text"><string>書き出しのガイド ↗</string></property><property name="toolTip"><string>オンラインガイドをブラウザで開きます。</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
    <item><widget class="QLabel" name="labelScope"><property name="text"><string>対象：</string></property><property name="textFormat"><enum>Qt::TextFormat::PlainText</enum></property><property name="wordWrap"><bool>true</bool></property></widget></item>
    <item><layout class="QHBoxLayout" name="layoutFormat">
     <item><widget class="QLabel" name="labelFormat"><property name="text"><string>形式：</string></property></widget></item>

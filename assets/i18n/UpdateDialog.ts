@@ -58,5 +58,13 @@
       <source>閉じる</source>
       <translation>閉じる</translation>
     </message>
+    <message>
+      <source>オンラインガイドをブラウザで開きます。</source>
+      <translation>オンラインガイドをブラウザで開きます。</translation>
+    </message>
+    <message>
+      <source>更新・対処方法 ↗</source>
+      <translation>更新・対処方法 ↗</translation>
+    </message>
   </context>
 </TS>

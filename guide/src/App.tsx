@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { pages, referencePages, legacyAnchorTargets } from './content';
-import { fallback, languages, loadDictionary, type Dictionary, type Translate } from './i18n';
+import { browserLanguage, fallback, languages, loadDictionary, type Dictionary, type Translate } from './i18n';
 import { GuideLink, GuideSection, PageNavigation, PageToc } from './components';
 import { Icon } from './Icon';
 import { useTheme } from './useTheme';
@@ -8,6 +8,11 @@ import { BrandLogo } from './BrandLogo';
 import { routePath, siteUrl } from './urls';
 
 function readRoute() {
+  const path = routePath();
+  if (path === '/' || /^\/guide(?:\/[^/]+)?\/?$/.test(path)) {
+    const suffix = path === '/' ? '/guide' : path;
+    history.replaceState(null, '', siteUrl(`/${browserLanguage()}${suffix}${location.search}${location.hash}`));
+  }
   const match = /^\/([^/]+)\/guide(?:\/([^/]+))?\/?$/.exec(routePath());
   let anchor = location.hash.slice(1);
   try { anchor = decodeURIComponent(anchor); } catch { /* Keep malformed hashes unchanged. */ }
@@ -43,7 +48,6 @@ export default function App() {
   const notFound = !route.valid || !languageSupported || (!home && !page);
 
   useEffect(() => {
-    if (routePath() === '/') history.replaceState(null, '', siteUrl('/ja/guide'));
     setRoute(readRoute());
     const update = () => { setRoute(readRoute()); setMenuOpen(false); };
     window.addEventListener('popstate', update);

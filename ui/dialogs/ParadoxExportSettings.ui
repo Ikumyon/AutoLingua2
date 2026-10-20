@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ParadoxExportSettings</class>
+ <widget class="QWidget" name="ParadoxExportSettings"><layout class="QFormLayout" name="layoutParadox"><item row="0" column="0"><widget class="QLabel" name="layoutParadoxLabel0"><property name="text"><string>フォルダ構成：</string></property></widget></item><item row="0" column="1"><widget class="QComboBox" name="comboFolderLayout"><item><property name="text"><string>言語ごとのフォルダに分ける</string></property></item><item><property name="text"><string>同じフォルダに配置する</string></property></item></widget></item><item row="1" column="0"><widget class="QLabel" name="layoutParadoxLabel1"><property name="text"><string>エンコード方式：</string></property></widget></item><item row="1" column="1"><widget class="QComboBox" name="comboEncoding"><item><property name="text"><string>UTF-8 BOM付き</string></property></item><item><property name="text"><string>EU4 CJKエスケープ</string></property></item></widget></item></layout></widget>
+ <resources/>
+ <connections/>
+</ui>

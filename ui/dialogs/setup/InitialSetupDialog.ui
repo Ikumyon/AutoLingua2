@@ -30,6 +30,7 @@
    </widget></item>
    <item><widget class="QLabel" name="labelError"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
    <item><layout class="QHBoxLayout" name="layoutNavigation">
+    <item><widget class="QPushButton" name="buttonGuideSetup"><property name="text"><string>設定手順 ↗</string></property><property name="toolTip"><string>オンラインガイドをブラウザで開きます。</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
     <item><widget class="QPushButton" name="buttonBack"><property name="text"><string>戻る</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
     <item><widget class="QPushButton" name="buttonSkip"><property name="text"><string>あとで設定する</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
     <item><spacer name="navigationSpacer"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item>

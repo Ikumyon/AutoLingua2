@@ -30,6 +30,12 @@ def _initialize_search_bars(widget: QWidget) -> None:
         search_bar.initialize_ui()
 
 
+def _initialize_guide(widget: QWidget, name: str) -> None:
+    from autolingua2.ui.guide import bind_guide
+
+    bind_guide(widget, name)
+
+
 @runtime_checkable
 class UiForm(Protocol):
     def setupUi(self, widget: QWidget) -> None: ...
@@ -74,6 +80,7 @@ def load_ui(name: str, parent: QWidget | None = None) -> QWidget:
         form.setupUi(widget)
         _FormBinding(widget, form)
         _initialize_search_bars(widget)
+        _initialize_guide(widget, name)
         return widget
 
     # カスタム部品もこの窓口を利用するため、開発用の登録は読み込み時に行う。
@@ -101,4 +108,5 @@ def load_ui(name: str, parent: QWidget | None = None) -> QWidget:
     if widget is None:
         raise RuntimeError(f"UIファイルを読み込めません: {path}")
     _initialize_search_bars(widget)
+    _initialize_guide(widget, name)
     return widget

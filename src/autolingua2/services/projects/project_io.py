@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 from dataclasses import replace
-from base64 import b64encode
 from pathlib import Path
+
+from PySide6.QtGui import QImage
 
 from autolingua2.adapters.base import EmbeddedTranslationAdapter, FileAdapter
 from autolingua2.ir.imported import ImportedTranslation
@@ -15,11 +16,12 @@ from autolingua2.infrastructure.operations import check_cancelled
 from autolingua2.services.translation.key_conflicts import ConflictConfirmation, resolve_key_conflicts
 from autolingua2.services.projects.project_archive import relative_path
 from autolingua2.services.translation.source_classification import classify_sources
+from autolingua2.services.projects.thumbnail_mark import encode_thumbnail
 
 
 def read_project_thumbnail(path: Path) -> str:
     """元ファイルの場所に依存しない、保存用の画像データを読み込む。"""
-    return b64encode(path.read_bytes()).decode("ascii")
+    return encode_thumbnail(QImage(str(path)))
 
 
 def detect_inherited_language(adapter: FileAdapter, paths: list[Path]) -> str | None:

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ParadoxThumbnailExportSettings</class>
+ <widget class="QWidget" name="ParadoxThumbnailExportSettings"><layout class="QFormLayout" name="layoutDescriptor"><item row="0" column="0" colspan="2"><widget class="QCheckBox" name="checkUpdatePicture"><property name="text"><string>.modの画像指定を更新</string></property><property name="checked"><bool>true</bool></property></widget></item><item row="1" column="0"><widget class="QLabel" name="layoutDescriptorLabel1"><property name="text"><string>.modファイル</string></property></widget></item><item row="1" column="1"><layout class="QHBoxLayout" name="layoutDescriptorPath"><item><widget class="QLineEdit" name="editDescriptorPath"><property name="text"><string>descriptor.mod</string></property></widget></item><item><widget class="QPushButton" name="buttonBrowseDescriptor"><property name="text"><string>参照…</string></property></widget></item></layout></item></layout></widget>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,876 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ThumbnailDialog</class>
+ <widget class="QDialog" name="ThumbnailDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1000</width>
+    <height>720</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>サムネイル画像の加工</string>
+  </property>
+  <layout class="QVBoxLayout" name="layoutMain">
+   <item>
+    <widget class="QSplitter" name="editorSplitter">
+     <property name="orientation">
+      <enum>Qt::Orientation::Horizontal</enum>
+     </property>
+     <property name="childrenCollapsible">
+      <bool>false</bool>
+     </property>
+     <widget class="QWidget" name="tools">
+      <property name="minimumSize">
+       <size>
+        <width>48</width>
+        <height>0</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>48</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <layout class="QVBoxLayout" name="layoutTools">
+       <property name="leftMargin"><number>6</number></property>
+       <property name="topMargin"><number>6</number></property>
+       <property name="rightMargin"><number>6</number></property>
+       <property name="bottomMargin"><number>6</number></property>
+       <item>
+        <widget class="QLabel" name="toolsHeading">
+         <property name="text">
+          <string>道具</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonMove">
+         <property name="text">
+          <string>移動</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonScale">
+         <property name="text">
+          <string>拡大縮小</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonImageSize">
+         <property name="text"><string>キャンバスのサイズ変更</string></property>
+         <property name="toolTip"><string>キャンバスのサイズ変更：キャンバスの幅・高さと範囲の位置を変更</string></property>
+         <property name="checkable"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonRotate">
+         <property name="text">
+          <string>回転</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonAlign">
+         <property name="text">
+          <string>整列</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonCrop">
+         <property name="text">
+          <string>切り抜き</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonText">
+         <property name="text">
+          <string>文字</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="addHeading">
+         <property name="text">
+          <string>追加</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonAddImage">
+         <property name="text">
+          <string>画像…</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="toolsSpacer">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QPushButton" name="buttonReset">
+         <property name="text">
+          <string>すべて元に戻す</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="previewHost">
+      <property name="minimumSize">
+       <size>
+        <width>240</width>
+        <height>240</height>
+       </size>
+      </property>
+      <layout class="QVBoxLayout" name="layoutPreview"/>
+     </widget>
+     <widget class="QSplitter" name="inspectorSplitter">
+      <property name="minimumSize">
+       <size>
+        <width>260</width>
+        <height>0</height>
+       </size>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Orientation::Vertical</enum>
+      </property>
+      <property name="childrenCollapsible">
+       <bool>false</bool>
+      </property>
+      <widget class="QGroupBox" name="toolSettings">
+       <property name="title">
+        <string/>
+       </property>
+<layout class="QVBoxLayout" name="toolSettingsLayout">
+ <item>
+  <widget class="QStackedWidget" name="toolSettingsStack">
+   <property name="currentIndex"><number>0</number></property>
+<widget class="QWidget" name="imageSizeOptions">
+ <layout class="QVBoxLayout" name="imageSizeOptionsLayout">
+  <item><layout class="QHBoxLayout" name="imageWidthRow">
+   <item><widget class="QLabel" name="imageWidthLabel"><property name="text"><string>幅</string></property></widget></item>
+   <item><widget class="QSpinBox" name="spinImageWidth"><property name="minimum"><number>1</number></property><property name="maximum"><number>4096</number></property><property name="suffix"><string> px</string></property></widget></item>
+  </layout></item>
+  <item><layout class="QHBoxLayout" name="imageHeightRow">
+   <item><widget class="QLabel" name="imageHeightLabel"><property name="text"><string>高さ</string></property></widget></item>
+   <item><widget class="QSpinBox" name="spinImageHeight"><property name="minimum"><number>1</number></property><property name="maximum"><number>4096</number></property><property name="suffix"><string> px</string></property></widget></item>
+  </layout></item>
+  <item><widget class="QCheckBox" name="checkImageRatio"><property name="text"><string>比率固定</string></property><property name="checked"><bool>true</bool></property></widget></item>
+  <item><layout class="QHBoxLayout" name="imageXRow">
+   <item><widget class="QLabel" name="imageXLabel"><property name="text"><string>水平位置</string></property></widget></item>
+   <item><widget class="QSpinBox" name="spinImageX"><property name="minimum"><number>-100000</number></property><property name="maximum"><number>100000</number></property><property name="suffix"><string> px</string></property></widget></item>
+  </layout></item>
+  <item><layout class="QHBoxLayout" name="imageYRow">
+   <item><widget class="QLabel" name="imageYLabel"><property name="text"><string>垂直位置</string></property></widget></item>
+   <item><widget class="QSpinBox" name="spinImageY"><property name="minimum"><number>-100000</number></property><property name="maximum"><number>100000</number></property><property name="suffix"><string> px</string></property></widget></item>
+  </layout></item>
+  <item><widget class="QPushButton" name="buttonApplyImageSize"><property name="text"><string>サイズ変更を適用</string></property></widget></item>
+  <item><spacer name="imageSizeSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property></spacer></item>
+ </layout>
+</widget>
+<widget class="QWidget" name="moveOptions">
+ <layout class="QVBoxLayout" name="moveOptionsPageLayout">
+  <item><layout class="QVBoxLayout" name="moveOptionsLayout">
+          <item>
+           <layout class="QHBoxLayout" name="transformField0">
+            <item>
+             <widget class="QLabel" name="labelX">
+              <property name="text">
+               <string>X</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QDoubleSpinBox" name="spinX">
+              <property name="suffix">
+               <string/>
+              </property>
+              <property name="decimals">
+               <number>1</number>
+              </property>
+              <property name="minimum">
+               <double>-100000.000000000000000</double>
+              </property>
+              <property name="maximum">
+               <double>100000.000000000000000</double>
+              </property>
+              <property name="value">
+               <double>0.000000000000000</double>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="transformField1">
+            <item>
+             <widget class="QLabel" name="labelY">
+              <property name="text">
+               <string>Y</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QDoubleSpinBox" name="spinY">
+              <property name="suffix">
+               <string/>
+              </property>
+              <property name="decimals">
+               <number>1</number>
+              </property>
+              <property name="minimum">
+               <double>-100000.000000000000000</double>
+              </property>
+              <property name="maximum">
+               <double>100000.000000000000000</double>
+              </property>
+              <property name="value">
+               <double>0.000000000000000</double>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout></item>
+  <item><spacer name="moveOptionsSpacer">
+   <property name="orientation"><enum>Qt::Vertical</enum></property>
+   <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+  </spacer></item>
+ </layout>
+</widget>
+<widget class="QWidget" name="scaleOptions">
+ <layout class="QVBoxLayout" name="scaleOptionsPageLayout">
+  <item><layout class="QHBoxLayout" name="interpolationRow">
+   <item><widget class="QLabel" name="interpolationLabel"><property name="text"><string>補間方式</string></property></widget></item>
+   <item><widget class="QComboBox" name="comboInterpolation">
+    <property name="currentIndex"><number>3</number></property>
+    <item><property name="text"><string>最近傍法</string></property></item>
+    <item><property name="text"><string>バイリニア</string></property></item>
+    <item><property name="text"><string>バイキュービック</string></property></item>
+    <item><property name="text"><string>Lanczos</string></property></item>
+    <item><property name="text"><string>BOX</string></property></item>
+    <item><property name="text"><string>HAMMING</string></property></item>
+    <item><property name="text"><string>MKS2021</string></property></item>
+    <item><property name="text"><string>面積平均</string></property></item>
+   </widget></item>
+  </layout></item>
+  <item><layout class="QVBoxLayout" name="scaleOptionsLayout">
+          <item>
+           <layout class="QVBoxLayout" name="geometryLayout">
+            <item>
+             <layout class="QHBoxLayout" name="transformField2">
+              <item>
+               <widget class="QLabel" name="labelWidth">
+                <property name="text">
+                 <string>幅</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QDoubleSpinBox" name="spinWidth">
+                <property name="suffix">
+                 <string/>
+                </property>
+                <property name="decimals">
+                 <number>1</number>
+                </property>
+                <property name="minimum">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>100000.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>640.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="transformField3">
+              <item>
+               <widget class="QLabel" name="labelHeight">
+                <property name="text">
+                 <string>高さ</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QDoubleSpinBox" name="spinHeight">
+                <property name="suffix">
+                 <string/>
+                </property>
+                <property name="decimals">
+                 <number>1</number>
+                </property>
+                <property name="minimum">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>100000.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>480.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="checkRatio">
+              <property name="text">
+               <string>比率固定</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout></item>
+  <item><spacer name="scaleOptionsSpacer">
+   <property name="orientation"><enum>Qt::Vertical</enum></property>
+   <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+  </spacer></item>
+ </layout>
+</widget>
+<widget class="QWidget" name="rotationOptions">
+ <layout class="QVBoxLayout" name="rotationOptionsPageLayout">
+  <item><layout class="QVBoxLayout" name="rotationOptionsLayout">
+          <item>
+           <layout class="QHBoxLayout" name="rotationRow">
+            <item>
+             <widget class="QLabel" name="labelRotation">
+              <property name="text">
+               <string>角度</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QDoubleSpinBox" name="spinRotation">
+              <property name="toolTip">
+               <string>正の角度で右回転、負の角度で左回転</string>
+              </property>
+              <property name="suffix">
+               <string>°</string>
+              </property>
+              <property name="decimals">
+               <number>1</number>
+              </property>
+              <property name="minimum">
+               <double>-360.000000000000000</double>
+              </property>
+              <property name="maximum">
+               <double>360.000000000000000</double>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QWidget" name="rotationActions"><layout class="QHBoxLayout" name="rotationActionsLayout">
+            <item>
+             <widget class="QPushButton" name="buttonRotateLeft">
+              <property name="text">
+               <string>左に90度回転</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="buttonRotateRight">
+              <property name="text">
+               <string>右に90度回転</string>
+              </property>
+             </widget>
+            </item>
+           </layout></widget>
+          </item>
+         </layout></item>
+  <item><spacer name="rotationOptionsSpacer">
+   <property name="orientation"><enum>Qt::Vertical</enum></property>
+   <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+  </spacer></item>
+ </layout>
+</widget>
+<widget class="QWidget" name="alignmentOptions">
+ <layout class="QVBoxLayout" name="alignmentOptionsPageLayout">
+  <item><layout class="QHBoxLayout" name="alignmentActionsLayout">
+          <item>
+           <widget class="QToolButton" name="buttonAlignLeft">
+            <property name="toolTip">
+             <string>左寄せ</string>
+            </property>
+            <property name="text">
+             <string>左寄せ</string>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="buttonAlignCenterHorizontal">
+            <property name="toolTip">
+             <string>水平中央</string>
+            </property>
+            <property name="text">
+             <string>水平中央</string>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="buttonAlignRight">
+            <property name="toolTip">
+             <string>右寄せ</string>
+            </property>
+            <property name="text">
+             <string>右寄せ</string>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="buttonAlignTop">
+            <property name="toolTip">
+             <string>上寄せ</string>
+            </property>
+            <property name="text">
+             <string>上寄せ</string>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="buttonAlignCenterVertical">
+            <property name="toolTip">
+             <string>垂直中央</string>
+            </property>
+            <property name="text">
+             <string>垂直中央</string>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="buttonAlignBottom">
+            <property name="toolTip">
+             <string>下寄せ</string>
+            </property>
+            <property name="text">
+             <string>下寄せ</string>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+           </widget>
+          </item>
+         </layout></item>
+  <item><spacer name="alignmentOptionsSpacer">
+   <property name="orientation"><enum>Qt::Vertical</enum></property>
+   <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+  </spacer></item>
+ </layout>
+</widget>
+<widget class="QWidget" name="cropOptions">
+ <layout class="QVBoxLayout" name="cropOptionsPageLayout">
+  <item><layout class="QVBoxLayout" name="cropOptionsLayout">
+          <item>
+           <widget class="QLabel" name="cropHint">
+            <property name="text">
+             <string>範囲をドラッグして確定</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="buttonCommitCrop">
+            <property name="text">
+             <string>確定</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="buttonCancelCrop">
+            <property name="text">
+             <string>取消</string>
+            </property>
+           </widget>
+          </item>
+         </layout></item>
+  <item><spacer name="cropOptionsSpacer">
+   <property name="orientation"><enum>Qt::Vertical</enum></property>
+   <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+  </spacer></item>
+ </layout>
+</widget>
+<widget class="QWidget" name="textOptions">
+ <layout class="QVBoxLayout" name="textOptionsPageLayout">
+  <item><widget class="QLabel" name="textToolHint">
+          <property name="text">
+           <string>キャンバスをクリックして文字を追加</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+         </widget></item>
+  <item><widget class="QGroupBox" name="textSettings">
+          <property name="title">
+           <string>文字</string>
+          </property>
+          <layout class="QVBoxLayout" name="textSettingsLayout">
+           <item>
+            <layout class="QHBoxLayout" name="textRow">
+             <item>
+              <widget class="QLabel" name="textRowLabel">
+               <property name="text">
+                <string>内容</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="editText"/>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="fontRow">
+             <item>
+              <widget class="QLabel" name="fontRowLabel">
+               <property name="text">
+                <string>フォント</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QFontComboBox" name="comboFont"/>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="fontSizeRow">
+             <item>
+              <widget class="QLabel" name="fontSizeRowLabel">
+               <property name="text">
+                <string>サイズ</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QDoubleSpinBox" name="spinFontSize">
+               <property name="suffix">
+                <string> px</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="minimum">
+                <double>4.000000000000000</double>
+               </property>
+               <property name="maximum">
+                <double>1000.000000000000000</double>
+               </property>
+               <property name="value">
+                <double>48.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="textColors">
+             <item>
+              <widget class="QPushButton" name="buttonTextColor">
+               <property name="text">
+                <string>文字色</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="buttonOutlineColor">
+               <property name="text">
+                <string>縁取り色</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="outlineRow">
+             <item>
+              <widget class="QLabel" name="outlineRowLabel">
+               <property name="text">
+                <string>縁取り幅</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QDoubleSpinBox" name="spinOutline">
+               <property name="suffix">
+                <string> px</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="minimum">
+                <double>0.000000000000000</double>
+               </property>
+               <property name="maximum">
+                <double>50.000000000000000</double>
+               </property>
+               <property name="value">
+                <double>2.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget></item>
+  <item><spacer name="textOptionsSpacer">
+   <property name="orientation"><enum>Qt::Vertical</enum></property>
+   <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+  </spacer></item>
+ </layout>
+</widget>
+  </widget>
+ </item>
+</layout>
+      </widget>
+      <widget class="QGroupBox" name="layersGroup">
+       <property name="title">
+        <string>レイヤー（上ほど手前）</string>
+       </property>
+       <layout class="QVBoxLayout" name="layersGroupLayout">
+        <item>
+         <layout class="QHBoxLayout" name="opacityRow">
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="opacityRowLabel">
+            <property name="text">
+             <string>不透明度</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="opacityScrubberLayout"/>
+          </item>
+          <item>
+           <widget class="QToolButton" name="buttonOpacityMinus">
+            <property name="toolTip">
+             <string>不透明度を1%下げる</string>
+            </property>
+            <property name="accessibleName">
+             <string>不透明度を1%下げる</string>
+            </property>
+            <property name="text">
+             <string>−</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="buttonOpacityPlus">
+            <property name="toolTip">
+             <string>不透明度を1%上げる</string>
+            </property>
+            <property name="accessibleName">
+             <string>不透明度を1%上げる</string>
+            </property>
+            <property name="text">
+             <string>＋</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QListWidget" name="listLayers"/>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="layerActions">
+          <item>
+           <widget class="QPushButton" name="buttonLayerUp">
+            <property name="text">
+             <string>上へ</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="buttonLayerDown">
+            <property name="text">
+             <string>下へ</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="buttonRemoveLayer">
+            <property name="text">
+             <string>削除</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="labelHelp">
+     <property name="text">
+      <string>Ctrl＋ホイール：表示倍率　Space＋ドラッグ：表示位置</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="layoutFooter">
+     <item><widget class="QPushButton" name="buttonGuideThumbnail"><property name="text"><string>ガイド ↗</string></property><property name="toolTip"><string>オンラインガイドをブラウザで開きます。</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
+     <item>
+      <widget class="QLabel" name="labelViewZoom">
+       <property name="text">
+        <string>表示倍率</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="buttonZoomOut">
+       <property name="text">
+        <string>−</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDoubleSpinBox" name="spinViewZoom">
+       <property name="suffix">
+        <string> %</string>
+       </property>
+       <property name="decimals">
+        <number>1</number>
+       </property>
+       <property name="minimum">
+        <double>5.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>1600.000000000000000</double>
+       </property>
+       <property name="value">
+        <double>100.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="buttonZoomIn">
+       <property name="text">
+        <string>＋</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="buttonFit">
+       <property name="text">
+        <string>全体表示</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="footerSpacer">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>0</width>
+         <height>0</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="buttonCancel">
+       <property name="text">
+        <string>キャンセル</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="buttonApply">
+       <property name="text">
+        <string>適用</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

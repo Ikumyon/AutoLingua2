@@ -15,6 +15,8 @@ from autolingua2.infrastructure.encoding import detect_encoding, read_text_auto
 from autolingua2.infrastructure.platform import current_platform
 from autolingua2.services.settings.settings_store import AiModel, AiSetupValues, load_plugin_settings, save_plugin_settings
 from autolingua2.ui.creation.creation_contract import CreationAdapter, CreationContext
+from autolingua2.services.exporting.thumbnail_export import ThumbnailExportHook
+from autolingua2.services.exporting.export_contract import ExportFile
 
 __all__ = [
     "PluginContext",
@@ -30,6 +32,8 @@ __all__ = [
     "PluginSettings",
     "UIContribution",
     "ExportSettingsPanel",
+    "ThumbnailExportPanel",
+    "ExportFile",
     "AiModel",
     "AiSetupValues",
     "AiSetupCallbacks",
@@ -154,6 +158,7 @@ class UIContribution:
     text_presentation: Callable[[str], GameTextPresentation | None] | None = None
     highlighter_factory: HighlighterFactory | None = None
     export_settings: dict[str, ExportSettingsPanel] = field(default_factory=dict)
+    thumbnail_export: ThumbnailExportPanel | None = None
     ai_setup: AiSetupOption | None = None
 
 
@@ -181,6 +186,11 @@ class PluginContribution:
     voice_input: VoiceInputProvider | None = None
     operations: tuple[OperationContribution, ...] = ()
     glossary_formats: tuple[GlossaryFormat, ...] = ()
+
+
+class ThumbnailExportPanel(ThumbnailExportHook, Protocol):
+    def create_widget(self, directory: Path, parent: QWidget) -> QWidget: ...
+    def read_settings(self, widget: QWidget) -> dict[str, object]: ...
 
 
 class PluginContext:

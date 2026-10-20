@@ -1,10 +1,11 @@
 """UI settings panel for BMFont character list export."""
 from __future__ import annotations
 
-from PySide6.QtWidgets import QComboBox, QFormLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QWidget
 
 from autolingua2.ir.imported import ImportedTranslation
 from autolingua2.ui.resources.i18n import tr
+from autolingua2.ui.ui_loader import load_ui, require_child
 
 
 class BmFontExportWidget(QWidget):
@@ -12,11 +13,12 @@ class BmFontExportWidget(QWidget):
 
     def __init__(self, workspaces: list[ImportedTranslation], parent: QWidget) -> None:
         super().__init__(parent)
-        layout = QFormLayout(self)
-        self.combo_target = QComboBox(self)
-        self.combo_target.addItem(tr("BmFontExport", "訳文（翻訳）"), "target")
-        self.combo_target.addItem(tr("BmFontExport", "原文"), "source")
-        layout.addRow(tr("BmFontExport", "対象テキスト："), self.combo_target)
+        panel = load_ui("dialogs/BmFontExportSettings.ui", self)
+        self.combo_target = require_child(panel, QComboBox, "comboTarget")
+        self.setLayout(panel.layout())
+        panel.deleteLater()
+        self.combo_target.setItemData(0, "target")
+        self.combo_target.setItemData(1, "source")
 
 
 class BmFontExportSettingsPanel:

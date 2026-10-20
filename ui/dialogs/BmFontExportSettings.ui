@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>BmFontExportSettings</class>
+ <widget class="QWidget" name="BmFontExportSettings"><layout class="QFormLayout" name="layoutBmFont"><item row="0" column="0"><widget class="QLabel" name="layoutBmFontLabel0"><property name="text"><string>対象テキスト：</string></property></widget></item><item row="0" column="1"><widget class="QComboBox" name="comboTarget"><item><property name="text"><string>訳文（翻訳）</string></property></item><item><property name="text"><string>原文</string></property></item></widget></item></layout></widget>
+ <resources/>
+ <connections/>
+</ui>

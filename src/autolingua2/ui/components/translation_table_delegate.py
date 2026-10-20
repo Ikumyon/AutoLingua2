@@ -47,7 +47,8 @@ def _opt_palette(option: QStyleOptionViewItem) -> QPalette:
 
 
 def _opt_state(option: QStyleOptionViewItem) -> int:
-    return int(getattr(option, "state", 0))
+    state = getattr(option, "state", 0)
+    return int(getattr(state, "value", state))
 
 
 class StatusComboBoxDelegate(QStyledItemDelegate):

@@ -24,6 +24,7 @@
     <layout class="QHBoxLayout" name="layoutNavigation">
      <item>
       <widget class="QPushButton" name="buttonBack">
+       <property name="autoDefault"><bool>false</bool></property>
        <property name="toolTip">
         <string>戻る</string>
        </property>
@@ -34,6 +35,7 @@
      </item>
      <item>
       <widget class="QPushButton" name="buttonForward">
+       <property name="autoDefault"><bool>false</bool></property>
        <property name="toolTip">
         <string>進む</string>
        </property>
@@ -44,6 +46,7 @@
      </item>
      <item>
       <widget class="QPushButton" name="buttonUp">
+       <property name="autoDefault"><bool>false</bool></property>
        <property name="toolTip">
         <string>上のフォルダへ</string>
        </property>
@@ -179,6 +182,7 @@
     <layout class="QHBoxLayout" name="layoutFolderTools">
      <item>
       <widget class="QPushButton" name="buttonNewFolder">
+       <property name="autoDefault"><bool>false</bool></property>
        <property name="text">
         <string>新しいフォルダ</string>
        </property>
@@ -262,6 +266,20 @@
      <item row="1" column="1">
       <widget class="QComboBox" name="comboFormat"/>
      </item>
+     <item row="2" column="0" colspan="2">
+      <widget class="QWidget" name="filenameRow">
+       <layout class="QFormLayout" name="layoutFileOutput">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+        <item row="0" column="0"><widget class="QLabel" name="labelFilename"><property name="text"><string>ファイル名：</string></property></widget></item>
+        <item row="0" column="1"><widget class="QLineEdit" name="editFilename"/></item>
+        <item row="1" column="0"><widget class="QLabel" name="labelFileType"><property name="text"><string>ファイルの種類：</string></property></widget></item>
+        <item row="1" column="1"><widget class="QComboBox" name="comboFileFormat"/></item>
+       </layout>
+      </widget>
+     </item>
     </layout>
    </item>
    <item>
@@ -278,7 +296,19 @@
       </item>
       <item>
        <widget class="QWidget" name="widgetTranslationStates">
-        <layout class="QGridLayout" name="layoutTranslationStates"/>
+        <layout class="QGridLayout" name="layoutTranslationStates">
+         <item row="0" column="0"><widget class="QCheckBox" name="checkState_untranslated"><property name="text"><string>未翻訳</string></property><property name="checked"><bool>false</bool></property></widget></item>
+         <item row="1" column="0"><widget class="QCheckBox" name="checkState_ai_translated"><property name="text"><string>AIによる翻訳</string></property><property name="checked"><bool>true</bool></property></widget></item>
+         <item row="1" column="1"><widget class="QCheckBox" name="checkState_human_translated"><property name="text"><string>人間による翻訳</string></property><property name="checked"><bool>true</bool></property></widget></item>
+         <item row="2" column="0"><widget class="QCheckBox" name="checkState_ai_reviewed"><property name="text"><string>AIによる校閲</string></property><property name="checked"><bool>true</bool></property></widget></item>
+         <item row="2" column="1"><widget class="QCheckBox" name="checkState_human_reviewed"><property name="text"><string>人間による校閲</string></property><property name="checked"><bool>true</bool></property></widget></item>
+         <item row="3" column="0"><widget class="QCheckBox" name="checkState_review_issues"><property name="text"><string>校閲指摘あり</string></property><property name="checked"><bool>false</bool></property></widget></item>
+         <item row="4" column="0"><widget class="QCheckBox" name="checkState_translation_error"><property name="text"><string>翻訳エラー</string></property><property name="checked"><bool>false</bool></property></widget></item>
+         <item row="4" column="1"><widget class="QCheckBox" name="checkState_review_error"><property name="text"><string>校閲エラー</string></property><property name="checked"><bool>false</bool></property></widget></item>
+         <item row="5" column="0"><widget class="QCheckBox" name="checkState_doubtful"><property name="text"><string>疑問あり</string></property><property name="checked"><bool>false</bool></property></widget></item>
+         <item row="6" column="0"><widget class="QCheckBox" name="checkState_locked"><property name="text"><string>ロック</string></property><property name="checked"><bool>true</bool></property></widget></item>
+         <item row="6" column="1"><widget class="QCheckBox" name="checkState_hidden"><property name="text"><string>非表示</string></property><property name="checked"><bool>false</bool></property></widget></item>
+        </layout>
        </widget>
       </item>
      </layout>
@@ -308,6 +338,7 @@
    </item>
    <item>
     <layout class="QHBoxLayout" name="layoutButtons">
+     <item><widget class="QPushButton" name="buttonGuideExport"><property name="text"><string>選択形式のガイド ↗</string></property><property name="toolTip"><string>オンラインガイドをブラウザで開きます。</string></property><property name="autoDefault"><bool>false</bool></property></widget></item>
      <item>
       <spacer name="spacerButtons">
        <property name="orientation">
@@ -333,6 +364,7 @@
      </item>
      <item>
       <widget class="QPushButton" name="buttonCancel">
+       <property name="autoDefault"><bool>false</bool></property>
        <property name="text">
         <string>キャンセル</string>
        </property>
@@ -341,6 +373,7 @@
     </layout>
    </item>
   </layout>
+  <action name="actionEditExportAddress"/>
  </widget>
  <tabstops>
   <tabstop>editLocation</tabstop>

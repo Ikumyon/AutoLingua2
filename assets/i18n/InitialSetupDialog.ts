@@ -42,5 +42,13 @@
       <source>設定はあとから変更できます。</source>
       <translation>設定はあとから変更できます。</translation>
     </message>
+    <message>
+      <source>オンラインガイドをブラウザで開きます。</source>
+      <translation>オンラインガイドをブラウザで開きます。</translation>
+    </message>
+    <message>
+      <source>設定手順 ↗</source>
+      <translation>設定手順 ↗</translation>
+    </message>
   </context>
 </TS>

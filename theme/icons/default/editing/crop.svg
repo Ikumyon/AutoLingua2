@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <title>crop</title>
+  <defs>
+    <linearGradient id="crFrame" x1="2" y1="2" x2="18" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3bd5ff"/>
+      <stop offset="0.55" stop-color="#0094f0"/>
+      <stop offset="1" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="crCorner" x1="6" y1="6" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fde047"/>
+      <stop offset="0.55" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <g fill="none">
+    <rect x="7.5" y="7.5" width="9" height="9" rx="1" fill="#38bdf8" fill-opacity="0.18"/>
+    <path stroke="url(#crFrame)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M6.5 2.5v12a3 3 0 0 0 3 3h12"/>
+    <path stroke="url(#crCorner)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M2.5 6.5h12a3 3 0 0 1 3 3v12"/>
+  </g>
+</svg>

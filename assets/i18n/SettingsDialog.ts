@@ -18,5 +18,17 @@
       <source>設定項目</source>
       <translation>設定項目</translation>
     </message>
+    <message>
+      <source>この設定のガイド ↗</source>
+      <translation>この設定のガイド ↗</translation>
+    </message>
+    <message>
+      <source>オンラインガイドをブラウザで開きます。</source>
+      <translation>オンラインガイドをブラウザで開きます。</translation>
+    </message>
+    <message>
+      <source>外部資料のガイド ↗</source>
+      <translation>外部資料のガイド ↗</translation>
+    </message>
   </context>
 </TS>

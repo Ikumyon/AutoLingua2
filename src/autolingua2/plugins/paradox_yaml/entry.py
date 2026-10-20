@@ -6,6 +6,7 @@ from .ui.eu4 import ParadoxPalette, presentation
 from .ui.panel import ParadoxCreationAdapter
 from .ui.settings_page import ParadoxSettingsPageProvider
 from .ui.translations import PluginTranslations
+from .ui.thumbnail_export import ParadoxThumbnailExport
 
 
 def register(context: PluginContext) -> None:
@@ -25,6 +26,7 @@ def register(context: PluginContext) -> None:
         text_presentation=presentation,
         highlighter_factory=palette.create_highlighter,
         export_settings={"yaml": ParadoxExportSettings()},
+        thumbnail_export=ParadoxThumbnailExport(context.files.read_text_auto),
     )
 
     context.register(PluginContribution(

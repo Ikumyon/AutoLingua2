@@ -74,5 +74,65 @@
       <source>進む</source>
       <translation>進む</translation>
     </message>
+    <message>
+      <source>AIによる校閲</source>
+      <translation>AIによる校閲</translation>
+    </message>
+    <message>
+      <source>AIによる翻訳</source>
+      <translation>AIによる翻訳</translation>
+    </message>
+    <message>
+      <source>オンラインガイドをブラウザで開きます。</source>
+      <translation>オンラインガイドをブラウザで開きます。</translation>
+    </message>
+    <message>
+      <source>ファイルの種類：</source>
+      <translation>ファイルの種類：</translation>
+    </message>
+    <message>
+      <source>ファイル名：</source>
+      <translation>ファイル名：</translation>
+    </message>
+    <message>
+      <source>ロック</source>
+      <translation>ロック</translation>
+    </message>
+    <message>
+      <source>人間による校閲</source>
+      <translation>人間による校閲</translation>
+    </message>
+    <message>
+      <source>人間による翻訳</source>
+      <translation>人間による翻訳</translation>
+    </message>
+    <message>
+      <source>未翻訳</source>
+      <translation>未翻訳</translation>
+    </message>
+    <message>
+      <source>校閲エラー</source>
+      <translation>校閲エラー</translation>
+    </message>
+    <message>
+      <source>校閲指摘あり</source>
+      <translation>校閲指摘あり</translation>
+    </message>
+    <message>
+      <source>疑問あり</source>
+      <translation>疑問あり</translation>
+    </message>
+    <message>
+      <source>翻訳エラー</source>
+      <translation>翻訳エラー</translation>
+    </message>
+    <message>
+      <source>選択形式のガイド ↗</source>
+      <translation>選択形式のガイド ↗</translation>
+    </message>
+    <message>
+      <source>非表示</source>
+      <translation>非表示</translation>
+    </message>
   </context>
 </TS>

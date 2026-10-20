@@ -28,7 +28,7 @@ class _ScriptHighlighter(QSyntaxHighlighter):
                 name = match.group()
                 if name in TYPES or name == "void":
                     kind = "type"
-                elif name in RESERVED:
+                elif name in RESERVED or name == "on":
                     kind = "keyword"
                 elif text[match.end():].lstrip().startswith("("):
                     kind = "function"

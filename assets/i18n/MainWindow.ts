@@ -602,5 +602,41 @@ status: 表示ステータス / regex:/パターン/フラグ: 正規表現
       <source>＋ 言語を追加</source>
       <translation>＋ 言語を追加</translation>
     </message>
+    <message>
+      <source>AI設定のガイド ↗</source>
+      <translation>AI設定のガイド ↗</translation>
+    </message>
+    <message>
+      <source>この画面のガイド ↗</source>
+      <translation>この画面のガイド ↗</translation>
+    </message>
+    <message>
+      <source>オンラインガイドをブラウザで開きます。</source>
+      <translation>オンラインガイドをブラウザで開きます。</translation>
+    </message>
+    <message>
+      <source>ガイド ↗</source>
+      <translation>ガイド ↗</translation>
+    </message>
+    <message>
+      <source>サムネイル画像を加工</source>
+      <translation>サムネイル画像を加工</translation>
+    </message>
+    <message>
+      <source>ユーザーガイド ↗</source>
+      <translation>ユーザーガイド ↗</translation>
+    </message>
+    <message>
+      <source>作成手順 ↗</source>
+      <translation>作成手順 ↗</translation>
+    </message>
+    <message>
+      <source>使い方を開く ↗</source>
+      <translation>使い方を開く ↗</translation>
+    </message>
+    <message>
+      <source>加工</source>
+      <translation>加工</translation>
+    </message>
   </context>
 </TS>
