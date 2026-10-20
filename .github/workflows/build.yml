@@ -14,6 +14,11 @@ on:
       - '**/*.md'
       - '.github/workflows/guide-pages.yml'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing release tag to build and attach assets to (e.g. v0.9.0beta)'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -31,19 +36,29 @@ jobs:
         os: [windows-latest, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    permissions:
+      contents: write
     defaults:
       run:
         shell: pwsh
     env:
       CARGO_TERM_COLOR: always
       QT_QPA_PLATFORM: offscreen
+      RELEASE_TAG: ${{ inputs.release_tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG || github.ref }}
       - uses: actions/setup-python@v6
         with:
           python-version: '3.14'
       - name: Prepare version from release tag
-        run: python .github/prepare_version.py
+        run: |
+          if ($env:RELEASE_TAG) {
+            $env:GITHUB_REF_TYPE = 'tag'
+            $env:GITHUB_REF_NAME = $env:RELEASE_TAG
+          }
+          python .github/prepare_version.py
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -123,7 +138,9 @@ jobs:
           foreach ($file in @("AUTOlingua2$suffix", "core/autolingua2_core$suffix", "core/autolingua-source-watcher$suffix", "core/autolingua-updater$suffix", 'core/_internal/assets/chat/index.html')) {
             if (-not (Test-Path "dist/AUTOlingua2/$file" -PathType Leaf)) { throw "Missing build output: $file" }
           }
-          if (-not $IsWindows) {
+          if ($IsWindows) {
+            Compress-Archive -Path dist/AUTOlingua2 -DestinationPath dist/AUTOlingua2-windows.zip
+          } else {
             tar -czf dist/AUTOlingua2-linux.tar.gz -C dist AUTOlingua2
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
@@ -134,6 +151,15 @@ jobs:
             ${{ runner.os == 'Windows' && 'dist/AUTOlingua2/' || 'dist/AUTOlingua2-linux.tar.gz' }}
           if-no-files-found: error
           retention-days: 7
+      - name: Attach distribution to existing release
+        if: env.RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $archive = if ($IsWindows) { 'dist/AUTOlingua2-windows.zip' } else { 'dist/AUTOlingua2-linux.tar.gz' }
+          gh release upload $env:RELEASE_TAG $archive --clobber
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Save Rust build cache
         if: always() && steps.cargo-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
