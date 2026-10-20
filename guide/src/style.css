@@ -126,7 +126,14 @@ h2 { font-size: 21px; font-weight: 700; letter-spacing: -.02em; color: var(--hea
 h3 { font-size: 13px; margin: 24px 0 10px; color: var(--secondary); }
 p { margin: 0 0 18px; overflow-wrap: anywhere; }
 .step-label { font-size: 10px; font-weight: 700; letter-spacing: .17em; color: var(--accent); margin-bottom: 8px; }
-.guide-code { max-width: 100%; overflow-x: auto; padding: 18px; margin: 0 0 22px; border: 1px solid var(--line); border-radius: 8px; background: var(--subtle); color: var(--heading); font-size: 13px; line-height: 1.7; tab-size: 4; }
+.guide-code-block { min-width: 0; margin: 0 0 22px; border: 1px solid var(--line); border-radius: 8px; background: var(--subtle); }
+.guide-code-toolbar { display: flex; justify-content: flex-end; padding: 8px 8px 0; }
+.guide-code-copy { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--control-border); border-radius: 5px; background: var(--subtle); color: var(--text); font-size: 12px; }
+.guide-code-copy:hover, .guide-code-copy[data-state="copied"] { color: var(--accent); border-color: var(--accent); }
+.guide-code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.guide-code-copy:disabled { cursor: wait; opacity: .65; }
+.guide-code { max-width: 100%; overflow-x: auto; padding: 12px 18px 18px; margin: 0; color: var(--heading); font-size: 13px; line-height: 1.7; tab-size: 4; }
+@media print { .guide-code-toolbar { display: none; } }
 .guide-code code { font-family: Consolas, "Courier New", monospace; }
 .syntax-comment { color: var(--code-comment); font-style: italic; }
 .syntax-string { color: var(--code-string); }

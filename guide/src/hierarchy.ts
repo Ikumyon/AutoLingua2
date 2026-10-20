@@ -130,6 +130,29 @@ export function organizeGuide(sources: GuidePage[]) {
     prose('use-resources', 'details.mcpResources.use.title', 'details.mcpResources.use.body', 'details.mcpResources.use.verify'),
     prose('maintain', 'details.mcpResources.maintain.title', 'details.mcpResources.maintain.body', 'details.mcpResources.errors'),
   ]);
+  const plugins = child('plugin-development', 'automation', 'pluginDev.title', 'pluginDev.description', [
+    prose('choose', 'pluginDev.choose.title', 'pluginDev.choose.body'),
+    { id: 'files', title: 'pluginDev.files.title', blocks: [
+      { kind: 'paragraph', text: 'pluginDev.files.body' },
+      { kind: 'code', text: 'pluginDev.manifest' },
+    ] },
+    { id: 'example', title: 'pluginDev.example.title', blocks: [
+      { kind: 'paragraph', text: 'pluginDev.example.body' },
+      { kind: 'code', text: 'pluginDev.code' },
+    ] },
+    prose('verify', 'pluginDev.verify.title', 'pluginDev.verify.body'),
+    prose('extend', 'pluginDev.extend.title', 'pluginDev.extend.body'),
+    { id: 'references', title: 'pluginDev.references.title', blocks: [
+      { kind: 'paragraph', text: 'pluginDev.references.body' },
+      { kind: 'code', text: 'pluginDev.contract' },
+    ] },
+    { id: 'executable', title: 'pluginDev.rpc.title', blocks: [
+      { kind: 'paragraph', text: 'pluginDev.rpc.body' },
+      { kind: 'code', text: 'pluginDev.rpc.manifest' },
+      { kind: 'code', text: 'pluginDev.rpc.envelope' },
+      { kind: 'code', text: 'pluginDev.rpc.methods' },
+    ] },
+  ]);
 
   const pages: GuidePage[] = [
     source('setup'), source('first-translation'),
@@ -168,6 +191,7 @@ export function organizeGuide(sources: GuidePage[]) {
     source('ai-chat'),
     { ...source('settings'), sections: [
       ...sections('settings', 'open-and-save', 'application', 'shortcuts'),
+      prose('splash-image', 'guide.splash.title', 'guide.splash.setup', 'guide.splash.display', 'guide.splash.check'),
       overview('ai', ai.title, 'details.ai.overview', ai.slug),
       ...sections('settings', 'translation', 'tone-and-glossary', 'filter-rules'),
       prose('plugins', 'details.plugins.title', 'details.plugins.body', 'details.plugins.check'),
@@ -182,6 +206,7 @@ export function organizeGuide(sources: GuidePage[]) {
       ...sections('automation', 'script-reference'),
       overview('mcp-server', mcpServer.title, 'details.mcpServer.overview', mcpServer.slug),
       overview('external-resources', mcpResources.title, 'details.mcpResources.overview', mcpResources.slug),
+      overview('plugins', plugins.title, 'pluginDev.description', plugins.slug),
       prose('results', 'details.automation.results.title', 'details.automation.results.body', 'details.automation.results.stop'),
     ] },
     { slug: 'support', title: 'details.support.title', description: 'details.support.description', sections: [
@@ -194,7 +219,7 @@ export function organizeGuide(sources: GuidePage[]) {
     ] },
   ];
   const referencePages = [projectUpdates, thumbnail, glossaryEditor, glossaryExchange, tone, yaml, json, bmfont,
-    ai, scripts, triggers, scriptReference, mcpServer, mcpResources];
+    ai, scripts, triggers, scriptReference, mcpServer, mcpResources, plugins];
 
   // Old chapter/anchor URLs continue to open the detailed explanation after it moves.
   const legacyAnchorTargets: Record<string, string> = {};

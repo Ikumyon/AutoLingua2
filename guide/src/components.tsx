@@ -123,7 +123,7 @@ export function GuideSection({ section, t, language }: { section: Section; t: Tr
         case 'image': return <GuideImage key={index} src={block.src} caption={t(block.caption)} t={t} language={language} />;
         case 'paragraph': return <p key={index}><InlineText text={t(block.text)} /></p>;
         case 'guideReference': return <p key={index}>{t('guide.inlineReference').split('{guide}').map((part, partIndex) => <span key={partIndex}>{partIndex > 0 && <GuideLink href={`/${language}/guide/${block.slug}${block.anchor ? `#${block.anchor}` : ''}`}>{t(block.label)}</GuideLink>}{part}</span>)}</p>;
-        case 'code': return <ScriptCode key={index} source={t(block.text)} />;
+        case 'code': return <ScriptCode key={`${language}:${block.text}:${index}`} source={t(block.text)} t={t} />;
         case 'notice': return <Notice key={index} t={t}><InlineText text={t(block.text)} /></Notice>;
         case 'definitions': return <div key={index}>{block.title && <h3>{t(block.title)}</h3>}<DefinitionList items={block.items} t={t} /></div>;
         case 'links': return <div key={index} className="resource-links"><h3>{t(block.title)}</h3><ul>{block.items.map(item => <li key={item.href}><a href={item.href} target="_blank" rel="noreferrer">{t(item.label)} <Icon name="externalLink" /></a></li>)}</ul></div>;

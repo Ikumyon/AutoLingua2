@@ -1,6 +1,6 @@
 import {
   faArrowLeft, faArrowRight, faArrowUpRightFromSquare, faBars,
-  faBookOpen, faChevronRight, faCircleInfo, faGlobe, faXmark, faSun, faMoon, faPlay,
+  faBookOpen, faChevronRight, faCircleInfo, faGlobe, faXmark, faSun, faMoon, faPlay, faCopy, faCheck,
 } from '@fortawesome/free-solid-svg-icons';
 
 const icons = {
@@ -16,6 +16,8 @@ const icons = {
   sun: faSun,
   moon: faMoon,
   play: faPlay,
+  copy: faCopy,
+  check: faCheck,
 };
 
 // Decorative icons share sizing and never duplicate their control's accessible name.

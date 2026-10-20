@@ -1,85 +1,161 @@
-# Autolingua Desktop
+# AUTOlingua Desktop
 
-Paradoxゲームのローカライズファイルを中心に、AI翻訳・編集・確認・出力を行うデスクトップアプリです。
+Paradoxゲーム等のローカライズファイルに向けた、AI翻訳・差分追従・用語集管理を行うマルチプラットフォーム・デスクトップアプリです。
 
-**[ユーザーガイドを読む](https://ikumyon.github.io/AutoLingua2/)**
+> [!NOTE]
+> **アプリの利用者（エンドユーザー）向け情報**
+> - アプリのダウンロード: [GitHub Releases](https://github.com/Ikumyon/AutoLingua2/releases)
+> - 詳しい使い方・操作マニュアル: **[公式ユーザーガイド (Web)](https://ikumyon.github.io/AutoLingua2/)**
 
-## 主な機能
+本ドキュメントは、AUTOlingua のソースコードを変更・拡張・ビルドしたい開発者・コントリビューター向けの開発ガイドです。
 
-- **AI翻訳**：ChatGPTへのサインイン、OpenAI・Google Gemini・Anthropic Claudeへの接続とモデル設定。
-- **翻訳の編集・確認**：原文と訳文の一覧表示、検索・絞り込み、モデルごとの翻訳比較。
-- **プロジェクト管理**：原文の更新差分の確認、フォルダ監視、サムネイルの加工と出力。
-- **用語集・口調**：用語集の作成・継承・取り込み・書き出し、通常口調と条件付き口調の設定。
-- **ファイル出力**：Paradox YAML、ParaTranz JSON、BMFont用の使用文字一覧の出力。
-- **AIチャット**：資料や翻訳内容を参照した相談と、提案された変更の適用。
-- **自動化・外部連携**：スクリプト、トリガーによる自動実行、MCP接続。
+---
 
-## 使い方
+## 🛠 アーキテクチャ & 技術スタック
 
-初回起動時のウィザードで表示言語とAIの接続を設定し、プロジェクトを作成して原文を取り込みます。
-翻訳・確認後、用途に合った形式でファイルを出力します。
+AUTOlingua は Python の GUI アプリケーションを中核としつつ、パフォーマンスと安定性が求められる部分に Rust や Web フロントエンド技術を組み合わせて構成されています。
 
-- [初期設定](https://ikumyon.github.io/AutoLingua2/ja/guide/setup)
-- [最初の翻訳](https://ikumyon.github.io/AutoLingua2/ja/guide/first-translation)
-- [困ったとき・アプリの更新](https://ikumyon.github.io/AutoLingua2/ja/guide/support)
+| レイヤー / 領域 | 主要技術 | 役割・内容 |
+|---|---|---|
+| **GUI & コア** | Python 3.14+ / PySide6 (Qt) | メインUI制御、翻訳パイプライン、設定、プラグイン機構 |
+| **画面定義** | Qt Designer (`ui/*.ui`) | 画面ウィジェット・レイアウトの静的定義 |
+| **ネイティブ基盤** | Rust (Cargo) | 高速ランチャー、ファイル監視デーモン、ネイティブ拡張、アップデーター |
+| **Web UI** | React / TypeScript / Vite | アプリ内AIチャット画面 (`web/`) |
+| **ドキュメント** | React / TypeScript / VitePress 等 | GitHub Pages 公開用ユーザーガイド (`guide/`) |
+| **パッケージング** | PyInstaller / GitHub Actions | Windows / Linux 向けポータブルパッケージの自動生成 |
 
-ガイドは日本語を含む16言語に対応しています。ページ右上から表示言語を切り替えられます。
+---
 
-## 開発
+## 🚀 開発環境のセットアップ
 
-アプリ本体はPython・PySide6、ランチャーやネイティブ処理はRust、AIチャットの表示とオンラインガイドはReact・TypeScriptで構成しています。
+### 前提条件
+- **Python**: 3.14 以上
+- **Rust / Cargo**: 最新の stable ツールチェーン
+- **Node.js**: v18 以上 (web/ 開発時)
+- **C++ コンパイラ**: Windows の場合は MSVC (Visual Studio Build Tools 等)
 
-| ディレクトリ | 内容 |
-| --- | --- |
-| `src/autolingua2/` | アプリ本体、翻訳処理、プラグイン、各種サービス |
-| `ui/` | Qt Designerの画面定義 |
-| `crates/` | Rust製ランチャー、ネイティブライブラリ、監視デーモン、アップデーター |
-| `web/` | アプリ内AIチャットのWeb表示 |
-| `guide/` | GitHub Pagesで公開するユーザーガイド |
-| `assets/`・`theme/` | 画像、翻訳リソース、テーマ、アイコン |
+### 1. リポジトリのクローンと Python 環境構築
+```powershell
+git clone https://github.com/Ikumyon/AutoLingua2.git
+cd auto_lingua2
 
-Pythonの対応範囲と依存関係は [pyproject.toml](pyproject.toml) に記載しています。
-各部分のビルド手順は、それぞれのREADMEを参照してください。
+# 仮想環境の作成と有効化
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 
-- [Rustの構成とビルド](crates/README.md)
+# 依存関係のインストール（editable モード）
+pip install -e .
+```
+
+### 2. ネイティブコンポーネント & Web UI のビルド
+アプリの完全な起動には、Rust クレートおよび Web チャット UI の事前ビルドが必要です。
+
+```powershell
+# 1. Rust クレート（ランチャー・ファイル監視・アップデーター等）のビルド
+cargo build --release
+
+# 2. AIチャット Web UI のビルド
+cd web
+npm install
+npm run build
+cd ..
+
+# 3. UI翻訳バイナリ (.qm) のコンパイル
+python .github/ui_translations.py --compile
+```
+
+---
+
+## 💻 ローカル実行 & デバッグ
+
+```powershell
+# Python から直接起動（開発・デバッグ用）
+python -m autolingua2
+
+# またはビルド済みランチャー経由で起動
+.\target\release\autolingua-launcher.exe
+```
+
+---
+
+## 📂 プロジェクト構成
+
+```text
+auto_lingua2/
+├── crates/             # Rust クレート群
+│   ├── autolingua-launcher/       # アプリケーション起動ランチャー
+│   ├── autolingua-source-watcher/ # ファイル変更監視バックグラウンドデーモン
+│   ├── autolingua-updater/        # 自動更新・パッチ適用ツール
+│   └── autolingua-native/         # 高速テキスト差分抽出等のネイティブ拡張
+├── src/autolingua2/    # Python アプリケーション本体
+│   ├── ai/                        # AIプロバイダー連携 (OpenAI, Gemini, Claude, Ollama等)
+│   ├── gui/                       # ウィンドウ・ダイアログ・イベントハンドラ
+│   ├── plugins/                   # 拡張プラグイン機構
+│   ├── translation/               # 翻訳パイプライン、差分抽出、用語集適用
+│   ├── export/                    # 各種形式（YAML, ParaTranz, BMFont等）のエクスポート
+│   └── app.py                     # エントリーポイント
+├── ui/                 # Qt Designer で編集可能な画面定義ファイル (.ui)
+├── translations/       # 多言語UI翻訳ソース (.ts) とメタデータ
+├── web/                # AIチャット用 Web フロントエンド (React / TypeScript)
+├── guide/              # ドキュメントサイト (ユーザーガイド)
+└── .github/workflows/  # CI/CD ビルド・リリースワークフロー
+```
+
+各サブプロジェクトの詳細は、各フォルダ内の README を参照してください。
+- [Rust クレートの構成とビルド](crates/README.md)
 - [AIチャット表示のビルド](web/README.md)
 - [ユーザーガイドの起動・ビルド・公開](guide/README.md)
 
-ユーザーガイドは、`main` の `guide/` または公開ワークフローを更新すると、GitHub ActionsがビルドしてGitHub Pagesへ公開します。
-アプリ本体だけの変更ではガイドを再ビルドしません。
+---
 
-### ビルドの検証
+## 🔧 ソースコードの改造・拡張ガイド
 
-GitHub Actionsの **Build desktop** でWindows・Linuxのビルドを検証します。
-`main` へのpush、プルリクエスト、手動実行に対応し、ガイドやMarkdownだけの変更は対象外です。
-`v0.9.0` のような `v` で始まるタグをpushしたときも、そのタグの配布用ビルドを実行します。
-時間による定期実行は行いません。タグは配布するバージョンを確定したときに付けます。
+### 1. 画面UIの変更 (`ui/`)
+- ウィジェット配置や静的レイアウトはすべて `ui/*.ui` に定義されています。
+- Qt Designer（または `pyside6-designer`）を使って GUI で直感的に編集できます。
+- **実装原則**: 静的なレイアウトは `.ui` に記述し、ボタン押下時のロジックや動的表示制御は Python 側（`src/autolingua2/gui/`）で実装します。
 
-正式なバージョン番号はGitタグだけで管理します。例えば `v0.9.1` タグのビルドでは、
-Actionsが `VERSION` を `0.9.1` として自動生成し、Python本体・Rust・実行ファイルの
-バージョン情報と配布物に反映します。生成した番号はリポジトリに書き戻しません。
-タグは `vMAJOR.MINOR.PATCH` 形式とし、各数値は0〜65535の範囲で指定します。
-ローカルとタグ以外のビルドは仮の番号 `0.0.0` を使います。
-リリースごとに `VERSION` を手で更新する必要はありません。
+### 2. AIプロバイダー・翻訳ロジックの追加 (`src/autolingua2/ai/`)
+- 新しい LLM API やローカルモデル連携を追加する場合は、`src/autolingua2/ai/` 配下のプロバイダーインターフェースを実装します。
 
-リリース対象のコミットで、例えば次のように実行します。
+### 3. プラグインの追加 (`src/autolingua2/plugins/`)
+- 独自のテキスト前処理・後処理やファイル変換ロジックをプラグインとして組み込むことができます。
 
+### 4. 多言語UI翻訳の編集 (`translations/`)
+- 各言語向けに Qt Linguist 形式の `.ts` ファイルが用意されています。
+- 翻訳の更新や追加を行った後、以下のスクリプトで `.qm` バイナリへ一括コンパイルします：
+  ```powershell
+  python .github/ui_translations.py --compile
+  ```
+
+---
+
+## 📦 パッケージング & 配布用ビルド
+
+### ローカルでの PyInstaller ビルド
+Windows 向けのスタンドアロン配布パッケージをローカルで作成する場合：
 ```powershell
-git tag v0.9.1
-git push origin v0.9.1
+python -m PyInstaller --noconfirm AUTOlingua2.spec
 ```
 
-タグのビルド成果物を確認してからGitHub Releasesで公開します。
+### GitHub Actions による自動リリース
+本プロジェクトでは、バージョン管理を **Git タグ** で一元化しています。
+`vMAJOR.MINOR.PATCH` 形式のタグを push すると、CI/CD ワークフロー（`Build desktop`）が自動実行され、Windows / Linux 向けの配布成果物が生成されます。
 
-両OSでチャット画面の型チェックとビルド、Rustの4コンポーネントのビルド、
-Pythonネイティブ拡張の読み込み、Qtリソースの変換、PyInstallerによるパッケージ作成を行います。
-成功した配布物は各実行のArtifactsから7日間ダウンロードできます。
-Linux版は実行権限を維持するためtar.gzにまとめます。
-GUIの起動・操作テストとリリース公開は行いません。
+```powershell
+# 例: v1.0.0 をリリースする場合
+git tag v1.0.0
+git push origin v1.0.0
+```
 
-## ライセンス
+- CI がタグから `VERSION`（例: `1.0.0`）を自動生成し、Python、Rust、実行ファイルメタデータに注入します。
+- 手動でコード内のバージョン番号を書き換える必要はありません。
+
+---
+
+## 📄 ライセンス
 
 [MIT License](LICENSE) — Copyright (c) 2026 Ikumyon
 
 同梱する外部ライブラリ・素材には、それぞれのライセンスが適用されます。
-ガイドで使用するアイコンのライセンス情報は [third-party-notices.txt](guide/public/third-party-notices.txt) に記載しています。
+ユーザーガイドで使用するアイコンのライセンス情報は [third-party-notices.txt](guide/public/third-party-notices.txt) をご参照ください。
