@@ -471,6 +471,7 @@ dependencies = [
  "autolingua2-native",
  "chrono",
  "hex",
+ "libc",
  "serde",
  "serde_json",
  "sha2",
