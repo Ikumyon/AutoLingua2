@@ -1,5 +1,6 @@
 import type { TextKey } from './i18n';
-import { firstTranslationLabels } from './firstTranslationImageLabels';
+import { firstTranslationLabels, imageSizes as firstImageSizes } from './firstTranslationImageLabels';
+import { captureImageLabels, captureImageSizes } from './captureImageLabels';
 
 export type ImageLabel = {
   text: TextKey;
@@ -10,6 +11,15 @@ export type ImageLabel = {
   button?: boolean;
   fontSize?: number;
   background?: string;
+  fit?: boolean;
+  color?: string;
+};
+
+export const imageSizes: Record<string, [number, number]> = {
+  ...firstImageSizes,
+  ...captureImageSizes,
+  '/images/setup/ai-selection.webp': [934, 796],
+  '/images/setup/connection-success.webp': [934, 796],
 };
 
 const shared: ImageLabel[] = [
@@ -22,6 +32,17 @@ const shared: ImageLabel[] = [
 // Coordinates refer to the original 934 × 796 screenshots; SVG scales them together.
 export const imageLabels: Record<string, ImageLabel[]> = {
   ...firstTranslationLabels,
+  ...captureImageLabels,
+  '/images/setup/display-language.webp': [
+    { text: 'setup.imageText.title', x: 30, y: 12, width: 260, height: 24, fontSize: 14 },
+    { text: 'setup.imageText.steps', x: 18, y: 61, width: 300, height: 26, fontSize: 14 },
+    { text: 'setup.displayLanguage.description', x: 36, y: 108, width: 450, height: 27, fontSize: 16 },
+    { text: 'setup.displayLanguage.selection.label', x: 20, y: 150, width: 94, height: 26, fontSize: 11 },
+    { text: 'setup.imageText.systemDefault', x: 122, y: 148, width: 240, height: 28, background: '#2b2b2b', fontSize: 14 },
+    { text: 'setup.displayLanguage.custom.label', x: 79, y: 196, width: 320, height: 26, fontSize: 15 },
+    { text: 'setup.navigation.skip.label', x: 21, y: 747, width: 138, height: 32, button: true, fontSize: 15 },
+    { text: 'setup.navigation.next.label', x: 840, y: 747, width: 75, height: 32, button: true, fontSize: 15 },
+  ],
   '/images/setup/ai-selection.webp': [
     ...shared,
     { text: 'setup.imageText.choose', x: 32, y: 108, width: 650, height: 27 },

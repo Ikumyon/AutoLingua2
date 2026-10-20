@@ -1,15 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
-import { pages, referencePages } from './content';
+import { pages, referencePages, legacyAnchorTargets } from './content';
 import { fallback, languages, loadDictionary, type Dictionary, type Translate } from './i18n';
 import { GuideLink, GuideSection, PageNavigation, PageToc } from './components';
 import { Icon } from './Icon';
 import { useTheme } from './useTheme';
 import { BrandLogo } from './BrandLogo';
+import { routePath, siteUrl } from './urls';
 
 function readRoute() {
-  const match = /^\/([^/]+)\/guide(?:\/([^/]+))?\/?$/.exec(location.pathname);
+  const match = /^\/([^/]+)\/guide(?:\/([^/]+))?\/?$/.exec(routePath());
+  let anchor = location.hash.slice(1);
+  try { anchor = decodeURIComponent(anchor); } catch { /* Keep malformed hashes unchanged. */ }
+  const target = match && legacyAnchorTargets[`${match[2]}#${anchor}`];
+  if (target) {
+    history.replaceState(null, '', siteUrl(`/${match[1]}/guide/${target}`));
+    return { language: match[1], slug: target.split('#')[0], valid: true };
+  }
   return { language: match?.[1] ?? 'ja', slug: match?.[2] ?? '', valid: Boolean(match) };
 }
+
+const readingOrder = pages.flatMap(page => [page, ...referencePages.filter(child => child.parentSlug === page.slug)]);
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
@@ -27,11 +37,13 @@ export default function App() {
   const pageIndex = pages.findIndex(page => page.slug === route.slug);
   const page = pages[pageIndex] ?? referencePages.find(page => page.slug === route.slug);
   const parentPage = pages.find(item => item.slug === page?.parentSlug);
+  const readingIndex = readingOrder.findIndex(item => item.slug === page?.slug);
+  const children = referencePages.filter(item => item.parentSlug === page?.slug);
   const home = route.valid && languageSupported && !route.slug;
   const notFound = !route.valid || !languageSupported || (!home && !page);
 
   useEffect(() => {
-    if (location.pathname === '/') history.replaceState(null, '', '/ja/guide');
+    if (routePath() === '/') history.replaceState(null, '', siteUrl('/ja/guide'));
     setRoute(readRoute());
     const update = () => { setRoute(readRoute()); setMenuOpen(false); };
     window.addEventListener('popstate', update);
@@ -75,9 +87,9 @@ export default function App() {
   return <>
     <a className="skip-link" href="#content">{t('guide.skipToContent')}</a>
     <header className="site-header">
-      <GuideLink href={`/${language}/guide`} className="brand"><BrandLogo t={t} /><span className="brand-divider" /><span className="brand-guide">{t('guide.label')}</span></GuideLink>
+      <GuideLink href={`/${language}/guide`} className="brand"><BrandLogo t={t} theme={theme} /><span className="brand-divider" /><span className="brand-guide">{t('guide.label')}</span></GuideLink>
       <div className="header-actions"><label className="language-select"><Icon name="language" /><span className="sr-only">{t('guide.language')}</span><select value={language} onChange={event => {
-        history.pushState(null, '', `/${event.target.value}/guide${route.slug ? `/${route.slug}` : ''}${location.hash}`);
+        history.pushState(null, '', siteUrl(`/${event.target.value}/guide${route.slug ? `/${route.slug}` : ''}${location.hash}`));
         window.dispatchEvent(new PopStateEvent('popstate'));
       }}>{languages.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
       <button className="theme-toggle" onClick={toggleTheme} aria-label={t(theme === 'dark' ? 'guide.theme.switchToLight' : 'guide.theme.switchToDark')} title={t(theme === 'dark' ? 'guide.theme.switchToLight' : 'guide.theme.switchToDark')}><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
@@ -96,15 +108,16 @@ export default function App() {
         <div className="breadcrumb"><GuideLink href={`/${language}/guide`}>{t('guide.label')}</GuideLink><Icon name="chevronRight" />{parentPage && <><GuideLink href={`/${language}/guide/${parentPage.slug}`}>{t(parentPage.title)}</GuideLink><Icon name="chevronRight" /></>}<span>{t(notFound ? 'guide.notFound' : home ? 'guide.home' : page!.title)}</span></div>
         {!dictionary ? <div className="load-state" role={error ? 'alert' : 'status'}><p>{t(error ? 'guide.loadError' : 'guide.loading')}</p>{error && <button onClick={() => setRetry(value => value + 1)}>{t('guide.retry')}</button>}</div> : notFound ? <><h1>{t('guide.notFound')}</h1><p>{t('guide.notFoundDescription')}</p><GuideLink href={`/${language}/guide`}>{t('guide.home')} <Icon name="arrowRight" /></GuideLink></> : home ? <>
           <div className="guide-hero"><div><div className="eyebrow">{t('guide.productName')}</div><h1>{t('guide.label')}</h1><p className="lead">{t('guide.description')}</p>
-          <GuideLink href={`/${language}/guide/setup`} className="primary-link">{t('guide.readSetup')} <Icon name="arrowRight" /></GuideLink></div><img className="hero-mascot" src="/brand/app.webp" alt="" width="320" height="320" /></div>
+          <GuideLink href={`/${language}/guide/setup`} className="primary-link">{t('guide.readSetup')} <Icon name="arrowRight" /></GuideLink></div><img className="hero-mascot" src={siteUrl('/brand/app.webp')} alt="" width="320" height="320" /></div>
           <h2 className="home-toc-title">{t('guide.toc')}</h2><div className="chapter-grid">{pages.map((item, index) => <GuideLink key={item.slug} href={`/${language}/guide/${item.slug}`} className="chapter-card"><span className="card-number">{String(index + 1).padStart(2, '0')}</span><strong>{t(item.title)}</strong><span className="card-status">{!item.sections.length ? t('guide.preparing') : <Icon name="arrowRight" />}</span></GuideLink>)}</div>
         </> : <>
-          <div className="eyebrow">{parentPage ? t('guide.reference') : `${String(pageIndex + 1).padStart(2, '0')} / ${String(pages.length).padStart(2, '0')}`}</div>
+          <div className="eyebrow">{parentPage ? t(parentPage.title) : `${String(pageIndex + 1).padStart(2, '0')} / ${String(pages.length).padStart(2, '0')}`}</div>
           <h1>{t(page!.title)}</h1>{page!.description && <p className="lead">{t(page!.description)}</p>}
           <div className="mobile-page-toc"><PageToc sections={page!.sections} t={t} active={activeSection} /></div>
           {!page!.sections.length && <div className="empty-state"><span className="status-pill">{t('guide.preparing')}</span><p>{t('guide.preparingDescription')}</p></div>}
           {page!.sections.map(section => <GuideSection key={section.id} section={section} t={t} language={language} />)}
-          <PageNavigation previous={parentPage ?? pages[pageIndex - 1]} next={pageIndex >= 0 ? pages[pageIndex + 1] : undefined} language={language} t={t} />
+          {children.length > 0 && <nav className="resource-links" aria-label={t('details.children')}><h2>{t('details.children')}</h2><ul>{children.map(child => <li key={child.slug}><GuideLink href={`/${language}/guide/${child.slug}`}>{t(child.title)} <Icon name="arrowRight" /></GuideLink>{child.description && <p>{t(child.description)}</p>}</li>)}</ul></nav>}
+          <PageNavigation previous={readingOrder[readingIndex - 1]} next={readingOrder[readingIndex + 1]} language={language} t={t} />
         </>}
         <footer className="content-footer">{t('guide.productName')}<span>{t('guide.label')}</span></footer>
       </main>

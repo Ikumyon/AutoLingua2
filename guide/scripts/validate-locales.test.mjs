@@ -21,3 +21,17 @@ test('language key differences are reported together', () => {
   assert.throws(() => compareKeys({ a: 'a' }, { b: 'b' }, 'en.json'), /missing keys \[a\]; extra keys \[b\]/);
   assert.doesNotThrow(() => compareKeys({ a: '日本語' }, { a: 'English' }, 'en.json'));
 });
+
+test('details, image captions and screenshot subtitles are required in every language', () => {
+  const reference = { title: '題名', 'details.child.title': '子ページ',
+    'details.images.sample': '画像の説明', 'details.shots.close': '閉じる' };
+  const translated = { title: 'Title', 'details.child.title': 'Child',
+    'details.images.sample': 'Image caption', 'details.shots.close': 'Close' };
+  assert.doesNotThrow(() => compareKeys(reference, translated, 'en.json'));
+  for (const key of Object.keys(reference)) {
+    const incomplete = { ...translated };
+    delete incomplete[key];
+    assert.throws(() => compareKeys(reference, incomplete, 'en.json'), error => error.message.includes(`missing keys [${key}]`));
+  }
+  assert.throws(() => compareKeys(reference, { ...translated, 'details.typo': 'Unknown' }, 'en.json'), /extra keys \[details.typo\]/);
+});

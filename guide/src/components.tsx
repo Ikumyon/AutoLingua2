@@ -1,14 +1,69 @@
-import { useRef, type MouseEvent, type ReactNode } from 'react';
+import { useMemo, useRef, type MouseEvent, type ReactNode } from 'react';
 import type { Definition, GuidePage, Section } from './content';
 import type { Translate } from './i18n';
 import { Icon } from './Icon';
 import { ScriptCode } from './ScriptCode';
-import { imageLabels } from './imageLabels';
-import { imageSizes } from './firstTranslationImageLabels';
+import { imageLabels, imageSizes, type ImageLabel } from './imageLabels';
+import { siteUrl } from './urls';
+
+let subtitleMeasure: CanvasRenderingContext2D | null = null;
+
+function subtitleLayout(text: string, label: ImageLabel) {
+  const initialSize = label.fontSize ?? 18;
+  const original = text.split('\n');
+  if (!label.fit || typeof document === 'undefined') return { lines: original, size: initialSize, spacing: 1.5 };
+  subtitleMeasure ??= document.createElement('canvas').getContext('2d');
+  const context = subtitleMeasure;
+  if (!context) return { lines: original, size: initialSize, spacing: 1.5 };
+  const available = label.width - 8;
+  const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  // Measure the same font used by the SVG, wrapping before reducing its size.
+  for (let size = initialSize; size >= Math.min(initialSize, 12); size -= 0.5) {
+    context.font = `${size}px Arial, sans-serif`;
+    const lines: string[] = [];
+    for (const line of original) {
+      let current = '';
+      for (const word of line.match(/\S+\s*|\s+/gu) ?? ['']) {
+        if (current && context.measureText(current + word).width > available) {
+          lines.push(current.trimEnd());
+          current = '';
+        }
+        for (const { segment } of graphemes.segment(word)) {
+          if (current && context.measureText(current + segment).width > available) {
+            lines.push(current.trimEnd());
+            current = '';
+          }
+          current += segment;
+        }
+      }
+      lines.push(current.trimEnd());
+    }
+    if (lines.length * size * 1.15 <= label.height) return { lines, size, spacing: 1.15 };
+  }
+  // Extremely small source controls retain the full text within their own bounds.
+  return { lines: original, size: Math.min(initialSize, 12), spacing: 1.15 };
+}
+
+function ImageSubtitle({ label, text }: { label: ImageLabel; text: string }) {
+  const { lines, size, spacing } = useMemo(() => subtitleLayout(text, label), [text, label]);
+  return <g>
+    <rect x={label.x} y={label.y} width={label.width} height={label.height} fill={label.background ?? (label.button ? '#2b2b2b' : '#1f1f1f')} />
+    {lines.map((line, index) => {
+      if (subtitleMeasure) subtitleMeasure.font = `${size}px Arial, sans-serif`;
+      const measured = subtitleMeasure?.measureText(line).width ?? 0;
+      return <text key={index} x={label.button ? label.x + label.width / 2 : label.x + 3}
+        y={label.y + label.height / 2 + (index - (lines.length - 1) / 2) * size * spacing}
+        textAnchor={label.button ? 'middle' : 'start'} dominantBaseline="central" fontSize={size}
+        fill={label.color} textLength={label.fit && measured > label.width - 8 ? label.width - 8 : undefined}
+        lengthAdjust="spacingAndGlyphs">{line}</text>;
+    })}
+  </g>;
+}
 
 export function GuideLink({ href, children, className, current, onNavigate }: {
   href: string; children: ReactNode; className?: string; current?: boolean; onNavigate?: () => void;
 }) {
+  href = siteUrl(href);
   function follow(event: MouseEvent<HTMLAnchorElement>) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
@@ -29,12 +84,9 @@ export function GuideImage({ src, caption, t, language }: { src: string; caption
   const [width, height] = imageSizes[src] ?? [934, 796];
   function picture() {
     return <span className="guide-image-picture">
-      <img src={src} alt={[caption, ...labels.map(label => t(label.text))].join(' ')} loading="lazy" decoding="async" />
+      <img src={siteUrl(src)} alt={[caption, ...labels.map(label => t(label.text))].join(' ')} loading="lazy" decoding="async" />
       {labels.length > 0 && <svg className="guide-image-labels" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
-        {labels.map(label => <g key={`${label.x}-${label.y}`}>
-          <rect x={label.x} y={label.y} width={label.width} height={label.height} fill={label.background ?? (label.button ? '#2b2b2b' : '#1f1f1f')} />
-          <text x={label.button ? label.x + label.width / 2 : label.x + 3} y={label.y + label.height / 2} textAnchor={label.button ? 'middle' : 'start'} dominantBaseline="central" fontSize={label.fontSize ?? 18}>{t(label.text)}</text>
-        </g>)}
+        {labels.map(label => <ImageSubtitle key={`${label.x}-${label.y}`} label={label} text={t(label.text)} />)}
       </svg>}
     </span>;
   }

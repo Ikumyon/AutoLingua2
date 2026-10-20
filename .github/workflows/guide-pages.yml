@@ -1,0 +1,50 @@
+name: Publish guide
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'guide/**'
+      - '.github/workflows/guide-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: guide-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/configure-pages@v5
+        id: pages
+      - name: Install dependencies
+        run: npm install --no-package-lock
+        working-directory: guide
+      - name: Build guide
+        run: npm run build
+        working-directory: guide
+        env:
+          GUIDE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: guide/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

@@ -11,7 +11,7 @@ function packageRoot(name) {
 }
 
 export default {
-  base: '/',
+  base: process.env.GUIDE_BASE_PATH || '/',
   resolve: {
     alias: [
       { find: /^react-dom(?=\/|$)/, replacement: packageRoot('react-dom') },
@@ -20,6 +20,12 @@ export default {
   },
   plugins: [{
     name: 'validate-guide-locales',
+    generateBundle: { order: 'post', handler(_options, bundle) {
+      // GitHub Pages serves this entry for direct visits to client-side routes.
+      const index = bundle['index.html'];
+      if (!index || index.type !== 'asset') throw new Error('Missing guide entry');
+      this.emitFile({ type: 'asset', fileName: '404.html', source: index.source });
+    } },
     resolveId(id) {
       if (id === 'virtual:guide-default-locale') return '\0guide-default-locale';
       if (id === 'virtual:guide-languages') return '\0guide-languages';

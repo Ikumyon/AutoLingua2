@@ -1,5 +1,5 @@
 import type { TextKey } from './i18n';
-import { scriptReference } from './script-reference';
+import { organizeGuide } from './hierarchy';
 
 export type Definition = { label: TextKey; body: TextKey };
 type Block =
@@ -13,8 +13,6 @@ type Block =
 export type Section = { id: string; title: TextKey; step?: number; blocks: Block[] };
 export type GuidePage = { slug: string; parentSlug?: string; title: TextKey; navTitle?: TextKey; description?: TextKey; sections: Section[] };
 
-export const referencePages: GuidePage[] = [scriptReference];
-
 const setup: GuidePage = {
   slug: 'setup', title: 'setup.title', description: 'setup.description',
   sections: [
@@ -24,6 +22,7 @@ const setup: GuidePage = {
     ] },
     { id: 'display-language', title: 'setup.displayLanguage.title', step: 1, blocks: [
       { kind: 'paragraph', text: 'setup.displayLanguage.description' },
+      { kind: 'image', src: '/images/setup/display-language.webp', caption: 'setup.images.displayLanguage' },
       { kind: 'definitions', title: 'setup.displayLanguage.items', items: [
         { label: 'setup.displayLanguage.selection.label', body: 'setup.displayLanguage.selection.body' },
         { label: 'setup.displayLanguage.custom.label', body: 'setup.displayLanguage.custom.body' },
@@ -86,11 +85,12 @@ const setup: GuidePage = {
   ],
 };
 
-export const pages: GuidePage[] = [
+const chapterSources: GuidePage[] = [
   setup,
   { slug: 'first-translation', title: 'firstTranslation.title', description: 'firstTranslation.description', sections: [
     { id: 'before-starting', title: 'firstTranslation.before.title', blocks: [
       { kind: 'paragraph', text: 'firstTranslation.before.body' },
+      { kind: 'image', src: '/images/first-translation/project-start.webp', caption: 'details.images.projectStart' },
       { kind: 'guideReference', label: 'setup.title', slug: 'setup' },
       { kind: 'notice', text: 'firstTranslation.before.models' },
     ] },
@@ -314,6 +314,7 @@ export const pages: GuidePage[] = [
     { id: 'create-glossary', title: 'glossaryTone.glossary.title', blocks: [
       { kind: 'paragraph', text: 'glossaryTone.glossary.languages' },
       { kind: 'paragraph', text: 'glossaryTone.glossary.create' },
+      { kind: 'image', src: '/images/glossary-tone/glossary-manager.webp', caption: 'glossaryTone.images.manager' },
       { kind: 'notice', text: 'glossaryTone.glossary.save' },
     ] },
     { id: 'edit-terms', title: 'glossaryTone.terms.title', blocks: [
@@ -354,6 +355,7 @@ export const pages: GuidePage[] = [
       ] },
       { id: 'normal-tone', title: 'glossaryTone.tone.title', blocks: [
       { kind: 'paragraph', text: 'glossaryTone.tone.create' },
+      { kind: 'image', src: '/images/glossary-tone/tone-settings.webp', caption: 'glossaryTone.images.tone' },
       { kind: 'paragraph', text: 'glossaryTone.tone.example' },
       { kind: 'notice', text: 'glossaryTone.tone.save' },
     ] },
@@ -391,6 +393,7 @@ export const pages: GuidePage[] = [
     ] },
     { id: 'translation-states', title: 'export.states.title', step: 3, blocks: [
       { kind: 'paragraph', text: 'export.states.body' },
+      { kind: 'image', src: '/images/export/export-options.webp', caption: 'export.images.options' },
       { kind: 'paragraph', text: 'export.states.fallback' },
       { kind: 'guideReference', label: 'translation.states.title', slug: 'translation', anchor: 'translation-states' },
       { kind: 'notice', text: 'export.states.exchange' },
@@ -545,3 +548,5 @@ export const pages: GuidePage[] = [
     ] },
   ] },
 ];
+
+export const { pages, referencePages, legacyAnchorTargets } = organizeGuide(chapterSources);

@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 declare module '*.css';
 declare module 'virtual:guide-languages' {
   const languages: { code: string; label: string }[];

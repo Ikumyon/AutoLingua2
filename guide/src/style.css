@@ -85,7 +85,7 @@ button { cursor: pointer; }
 .site-header { height: 76px; position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 34px; background: var(--header); border-bottom: 1px solid var(--line); backdrop-filter: blur(14px); }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; color: var(--heading); }
 .brand:hover { text-decoration: none; }
-.brand-logo { display: block; flex-shrink: 0; width: 204px; padding: 7px 10px; border: 1px solid #dce5ef; border-radius: 8px; background: #fff; }
+.brand-logo { display: block; flex-shrink: 0; width: 204px; }
 .brand-logo img { display: block; width: 100%; height: auto; }
 .brand-divider { width: 1px; height: 22px; margin: 0 5px; background: var(--line); }
 .brand-guide { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: .03em; }
