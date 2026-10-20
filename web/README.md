@@ -5,12 +5,8 @@ Qt側が入力、文中参照、AI通信、変更適用・ジョブ操作を担�
 
 ## ビルド
 
-兄弟プロジェクト `../auto_lingua/node_modules` のReact、React DOM、TypeScript、Viteと型定義を再利用します。
-このディレクトリから見た実パスは `../../auto_lingua/node_modules` です。
-兄弟プロジェクトのファイルは変更しません。
-
-React／React DOMは既存の導入先をローカル依存として指定しています。
-必要な実行依存が省略されないよう、peer依存も含めて導入します。
+Node.js 24以上を使用し、依存はこのディレクトリに導入します。
+兄弟プロジェクトは不要です。
 
 ```powershell
 cd web

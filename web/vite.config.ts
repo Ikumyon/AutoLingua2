@@ -1,7 +1,4 @@
-import { defineConfig } from '../../auto_lingua/node_modules/vite/dist/node/index.js';
-import { fileURLToPath } from 'node:url';
-
-const shared = fileURLToPath(new URL('../../auto_lingua/node_modules/', import.meta.url)).replace(/\\/g, '/');
+import { defineConfig } from 'vite';
 
 function vendorChunk(moduleId: string): string | null {
   const path = moduleId.replace(/\\/g, '/');
@@ -19,12 +16,6 @@ function vendorChunk(moduleId: string): string | null {
 
 export default defineConfig({
   base: './',
-  resolve: {
-    alias: [
-      { find: /^react-dom(\/.*)?$/, replacement: `${shared}react-dom$1` },
-      { find: /^react(\/.*)?$/, replacement: `${shared}react$1` },
-    ],
-  },
   build: {
     outDir: '../assets/chat', emptyOutDir: true, target: 'es2022',
     rolldownOptions: {

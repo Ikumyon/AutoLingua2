@@ -3,12 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node ../../auto_lingua/node_modules/vite/bin/vite.js build",
-    "typecheck": "node ../../auto_lingua/node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "react": "file:../../auto_lingua/node_modules/react",
-    "react-dom": "file:../../auto_lingua/node_modules/react-dom",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "streamdown": "2.7.0",
     "unified": "11.0.5",
     "@streamdown/code": "2.0.0",
@@ -22,5 +22,11 @@
     "tailwindcss": "4.3.3",
     "@tailwindcss/postcss": "4.3.3",
     "postcss": "8.5.30"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "typescript": "6.0.2",
+    "vite": "8.2.2"
   }
 }
