@@ -32,7 +32,26 @@ impl Group {
 impl Drop for Group { fn drop(&mut self) { self.close(); } }
 
 pub fn executable_name(name: &str) -> String { name.into() }
-pub fn configure_core_command(_command: &mut std::process::Command) {}
+#[cfg(feature = "python")]
+pub fn configure_updater_command(_command: &mut std::process::Command, _detached: bool) {}
+pub fn configure_core_command(command: &mut std::process::Command) {
+    // 明示されたQtの入力方式を優先し、なければOS側の指定に合わせる。
+    let selected = std::env::var("QT_IM_MODULE")
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            match std::env::var("XMODIFIERS").ok()?.trim() {
+                "@im=fcitx" => Some("fcitx".to_owned()),
+                "@im=ibus" => Some("ibus".to_owned()),
+                _ => None,
+            }
+        });
+    if let Some(selected) = selected {
+        // 子プロセスだけに適用し、Qt初期化前に両変数の競合を解消する。
+        command.env("QT_IM_MODULE", &selected).env("QT_IM_MODULES", &selected);
+    }
+}
 pub struct ProcessWatch(std::os::fd::OwnedFd);
 impl ProcessWatch {
     pub fn open(pid: u32) -> io::Result<Self> {

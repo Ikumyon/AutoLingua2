@@ -79,6 +79,8 @@ def package_license(library: Path, destination: Path) -> None:
                 shutil.copy2(copyright_file, destination / (package.replace(":", "_") + ".copyright"))
                 for name in set(re.findall(r"/usr/share/common-licenses/([\w.+-]+)",
                                            copyright_file.read_text())):
+                    # 文末のピリオドを除き、LGPL-2.1など名前の途中のドットは保持する。
+                    name = name.rstrip(".")
                     common = Path("/usr/share/common-licenses") / name
                     require(common.is_file(), f"Missing referenced license: {common}")
                     target = destination / "common-licenses"

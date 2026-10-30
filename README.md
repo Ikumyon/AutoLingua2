@@ -156,7 +156,11 @@ SDKには `qmake` などの実行に必要なICUも含めてください。自�
 異なるQt版へのフォールバックは行いません。Qtのprivate APIを使用するため同じ版が必要です。
 SDKは配布せず、生成プラグイン・実行時依存（OS側のglibcを除く）・ライセンスと
 Fcitxの対応ソースを同梱します。版・欠落・依存解決・SDK絶対パスを静的検査し、不整合はビルド失敗にします。
-開発起動ではこの処理を実行せず、入力方式の環境変数やOS側のFcitx・IBus・Wayland設定も変更しません。
+開発起動ではプラグインの生成・導入を実行しません。
+LinuxではRustランチャーがQt本体の起動前に、空でない `QT_IM_MODULE`、次に `XMODIFIERS` の
+`@im=fcitx`／`@im=ibus` の順で入力方式を選び、アプリ内の `QT_IM_MODULE` と
+`QT_IM_MODULES` を同じ値に揃えます。判断材料がなければ既存値を保持してQtに任せます。
+この処理は配布版と開発起動の両方に適用し、OS全体の設定は変更しません。
 
 調査時点の公開 `v0.9.0beta` の `AUTOlingua2-linux.tar.gz` を直接確認したところ、
 `platforminputcontexts` にはIBus・Compose・Virtual Keyboardがあり、Fcitxはありませんでした。

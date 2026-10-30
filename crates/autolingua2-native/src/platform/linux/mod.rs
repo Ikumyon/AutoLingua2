@@ -18,3 +18,5 @@ pub use desktop::{allocate_debug_console, configure_desktop_integration};
 pub use desktop::{system_voice_input_available, start_system_voice_input};
 #[cfg(feature = "python")]
 pub use process::{is_executable_plugin, configure_plugin_command, Group};
+#[cfg(feature = "python")]
+pub use process::configure_updater_command;

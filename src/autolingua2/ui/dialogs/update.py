@@ -3,10 +3,8 @@ from __future__ import annotations
 from autolingua2.infrastructure.automation_activity import activity_callback, observe_async
 
 import json
-import os
-import subprocess
-import sys
-from pathlib import Path
+
+from autolingua2_native import platform as native_platform
 
 from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtWidgets import (
@@ -24,19 +22,6 @@ from autolingua2.infrastructure.filesystem import PROJECT_ROOT
 from autolingua2.ui.dialogs import load_ui, require_child
 
 
-def find_updater_executable() -> Path | None:
-    exe_name = "autolingua-updater.exe" if sys.platform == "win32" else "autolingua-updater"
-    candidates = [
-        PROJECT_ROOT / "core" / exe_name,
-        PROJECT_ROOT / "target" / "release" / exe_name,
-        PROJECT_ROOT / "target" / "debug" / exe_name,
-    ]
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-    return None
-
-
 def format_bytes_human(num_bytes: int) -> str:
     if num_bytes >= 1024 * 1024 * 1024:
         return f"{num_bytes / (1024 * 1024 * 1024):.1f} GB"
@@ -52,30 +37,11 @@ class UpdateCheckWorker(QThread):
     failed_check = Signal(str)
 
     def run(self) -> None:
-        updater_exe = find_updater_executable()
-        if updater_exe is None:
-            self.failed_check.emit("アップデーター実行ファイル (autolingua-updater) が見つかりません。")
-            return
-
-        cmd = [str(updater_exe), "check", "--project-root", str(PROJECT_ROOT),
-               "--current-version", __version__]
-        creationflags = 0
-        if sys.platform == "win32":
-            creationflags = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
-
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                check=False,
-                creationflags=creationflags,
-                cwd=str(PROJECT_ROOT),
-            )
-            stdout = result.stdout.strip()
+            returncode, stdout, stderr = native_platform.check_update(str(PROJECT_ROOT), __version__)
+            stdout = stdout.strip()
             if not stdout:
-                self.failed_check.emit(result.stderr.strip() or "更新確認からの応答がありません。")
+                self.failed_check.emit(stderr.strip() or "更新確認からの応答がありません。")
                 return
 
             data = json.loads(stdout)
@@ -83,9 +49,9 @@ class UpdateCheckWorker(QThread):
                 self.failed_check.emit("更新確認からの応答がJSONオブジェクトではありません。")
                 return
             error = data.get("error")
-            if result.returncode != 0 or error:
-                detail = error if isinstance(error, str) and error else result.stderr.strip()
-                self.failed_check.emit(detail or f"更新確認に失敗しました（終了コード: {result.returncode}）。")
+            if returncode != 0 or error:
+                detail = error if isinstance(error, str) and error else stderr.strip()
+                self.failed_check.emit(detail or f"更新確認に失敗しました（終了コード: {returncode}）。")
                 return
             if not isinstance(data.get("has_update"), bool) or not isinstance(data.get("current_version"), str):
                 self.failed_check.emit("更新確認からの応答に必要なバージョン情報がありません。")
@@ -181,19 +147,7 @@ class UpdateDialogController(QObject):
         self.stack_update.setCurrentWidget(self.page_error)
 
     def _on_download_clicked(self) -> None:
-        updater_exe = find_updater_executable()
-        if updater_exe is None:
-            self._on_check_failed("アップデーター実行ファイルが見つかりません。")
-            return
-
-        cmd = [
-            str(updater_exe),
-            "gui",
-            "--project-root",
-            str(PROJECT_ROOT),
-            "--parent-pid",
-            str(os.getpid()),
-        ]
+        cmd: list[str] = []
 
         if self._update_data:
             if url := self._update_data.get("download_url"):
@@ -205,17 +159,11 @@ class UpdateDialogController(QObject):
             if sha := self._update_data.get("sha256"):
                 cmd.extend(["--sha256", str(sha)])
 
-        creationflags = 0
-        if sys.platform == "win32":
-            creationflags = subprocess.DETACHED_PROCESS  # type: ignore[attr-defined]
-
-        # アップデーターを別プロセスとして起動
-        subprocess.Popen(
-            cmd,
-            creationflags=creationflags,
-            cwd=str(PROJECT_ROOT),
-            close_fds=True,
-        )
+        try:
+            native_platform.start_update(str(PROJECT_ROOT), cmd)
+        except Exception as error:
+            self._on_check_failed(f"アップデーターの起動に失敗しました: {error}")
+            return
 
         # 本体側ダイアログを閉じてアプリを終了
         self.dialog.accept()

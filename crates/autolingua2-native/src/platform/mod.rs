@@ -41,4 +41,8 @@ pub mod bindings;
 #[cfg(feature = "python")]
 mod child;
 #[cfg(feature = "python")]
+mod updater;
+#[cfg(feature = "python")]
+pub use updater::{check_update, start_update};
+#[cfg(feature = "python")]
 pub use bindings::*;

@@ -91,6 +91,12 @@ impl Group {
 impl Drop for Group { fn drop(&mut self) { self.close(); } }
 
 pub fn executable_name(name: &str) -> String { format!("{name}.exe") }
+#[cfg(feature = "python")]
+pub fn configure_updater_command(command: &mut std::process::Command, detached: bool) {
+    use std::os::windows::process::CommandExt;
+    use windows_sys::Win32::System::Threading::DETACHED_PROCESS;
+    command.creation_flags(if detached { DETACHED_PROCESS } else { CREATE_NO_WINDOW });
+}
 pub fn configure_core_command(command: &mut std::process::Command) {
     use std::os::windows::process::CommandExt;
     command.creation_flags(CREATE_NO_WINDOW);
