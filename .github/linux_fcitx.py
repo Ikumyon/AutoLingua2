@@ -32,7 +32,13 @@ HOST_LIBS = re.compile(r"^(lib(c|m|dl|pthread|rt|resolv|util)\.so\.|ld-linux)")
 
 
 def run(*args: str) -> str:
-    return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT).strip()
+    try:
+        return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT).strip()
+    except subprocess.CalledProcessError as error:
+        # 共有ライブラリ不足など、子プロセスが出した原因をCIログに残す。
+        raise RuntimeError(
+            f"コマンドが失敗しました（終了コード {error.returncode}）: {args}\n{error.output}"
+        ) from error
 
 
 def require(condition: bool, message: str) -> None:
@@ -105,11 +111,12 @@ def prepare() -> tuple[list[tuple[str, str]], list[tuple[str, str]], Path]:
         sdk = Path(sdk_override).resolve()
     else:
         sdk = root / "sdk" / qt_version / "gcc_64"
-        if not (sdk / "bin/qmake").is_file():
-            # Only the required SDK archives; this directory never enters datas.
+        if not (sdk / "bin/qmake").is_file() or not any((sdk / "lib").glob("libicuuc.so*")):
+            # qmakeなどのSDKツールにもICUが必要。旧処理で取得済みのSDKも補完する。
+            # ビルド専用のSDKはdatasに含めない。
             run(sys.executable, "-m", "aqt", "install-qt", "linux", "desktop",
                 qt_version, "linux_gcc_64", "-O", str(root / "sdk"),
-                "--archives", "qtbase", "qtwayland")
+                "--archives", "qtbase", "qtwayland", "icu")
     require(run(str(sdk / "bin/qmake"), "-query", "QT_VERSION") == qt_version,
             f"SDK Qt version must exactly match PySide6 runtime Qt {qt_version}")
     build = root / "cmake"

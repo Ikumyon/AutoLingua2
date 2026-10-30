@@ -152,6 +152,7 @@ python -m PyInstaller --noconfirm AUTOlingua2.spec
 実際のPySide6の `qVersion()` と同じQt SDKを `build/linux-fcitx/sdk` に取得し、
 fcitx5-qt **5.1.16 / commit `115750044f3d0db16ca5859808c7da830fd1ff52`** をビルドします。
 既存SDKを使う場合は `AUTOLINGUA_QT_SDK=/path/to/Qt/6.x.y/gcc_64` を指定できます。
+SDKには `qmake` などの実行に必要なICUも含めてください。自動取得ではICUアーカイブも取得します。
 異なるQt版へのフォールバックは行いません。Qtのprivate APIを使用するため同じ版が必要です。
 SDKは配布せず、生成プラグイン・実行時依存（OS側のglibcを除く）・ライセンスと
 Fcitxの対応ソースを同梱します。版・欠落・依存解決・SDK絶対パスを静的検査し、不整合はビルド失敗にします。
