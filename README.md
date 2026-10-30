@@ -144,7 +144,7 @@ Linux配布ビルドはUbuntu 24.04（x86_64）を基準に、`AUTOlingua2.spec`
 既存のPython・Rust・Web・UI生成の準備に加え、以下のビルド依存が必要です。
 
 ```bash
-sudo apt-get install build-essential git cmake ninja-build extra-cmake-modules libx11-dev libxcb1-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev patchelf binutils
+sudo apt-get install build-essential git cmake extra-cmake-modules libx11-dev libxcb1-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev patchelf binutils
 python -m pip install aqtinstall==3.3.0
 python -m PyInstaller --noconfirm AUTOlingua2.spec
 ```
@@ -152,10 +152,13 @@ python -m PyInstaller --noconfirm AUTOlingua2.spec
 実際のPySide6の `qVersion()` と同じQt SDKを `build/linux-fcitx/sdk` に取得し、
 fcitx5-qt **5.1.16 / commit `115750044f3d0db16ca5859808c7da830fd1ff52`** をビルドします。
 既存SDKを使う場合は `AUTOLINGUA_QT_SDK=/path/to/Qt/6.x.y/gcc_64` を指定できます。
-SDKには `qmake` などの実行に必要なICUも含めてください。自動取得ではICUアーカイブも取得します。
+SDKはaqtの標準構成で取得します。既存SDKにも `qmake` などの実行に必要なICUを含めてください。
 異なるQt版へのフォールバックは行いません。Qtのprivate APIを使用するため同じ版が必要です。
 SDKは配布せず、生成プラグイン・実行時依存（OS側のglibcを除く）・ライセンスと
-Fcitxの対応ソースを同梱します。版・欠落・依存解決・SDK絶対パスを静的検査し、不整合はビルド失敗にします。
+Fcitxの対応ソースを同梱します。実行時依存の収集と配置にはPyInstallerの標準処理を使います。
+PySide6同梱のICU 73には[公式ライセンス全文](https://github.com/unicode-org/icu/blob/release-73-2/icu4c/LICENSE)を、
+OS由来の同梱ライブラリにはパッケージの著作権・ライセンス文書を添付します。
+版・欠落・依存解決・SDK絶対パスを静的検査し、不整合はビルド失敗にします。
 開発起動ではプラグインの生成・導入を実行しません。
 LinuxではRustランチャーがQt本体の起動前に、空でない `QT_IM_MODULE`、次に `XMODIFIERS` の
 `@im=fcitx`／`@im=ibus` の順で入力方式を選び、アプリ内の `QT_IM_MODULE` と

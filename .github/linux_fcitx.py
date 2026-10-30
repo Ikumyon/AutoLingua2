@@ -17,6 +17,7 @@ import sys
 import urllib.request
 
 from PySide6.QtCore import QLibraryInfo, QPluginLoader, qVersion
+from PyInstaller.depend import bindepend, dylib
 
 
 VERSION = "5.1.16"
@@ -26,9 +27,8 @@ PLUGIN = "libfcitx5platforminputcontextplugin.so"
 PLUGIN_DIR = Path("PySide6/Qt/plugins/platforminputcontexts")
 QT_LIB = Path("PySide6/Qt/lib")
 NOTICES = Path("licenses/fcitx")
-# glibc and its loader belong to the target OS. All other linked dependencies
-# (including libstdc++/libgcc) are collected recursively, rather than assumed.
-HOST_LIBS = re.compile(r"^(lib(c|m|dl|pthread|rt|resolv|util)\.so\.|ld-linux)")
+# ICU 73.1と73.2のライセンス全文は同一。確認した公式73.2のコミットを使用する。
+ICU_LICENSE = "https://raw.githubusercontent.com/unicode-org/icu/680f521746a3bd6a86f25f25ee50a62d88b489cf/icu4c/LICENSE"
 
 
 def run(*args: str) -> str:
@@ -90,10 +90,37 @@ def package_license(library: Path, destination: Path) -> None:
     raise RuntimeError(f"Cannot collect runtime dependency license: {library}")
 
 
+def collect_runtime(plugin: Path, licenses: Path) -> list[tuple[str, str]]:
+    # PyInstaller標準の依存解析・配置・OSライブラリ除外規則を利用する。
+    wheel_lib = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.LibrariesPath)).resolve()
+    entries = bindepend.binary_dependency_analysis(
+        [(str(PLUGIN_DIR / PLUGIN), str(plugin), "BINARY")],
+        search_paths=[str(wheel_lib)], symlink_suppression_patterns=[])
+    binaries = []
+    for target, source, kind in entries:
+        if kind == "SYMLINK":
+            # 通常のAnalysisが同じ配置規則で必要なシンボリックリンクを生成する。
+            continue
+        library = Path(source)
+        if library != plugin:
+            if library.resolve().is_relative_to(wheel_lib):
+                if not library.name.startswith("libQt6"):
+                    require(re.fullmatch(r"libicu\w+\.so\.73", library.name) is not None,
+                            f"PySide6同梱ライブラリのライセンス取得元が未定義です: {library}")
+                    license_file = licenses / "ICU-73-LICENSE.txt"
+                    if not license_file.is_file():
+                        urllib.request.urlretrieve(ICU_LICENSE, license_file)
+            else:
+                require(not library.name.startswith("libQt6"), f"PySide6以外のQt依存: {library}")
+                package_license(library, licenses)
+        binaries.append((source, str(Path(target).parent)))
+    return binaries
+
+
 def prepare() -> tuple[list[tuple[str, str]], list[tuple[str, str]], Path]:
     require(sys.platform == "linux", "Fcitx distribution build is Linux-only")
     require(platform.machine() == "x86_64", "Current Linux distribution target is x86_64")
-    for tool in ("git", "cmake", "ninja", "readelf", "patchelf", "ldconfig", "dpkg-query"):
+    for tool in ("git", "cmake", "readelf", "patchelf", "dpkg-query"):
         require(shutil.which(tool) is not None, f"Missing build prerequisite: {tool}")
     root = Path("build/linux-fcitx").resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -113,26 +140,20 @@ def prepare() -> tuple[list[tuple[str, str]], list[tuple[str, str]], Path]:
         sdk = Path(sdk_override).resolve()
     else:
         sdk = root / "sdk" / qt_version / "gcc_64"
-        if not (sdk / "bin/qmake").is_file() or not any((sdk / "lib").glob("libicuuc.so*")):
-            # qmakeなどのSDKツールにもICUが必要。旧処理で取得済みのSDKも補完する。
-            # ビルド専用のSDKはdatasに含めない。
+        if not (sdk / "bin/qmake").is_file():
+            # アーカイブを限定せず、実行時依存を含む標準構成のSDKを取得する。
             run(sys.executable, "-m", "aqt", "install-qt", "linux", "desktop",
-                qt_version, "linux_gcc_64", "-O", str(root / "sdk"),
-                "--archives", "qtbase", "qtwayland", "icu")
+                qt_version, "linux_gcc_64", "-O", str(root / "sdk"))
     require(run(str(sdk / "bin/qmake"), "-query", "QT_VERSION") == qt_version,
             f"SDK Qt version must exactly match PySide6 runtime Qt {qt_version}")
     build = root / "cmake"
-    # Remove the CMake cache when the SDK changes, without discarding source/SDK.
     cache = build / "CMakeCache.txt"
-    if cache.exists():
-        cache.unlink()
-    run("cmake", "-S", str(source), "-B", str(build), "-G", "Ninja",
-        f"-DCMAKE_PREFIX_PATH={sdk}", f"-DQt6_DIR={sdk}/lib/cmake/Qt6",
+    # SDKやジェネレーターを変更しても古いCMake設定を引き継がない。
+    run("cmake", "--fresh", "-S", str(source), "-B", str(build),
+        f"-DCMAKE_PREFIX_PATH={sdk}",
         "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_SKIP_RPATH=ON",
         f"-DCMAKE_CXX_FLAGS=-ffile-prefix-map={root}=. -ffile-prefix-map={sdk}=QtSDK",
-        "-DENABLE_QT4=OFF", "-DENABLE_QT5=OFF", "-DENABLE_QT6=ON",
-        "-DBUILD_ONLY_PLUGIN=ON", "-DENABLE_X11=ON",
-        "-DENABLE_QT6_WAYLAND_WORKAROUND=ON")
+        "-DENABLE_QT5=OFF", "-DBUILD_ONLY_PLUGIN=ON")
     qt_dirs = re.findall(r"^Qt6\w*_DIR:PATH=(.+)$", cache.read_text(), re.MULTILINE)
     require(bool(qt_dirs) and all(Path(p).resolve().is_relative_to(sdk) for p in qt_dirs),
             "CMake selected Qt components outside the matching SDK")
@@ -154,34 +175,7 @@ def prepare() -> tuple[list[tuple[str, str]], list[tuple[str, str]], Path]:
             f"https://raw.githubusercontent.com/qt/qtbase/v{qt_version}/LICENSES/{name}.txt",
             licenses / f"Qt-{name}.txt")
 
-    wheel_lib = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.LibrariesPath))
-    system: dict[str, Path] = {}
-    for name, path in re.findall(r"^\s*(\S+) .*?=> (\S+)$", run("ldconfig", "-p"), re.MULTILINE):
-        system.setdefault(name, Path(path))
-    binaries = [(str(plugin), str(PLUGIN_DIR))]
-    pending = [plugin]
-    seen: set[str] = set()
-    while pending:
-        current = pending.pop()
-        needed, _ = dynamic(current)
-        for name in needed:
-            if name in seen:
-                continue
-            seen.add(name)
-            if HOST_LIBS.match(name):
-                require(name in system, f"Missing OS runtime dependency: {name}")
-                continue
-            wheel_file = wheel_lib / name
-            dependency = wheel_file if wheel_file.is_file() else system.get(name)
-            require(dependency is not None and dependency.is_file(), f"Missing dependency: {name}")
-            assert dependency is not None
-            require(not dependency.resolve().is_relative_to(sdk), f"SDK runtime selected: {dependency}")
-            if name.startswith("libQt6"):
-                require(dependency == wheel_file, f"Qt dependency is outside PySide6: {dependency}")
-            else:
-                package_license(dependency, licenses)
-            binaries.append((str(dependency), str(QT_LIB) if name.startswith("libQt6") else "."))
-            pending.append(dependency)
+    binaries = collect_runtime(plugin, licenses)
     datas = [(str(file), str(NOTICES / file.relative_to(licenses).parent))
              for file in licenses.rglob("*") if file.is_file()]
     return binaries, datas, sdk
@@ -227,10 +221,14 @@ def verify(core: Path, sdk: Path) -> None:
                   for value in paths for entry in value.split(":") if entry]
         search.append(internal)
         for name in needed:
-            if HOST_LIBS.match(name):
-                continue
             resolved = next((folder / name for folder in search if (folder / name).is_file()), None)
+            if resolved is None and not dylib.include_library(name):
+                require(bindepend.resolve_library_path(name) is not None,
+                        f"Missing OS runtime dependency: {name}")
+                continue
             require(resolved is not None, f"Unresolved packaged dependency {name}: {current}")
             assert resolved is not None
             require(resolved.resolve().is_relative_to(internal.resolve()), f"External dependency: {resolved}")
             pending.append(resolved)
+            if re.fullmatch(r"libicu\w+\.so\.73", name):
+                require((internal / NOTICES / "ICU-73-LICENSE.txt").is_file(), "ICUライセンスがありません")
