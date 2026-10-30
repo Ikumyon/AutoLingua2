@@ -68,6 +68,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libwayland-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libegl1-mesa-dev libgl1-mesa-dev libinput-dev libudev-dev libssl-dev libglib2.0-0t64 libdbus-1-3 libnss3 libasound2t64 libxcomposite1 libxdamage1 libxrandr2 libxtst6
+          sudo apt-get install -y cmake ninja-build extra-cmake-modules libx11-dev patchelf binutils
       - name: Set up Rust
         run: |
           rustup toolchain install stable --profile minimal
@@ -84,6 +85,11 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -c "import subprocess,sys,tomllib; deps=tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']; subprocess.run([sys.executable,'-m','pip','install',*deps,'pyinstaller'],check=True)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($IsLinux) {
+            python -m pip install aqtinstall==3.3.0
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
       - name: Build chat frontend
         working-directory: web
         run: |
@@ -160,6 +166,14 @@ jobs:
           $archive = if ($IsWindows) { 'dist/AUTOlingua2-windows.zip' } else { 'dist/AUTOlingua2-linux.tar.gz' }
           gh release upload $env:RELEASE_TAG $archive --clobber
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $assetsJson = gh release view $env:RELEASE_TAG --json assets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $assets = ($assetsJson | ConvertFrom-Json).assets
+          $local = Get-Item -LiteralPath $archive
+          $uploaded = @($assets | Where-Object { $_.name -eq $local.Name })
+          if ($uploaded.Count -ne 1 -or $uploaded[0].size -ne $local.Length -or $uploaded[0].state -ne 'uploaded') {
+            throw "Release asset attachment verification failed: $($local.Name)"
+          }
       - name: Save Rust build cache
         if: always() && steps.cargo-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4

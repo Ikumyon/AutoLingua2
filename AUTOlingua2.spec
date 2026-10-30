@@ -5,6 +5,13 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import PySide6
 
+linux_ime_binaries = []
+linux_ime_datas = []
+if sys.platform == 'linux':
+    sys.path.insert(0, str(Path('.github').resolve()))
+    from linux_fcitx import prepare, verify
+    linux_ime_binaries, linux_ime_datas, linux_ime_sdk = prepare()
+
 version_info = None
 if sys.platform == 'win32':
     from PyInstaller.utils.win32.versioninfo import FixedFileInfo, StringFileInfo, StringStruct, StringTable, VSVersionInfo
@@ -45,11 +52,11 @@ for manifest in sorted(Path('src/autolingua2/plugins').glob('*/manifest.json')):
 a = Analysis(
     ['main.py'],
     pathex=['src', '.', 'build/native'],
-    binaries=[(str(lrelease_binary), 'PySide6')],
+    binaries=[(str(lrelease_binary), 'PySide6')] + linux_ime_binaries,
     datas=[('VERSION', '.'), ('assets/images/app.ico', 'assets/images'),
            ('assets/images/app.png', 'assets/images'), ('assets/i18n', 'assets/i18n'),
            ('assets/chat', 'assets/chat')]
-          + plugin_datas,
+          + plugin_datas + linux_ime_datas,
     hiddenimports=['autolingua2_native'] + ui_imports + plugin_imports,
     hookspath=[],
     hooksconfig={},
@@ -88,3 +95,5 @@ coll = COLLECT(
     upx_exclude=[],
     name='core',
 )
+if sys.platform == 'linux':
+    verify(Path(DISTPATH) / 'core', linux_ime_sdk)

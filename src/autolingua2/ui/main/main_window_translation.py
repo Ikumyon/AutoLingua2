@@ -24,6 +24,7 @@ from autolingua2.services.translation.translation_memory import TranslationMemor
 from autolingua2.ui.resources.i18n import tr
 from autolingua2.ui.main.language_names import workspace_language_name
 from autolingua2.ui.dialogs.translation_tone import TranslationToneDialog
+from autolingua2.ui.dialogs.retranslation import RetranslationDialog
 
 if TYPE_CHECKING:
     from autolingua2.ui.main.main_window import MainWindowController
@@ -130,7 +131,7 @@ class MainWindowTranslationController(QObject):
                 host.table_controller._sync_unit_row_content(host.filtered_units.index(unit), unit)
             self._update_translation_button_state()
 
-    def _start_batch_translation(self, targets: list[TranslationUnit]) -> None:
+    def _start_batch_translation(self, targets: list[TranslationUnit], *, additional_instructions: str = "") -> None:
         host = self.host
         workspace = host.active_workspace
         if workspace is None or self._options(warn=True) is None:
@@ -139,7 +140,8 @@ class MainWindowTranslationController(QObject):
         if not valid_targets:
             QMessageBox.information(host.window, tr("MainWindow", "翻訳"), tr("MainWindow", "翻訳対象の項目がありません。"))
             return
-        self.service.start_batch(workspace, valid_targets, host.imported.classification)
+        self.service.start_batch(workspace, valid_targets, host.imported.classification,
+                                 additional_instructions=additional_instructions)
 
     def _stop_batch_translation(self) -> None:
         self.service.stop()
@@ -152,8 +154,20 @@ class MainWindowTranslationController(QObject):
         options = self._options(warn=True)
         if options is None or not unit.source_text.strip():
             return
+        if (unit.hidden or unit.locked or is_pending_translation(unit)
+                or self.service.is_translating(workspace, unit.id)
+                or options.text_context.tags.analyze(unit.source_text)[2]):
+            return
+        instructions = ""
+        if unit.target_text.strip() or unit.state != UnitState.UNTRANSLATED:
+            dialog = RetranslationDialog([unit.label], 0, host.window)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            if host.active_workspace is not workspace or not host._workspace_is_alive(workspace):
+                return
+            instructions = dialog.additional_instructions()
         host.window.statusBar().showMessage(tr("MainWindow", "[{label}] を翻訳中...").format(label=unit.label), 3000)
-        self.service.translate_single(workspace, unit, options)
+        self.service.translate_single(workspace, unit, options, additional_instructions=instructions)
 
     def _unit_translated(self, workspace: Workspace, unit: TranslationUnit, batch: bool,
                          *, eligible_ids: set[str] | None = None) -> None:
@@ -335,6 +349,8 @@ class MainWindowTranslationController(QObject):
         eligible_ids: set[str] | None = None,
         offer_similar: bool = True,
     ) -> None:
+        if options is not None and options.additional_instructions:
+            return
         key = (workspace.language_code, unit.id)
         tone = workspace.records[unit.id].tone
         confirmed = (workspace, unit.target_text, unit.state, tone)
@@ -576,47 +592,22 @@ class MainWindowTranslationController(QObject):
             QMessageBox.information(self.host.window, tr("MainWindow", "翻訳"), tr("MainWindow", "選択された行に有効な原文がありません。"))
             return
 
-        untranslated = [u for u in valid_units if not is_pending_translation(u) and u.state == UnitState.UNTRANSLATED]
-        already_translated = [u for u in valid_units if is_pending_translation(u) or u.state != UnitState.UNTRANSLATED]
+        untranslated = [u for u in valid_units if not is_pending_translation(u)
+                        and u.state == UnitState.UNTRANSLATED and not u.target_text.strip()]
+        already_translated = [u for u in valid_units if u not in untranslated]
 
         if not already_translated:
             self._start_batch_translation(valid_units)
             return
 
-        msg_box = QMessageBox(self.host.window)
-        msg_box.setWindowTitle(tr("MainWindow", "翻訳対象の確認"))
-        msg_box.setIcon(QMessageBox.Icon.Question)
-
-        if not untranslated:
-            msg_box.setText(
-                tr("MainWindow", "選択されたすべての項目（{count} 件）はすでに翻訳済みです。\n上書きして再翻訳を実行しますか？").format(count=len(valid_units))
-            )
-            btn_overwrite = msg_box.addButton(tr("MainWindow", "再翻訳 (上書き)"), QMessageBox.ButtonRole.AcceptRole)
-            btn_cancel = msg_box.addButton(tr("MainWindow", "キャンセル"), QMessageBox.ButtonRole.RejectRole)
-            msg_box.setDefaultButton(btn_overwrite)
-            msg_box.exec()
-
-            if msg_box.clickedButton() == btn_overwrite:
-                self._start_batch_translation(valid_units)
-        else:
-            msg_box.setText(
-                tr(
-                    "MainWindow",
-                    f"選択された {len(valid_units)} 件のうち、すでに翻訳済みの項目が {len(already_translated)} 件あります。\nどのように翻訳を実行しますか？"
-                )
-            )
-            btn_overwrite = msg_box.addButton(tr("MainWindow", "すべて再翻訳 (上書き)"), QMessageBox.ButtonRole.AcceptRole)
-            btn_untranslated_only = msg_box.addButton(
-                tr("MainWindow", "未翻訳のみ翻訳 ({count}件)").format(count=len(untranslated)), QMessageBox.ButtonRole.ActionRole
-            )
-            btn_cancel = msg_box.addButton(tr("MainWindow", "キャンセル"), QMessageBox.ButtonRole.RejectRole)
-            msg_box.setDefaultButton(btn_untranslated_only)
-            msg_box.exec()
-
-            if msg_box.clickedButton() == btn_overwrite:
-                self._start_batch_translation(valid_units)
-            elif msg_box.clickedButton() == btn_untranslated_only:
-                self._start_batch_translation(untranslated)
+        workspace = self.host.active_workspace
+        dialog = RetranslationDialog([u.label for u in valid_units], len(untranslated), self.host.window)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        if workspace is None or self.host.active_workspace is not workspace or not self.host._workspace_is_alive(workspace):
+            return
+        targets = untranslated if dialog.untranslated_only else valid_units
+        self._start_batch_translation(targets, additional_instructions=dialog.additional_instructions())
 
     def _start_batch_translation_all(self) -> None:
         untranslated = [u for u in self.host.units if not is_pending_translation(u)

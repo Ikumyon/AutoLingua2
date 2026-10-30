@@ -138,6 +138,33 @@ Windows 向けのスタンドアロン配布パッケージをローカルで作
 python -m PyInstaller --noconfirm AUTOlingua2.spec
 ```
 
+### Linuxのローカル配布ビルド
+Linux配布ビルドはUbuntu 24.04（x86_64）を基準に、`AUTOlingua2.spec` から
+[共通Fcitx処理](.github/linux_fcitx.py)を実行します。ローカルでも同じspecを使います。
+既存のPython・Rust・Web・UI生成の準備に加え、以下のビルド依存が必要です。
+
+```bash
+sudo apt-get install build-essential git cmake ninja-build extra-cmake-modules libx11-dev libxcb1-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev libgl1-mesa-dev patchelf binutils
+python -m pip install aqtinstall==3.3.0
+python -m PyInstaller --noconfirm AUTOlingua2.spec
+```
+
+実際のPySide6の `qVersion()` と同じQt SDKを `build/linux-fcitx/sdk` に取得し、
+fcitx5-qt **5.1.16 / commit `115750044f3d0db16ca5859808c7da830fd1ff52`** をビルドします。
+既存SDKを使う場合は `AUTOLINGUA_QT_SDK=/path/to/Qt/6.x.y/gcc_64` を指定できます。
+異なるQt版へのフォールバックは行いません。Qtのprivate APIを使用するため同じ版が必要です。
+SDKは配布せず、生成プラグイン・実行時依存（OS側のglibcを除く）・ライセンスと
+Fcitxの対応ソースを同梱します。版・欠落・依存解決・SDK絶対パスを静的検査し、不整合はビルド失敗にします。
+開発起動ではこの処理を実行せず、入力方式の環境変数やOS側のFcitx・IBus・Wayland設定も変更しません。
+
+調査時点の公開 `v0.9.0beta` の `AUTOlingua2-linux.tar.gz` を直接確認したところ、
+`platforminputcontexts` にはIBus・Compose・Virtual Keyboardがあり、Fcitxはありませんでした。
+アーカイブのSHA-256は `0fdb23654607c84b02813266b0152dba386b1b5ee31fd513f70a5ec92e08edca` です。
+この欠落は確認済みですが、個々のOS環境での日本語入力の成否は別途実機確認が必要です。
+参考: [Qtのプラグイン配布](https://doc.qt.io/qt-6/deployment-plugins.html)、
+[FcitxとWayland](https://fcitx-im.org/wiki/Using_Fcitx_5_on_Wayland)、
+[Flathubでのバージョン・タグオブジェクト固定例](https://github.com/flathub/org.fcitx.Fcitx5/blob/master/org.fcitx.Fcitx5.yaml)。
+
 ### GitHub Actions による自動リリース
 本プロジェクトでは、バージョン管理を **Git タグ** で一元化しています。
 `vMAJOR.MINOR.PATCH` 形式のタグを push すると、CI/CD ワークフロー（`Build desktop`）が自動実行され、Windows / Linux 向けの配布成果物が生成されます。

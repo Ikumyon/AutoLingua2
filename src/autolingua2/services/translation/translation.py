@@ -61,6 +61,7 @@ class TranslationOptions:
     low_model_range: LowModelRange = LowModelRange.STANDARD
     concurrency: int = 4
     review_model: TranslationModel | None = None
+    additional_instructions: str = ""
 
 
 def tone_context(imported: ImportedTranslation, unit: UnitView) -> ToneContext:
@@ -103,6 +104,7 @@ class _Job:
     results: list[str] = field(default_factory=list)
     memory_pairs: list[tuple[str, str]] = field(default_factory=list)
     translations: dict[str, str] = field(default_factory=dict)
+    previous_translations: dict[str, str] = field(default_factory=dict)
 
     @property
     def unit(self) -> UnitView:
@@ -187,11 +189,14 @@ class TranslationService(QObject):
         tone = self.resolved_tone(units[0], options.tone, options.tone_items)
         protected = protect_group({unit.id: unit.source_text for unit in units}, options.text_context.tags)
         job = _Job(next(self._ids), workspace, tuple(units), options, tone, protected,
-                   split_sentences(protected.text, options.text_context.sentences),
+                   ((protected.text,) if options.additional_instructions else
+                    split_sentences(protected.text, options.text_context.sentences)),
                    memory_conditions(options.source_language, options.target_language, tone, options.text_context),
                    batch, self._batch_generation,
-                   any(unit.target_text.strip() or unit.state != UnitState.UNTRANSLATED for unit in units),
-                   reference=reference, reference_source=reference_source)
+                   bool(options.additional_instructions) or any(
+                       unit.target_text.strip() or unit.state != UnitState.UNTRANSLATED for unit in units),
+                   reference=reference, reference_source=reference_source,
+                   previous_translations={unit.id: unit.target_text for unit in units})
         self._jobs[job.id] = job
         for unit in units:
             workspace.records[unit.id].translating = True
@@ -200,12 +205,14 @@ class TranslationService(QObject):
 
     @observe_async("翻訳・AI校閲", lambda self: self.busy,
                    errors=("translation_failed", "memory_failed"), cancelled=("batch_stopped",))
-    def start_batch(self, workspace: Workspace, targets: list[UnitView], classification: ClassificationResult | None) -> None:
+    def start_batch(self, workspace: Workspace, targets: list[UnitView], classification: ClassificationResult | None,
+                    *, additional_instructions: str = "") -> None:
         if self.running:
             self.stop()
         options = self._get_options()
         if options is None or not self._workspace_is_alive(workspace):
             return
+        options = replace(options, additional_instructions=additional_instructions.strip())
         self._batch_generation += 1
         self._batch_jobs.clear()
         self._batch_results.clear()
@@ -225,7 +232,8 @@ class TranslationService(QObject):
         try:
             for unit in selected:
                 tone = self.resolved_tone(unit, options.tone, options.tone_items)
-                buckets.setdefault((options.text_context.tags.analyze(unit.source_text)[0], tone_identity(tone)), []).append(unit)
+                identity = unit.id if options.additional_instructions else options.text_context.tags.analyze(unit.source_text)[0]
+                buckets.setdefault((identity, tone_identity(tone)), []).append(unit)
             unit_jobs: dict[str, str] = {}
             for units in buckets.values():
                 representative = next((unit for unit in units if unit.id == exact_representatives.get(unit.id)), units[0])
@@ -237,7 +245,7 @@ class TranslationService(QObject):
             jobs_by_group: dict[str, set[str]] = {}
             for unit in selected:
                 jobs_by_group.setdefault(exact_representatives.get(unit.id, unit.id), set()).add(unit_jobs[unit.id])
-            if classification is not None:
+            if classification is not None and not options.additional_instructions:
                 for group in classification.groups:
                     if group.category != SourceCategory.SIMILAR:
                         continue
@@ -269,8 +277,9 @@ class TranslationService(QObject):
 
     @observe_async("翻訳・AI校閲", lambda self: self.busy,
                    errors=("translation_failed", "memory_failed"), cancelled=("batch_stopped",))
-    def translate_single(self, workspace: Workspace, unit: UnitView, options: TranslationOptions) -> None:
-        self._enqueue_single(workspace, unit, options)
+    def translate_single(self, workspace: Workspace, unit: UnitView, options: TranslationOptions,
+                         *, additional_instructions: str = "") -> None:
+        self._enqueue_single(workspace, unit, replace(options, additional_instructions=additional_instructions.strip()))
         self._pump()
 
     def _enqueue_single(self, workspace: Workspace, unit: UnitView, options: TranslationOptions,
@@ -411,7 +420,8 @@ class TranslationService(QObject):
                              if job.workspace.records[unit.id].notes.review)
             key_data = [context.adapter_id, context.game_id, job.options.source_language, job.options.target_language,
                               job.conditions, request_source, structure, job.reference, changes, model.provider.id, model.model,
-                              job.id if job.force else None, feedback]
+                              job.id if job.force else None, feedback, job.options.additional_instructions,
+                              job.previous_translations[job.unit.id] if job.options.additional_instructions else ""]
             key = json.dumps(key_data, ensure_ascii=False, sort_keys=True)
             if key in self._cache:
                 self.usage_counts["temporary_cache"] += 1
@@ -462,7 +472,10 @@ class TranslationService(QObject):
                                        target_language_name=job.options.target_language_name,
                                        tone=job.tone.prompt if job.tone is not None else None,
                                        reference_translation=reference, changes=changes, terms=terms, structured=True,
-                                       review_feedback=feedback)
+                                       review_feedback=feedback,
+                                       additional_instructions=job.options.additional_instructions,
+                                       current_translation=(job.previous_translations[job.unit.id]
+                                                            if job.options.additional_instructions else ""))
         except (ValueError, RuntimeError) as exc:
             self._fail_job(job, str(exc))
         return True
@@ -575,6 +588,12 @@ class TranslationService(QObject):
                 "approvedは良ければtrue、悪ければfalse。悪い場合のreviewには問題箇所と理由を必ず記載してください。"
                 "指定以外のフィールドは返さないでください。"
             )
+            if job.options.additional_instructions:
+                payload["additional_instructions"] = job.options.additional_instructions
+                prompt += (
+                    "additional_instructionsは今回のユーザーの修正指示です。表現について用語や口調と競合する場合は"
+                    "この指示を優先して評価してください。翻訳先言語・保護タグの制約は維持してください。"
+                )
             self.usage_counts["review_requests"] += 1
             self.client.request_chat(request_id, translator,
                                      [ChatMessage("user", json.dumps(payload, ensure_ascii=False))], prompt, [], [])
@@ -644,7 +663,8 @@ class TranslationService(QObject):
         protected_translation = "".join(job.results)
         context = job.options.text_context
         try:
-            if self._store_memory and (reviews is None or all(approved for approved, _ in reviews.values())):
+            if (self._store_memory and not job.options.additional_instructions
+                    and (reviews is None or all(approved for approved, _ in reviews.values()))):
                 self.memory.store(context.adapter_id, context.game_id, job.options.source_language, job.options.target_language,
                                   job.memory_pairs, job.conditions, user_confirmed=False)
         except TranslationMemoryError as exc:
@@ -689,10 +709,11 @@ class TranslationService(QObject):
                 message = error if failed is job else "参考元の翻訳に失敗しました。"
                 error_state = state if failed is job else UnitState.TRANSLATION_ERROR
                 label = "校閲エラー" if error_state == UnitState.REVIEW_ERROR else "翻訳エラー"
-                unit.target_text = f"［{label}］{message}"
-                unit.state = error_state
-                record.pending_confirmation = None
-                record.tone = None
+                if not failed.previous_translations[unit.id].strip():
+                    unit.target_text = f"［{label}］{message}"
+                    unit.state = error_state
+                    record.pending_confirmation = None
+                    record.tone = None
                 record.translating = False
                 self.activity_changed.emit(failed.workspace, unit, False)
                 self.translation_failed.emit(unit, message, failed.batch)
