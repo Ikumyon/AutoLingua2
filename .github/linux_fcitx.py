@@ -222,6 +222,10 @@ def verify(core: Path, sdk: Path) -> None:
         search.append(internal)
         for name in needed:
             resolved = next((folder / name for folder in search if (folder / name).is_file()), None)
+            # On the supported Ubuntu x86_64 target, glibc provides the ELF loader.
+            if resolved is None and name == "ld-linux-x86-64.so.2":
+                require((Path("/lib64") / name).is_file(), f"Missing OS runtime dependency: {name}")
+                continue
             if resolved is None and not dylib.include_library(name):
                 require(bindepend.resolve_library_path(name) is not None,
                         f"Missing OS runtime dependency: {name}")
